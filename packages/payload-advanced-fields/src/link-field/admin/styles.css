@@ -1,0 +1,23 @@
+.link-field-modal.drawer .drawer__content {
+  width: min(600px, calc(100vw - (2 * var(--gutter-h)))) !important;
+}
+
+.link-field-modal.drawer .drawer__content-children {
+  width: 100%;
+}
+
+.link-field-modal .drawer__content-children {
+  padding: 1.5rem 1.5rem 0;
+}
+
+.link-field-trigger-wrap {
+  display: inline-flex;
+  width: fit-content;
+  align-self: flex-start;
+}
+
+.link-field-trigger {
+  width: fit-content !important;
+  display: inline-flex !important;
+  align-self: flex-start;
+}

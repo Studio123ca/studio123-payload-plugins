@@ -1,0 +1,16 @@
+{
+  "name": "studio123-payload-plugins",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": "^18.20.2 || >=20.9.0"
+  }
+}
