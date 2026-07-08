@@ -9,11 +9,19 @@ const fetchInternalDoc = async (req: PayloadRequest | undefined, relationTo: str
   if (!req) return null;
 
   try {
+    const nestedReq = {
+      ...req,
+      context: {
+        ...(req.context ?? {}),
+        skipLinkHydration: true,
+      },
+    };
+
     return await req.payload.findByID({
       collection: relationTo,
       id,
       depth: 0,
-      req,
+      req: nestedReq as PayloadRequest,
       overrideAccess: true,
     });
   } catch {
@@ -148,6 +156,10 @@ export function createLinkFieldHooks(collectionSlugs?: string[], resolveInternal
   };
 
   const hydrateHook: FieldHook = async ({ req, value }) => {
+    if (req?.context && (req.context as Record<string, unknown>).skipLinkHydration) {
+      return value ?? null;
+    }
+
     // Get collections at hook EXECUTION time, not definition time
     const normalizedCollections = filterCollections(collectionSlugs);
     
