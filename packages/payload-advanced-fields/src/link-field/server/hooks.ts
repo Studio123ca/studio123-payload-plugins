@@ -1,7 +1,7 @@
 import type { FieldHook, PayloadRequest } from 'payload';
 import { getAdvancedFieldsConfig, getLinkCollections } from '../../config.js';
 import { getLinkHref } from '../shared/getLinkHref.js';
-import type { LinkCollectionOption, LinkFieldConfig, LinkHrefResolver, LinkValue } from '../shared/types.js';
+import type { LinkCollectionOption, LinkHrefResolver, LinkValue } from '../shared/types.js';
 import { normalizeLinkValue } from '../shared/validateLink.js';
 import { DEFAULT_LINK_COLLECTIONS } from '../shared/constants.js';
 
@@ -27,6 +27,15 @@ const fetchInternalDoc = async (req: PayloadRequest | undefined, relationTo: str
   } catch {
     return null;
   }
+};
+
+const trim = (value?: string | null) => (typeof value === 'string' ? value.trim() : '');
+
+const appendAnchor = (url: string | null, anchor?: string | null) => {
+  if (!url) return url;
+  const cleaned = trim(anchor).replace(/^#/, '');
+  if (!cleaned) return url;
+  return `${url}#${cleaned}`;
 };
 
 const getPrimitiveInternalValue = (value: LinkValue['internal']): string | number | null => {
@@ -95,7 +104,7 @@ const resolveStoredHref = async (
           req,
         });
 
-        if (resolvedHref) return resolvedHref;
+        if (resolvedHref) return appendAnchor(resolvedHref, value.anchor);
       }
 
        // Fall back to collection's generateURL
@@ -108,14 +117,14 @@ const resolveStoredHref = async (
            locale,
            req,
          });
-         return generatedHref;
+         return appendAnchor(generatedHref, value.anchor);
        }
     } else {
       // collection not found
     }
   }
 
-  return getLinkHref(value, collections, { req }) || value.url || null;
+  return getLinkHref(value, collections, { req }) || appendAnchor(value.url || null, value.anchor) || null;
 };
 
 const stripInternalDoc = (value: LinkValue) => {
@@ -139,7 +148,7 @@ const sanitizeCollections = (collections?: LinkCollectionOption[]) => {
   return collections;
 };
 
-const filterCollections = (collectionSlugs?: LinkFieldConfig['collectionSlugs']) => {
+const filterCollections = (collectionSlugs?: string[]) => {
   const globalCollections = sanitizeCollections(getLinkCollections());
   if (!collectionSlugs || collectionSlugs.length === 0) return globalCollections;
   return globalCollections.filter(collection => collectionSlugs.includes(collection.slug));

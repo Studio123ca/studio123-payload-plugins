@@ -4,6 +4,7 @@ import { Button } from '@payloadcms/ui/elements/Button';
 import { Drawer } from '@payloadcms/ui/elements/Drawer';
 import { useModal } from '@payloadcms/ui/elements/Modal';
 import { CheckboxInput } from '@payloadcms/ui/fields/Checkbox';
+import { FieldError } from '@payloadcms/ui/fields/FieldError';
 import { RelationshipInput } from '@payloadcms/ui/fields/Relationship';
 import { SelectInput } from '@payloadcms/ui/fields/Select';
 import { TextInput } from '@payloadcms/ui/fields/Text';
@@ -21,6 +22,8 @@ type Props = {
   onSave: (value: LinkValue | null) => void;
   value: LinkValue | null;
 };
+
+type DrawerErrors = Partial<Record<'email' | 'external' | 'internal' | 'label' | 'phone', string>>;
 
 const emptyDraft = (defaultType: LinkValue['type']): LinkValue => ({
   type: defaultType,
@@ -48,14 +51,30 @@ const getInternalValueId = (value: unknown): string | number | null => {
 function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel, onSave, value }: Props) {
   const { closeModal } = useModal();
   const [draft, setDraft] = useState<LinkValue>(value ?? emptyDraft(defaultType));
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<DrawerErrors>({});
   const lastDocTitleRef = useRef<string | null>(draft.internal?.title ?? null);
 
   const relationTo = collectionSlugs ?? [];
+  const paths = {
+    email: `${modalSlug}.email`,
+    external: `${modalSlug}.external`,
+    internal: `${modalSlug}.internal.value`,
+    label: `${modalSlug}.label`,
+    phone: `${modalSlug}.phone`,
+  };
   const relationshipValue = draft.internal ? { 
     value: draft.internal.value,
     relationTo: draft.internal.relationTo 
   } : null;
+
+  const clearError = (key: keyof DrawerErrors) => {
+    setErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (draft.type !== 'internal') return;
@@ -105,25 +124,37 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
   }, [draft.internal, draft.label, draft.type]);
 
   const handleSave = () => {
-    // Basic validation on the client side
+    const nextErrors: DrawerErrors = {};
+
+    if (!draft.label?.trim()) {
+      nextErrors.label = 'Enter a label.';
+    }
+
     if (draft.type === 'external' && !draft.external) {
-      setError('Enter a URL.');
-      return;
+      nextErrors.external = 'Enter a URL.';
     }
 
     if (draft.type === 'email') {
       const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email || '');
       if (!isEmail) {
-        setError('Please enter a valid email address.');
-        return;
+        nextErrors.email = draft.email?.trim() ? 'Please enter a valid email address.' : 'Enter an email address.';
       }
     }
 
     if (draft.type === 'phone' && !draft.phone) {
-      setError('Enter a phone number.');
+      nextErrors.phone = 'Enter a phone number.';
+    }
+
+    if (draft.type === 'internal' && !draft.internal?.value) {
+      nextErrors.internal = 'Select a destination.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
       return;
     }
 
+    setErrors({});
     onSave(draft);
     closeModal(modalSlug);
   };
@@ -142,11 +173,17 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
   return (
     <div className="field-type">
       <div style={{ display: 'grid', gap: '1rem' }}>
-        <TextInput
+          <TextInput
+          Error={<FieldError message={errors.label} path={paths.label} showError={Boolean(errors.label)} />}
           label="Label"
-          path={`${modalSlug}.label`}
+          path={paths.label}
+          required
+          showError={Boolean(errors.label)}
           value={draft.label ?? ''}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft(prev => ({ ...prev, label: event.target.value }))}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            clearError('label');
+            setDraft(prev => ({ ...prev, label: event.target.value }));
+          }}
         />
 
         <SelectInput
@@ -180,10 +217,12 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
                 label="Destination"
                 localized={false}
                 relationTo={relationTo}
-                required={false}
-                showError={false}
+                required
+                Error={<FieldError message={errors.internal} path={paths.internal} showError={Boolean(errors.internal)} />}
+                showError={Boolean(errors.internal)}
                 value={relationshipValue as ValueWithRelation | null}
                 onChange={(nextValue: ValueWithRelation | null) => {
+                  clearError('internal');
                   if (!nextValue) {
                     setDraft(prev => ({
                       ...prev,
@@ -241,31 +280,49 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
 
         {draft.type === 'external' && (
           <TextInput
+            Error={<FieldError message={errors.external} path={paths.external} showError={Boolean(errors.external)} />}
             label="URL"
-            path={`${modalSlug}.external`}
+            path={paths.external}
             placeholder="https://example.com"
+            required
+            showError={Boolean(errors.external)}
             value={draft.external ?? ''}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft(prev => ({ ...prev, external: event.target.value }))}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              clearError('external');
+              setDraft(prev => ({ ...prev, external: event.target.value }));
+            }}
           />
         )}
 
         {draft.type === 'email' && (
           <TextInput
+            Error={<FieldError message={errors.email} path={paths.email} showError={Boolean(errors.email)} />}
             label="Email"
-            path={`${modalSlug}.email`}
+            path={paths.email}
             placeholder="hello@example.com"
+            required
+            showError={Boolean(errors.email)}
             value={draft.email ?? ''}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft(prev => ({ ...prev, email: event.target.value }))}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              clearError('email');
+              setDraft(prev => ({ ...prev, email: event.target.value }));
+            }}
           />
         )}
 
         {draft.type === 'phone' && (
           <TextInput
+            Error={<FieldError message={errors.phone} path={paths.phone} showError={Boolean(errors.phone)} />}
             label="Phone"
-            path={`${modalSlug}.phone`}
+            path={paths.phone}
             placeholder="+1 555 555 5555"
+            required
+            showError={Boolean(errors.phone)}
             value={draft.phone ?? ''}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft(prev => ({ ...prev, phone: event.target.value }))}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              clearError('phone');
+              setDraft(prev => ({ ...prev, phone: event.target.value }));
+            }}
           />
         )}
 
@@ -277,7 +334,6 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
           readOnly={false}
         />
 
-        {error && <div className="field-error">{error}</div>}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1.5rem' }}>

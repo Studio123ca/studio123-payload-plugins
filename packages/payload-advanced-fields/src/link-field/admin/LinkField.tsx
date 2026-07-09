@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from './LinkField.client.js';
+export { default, default as LinkField } from './LinkField.client.js';

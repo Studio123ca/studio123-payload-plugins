@@ -70,6 +70,10 @@ export function validateLink(
     return options.required ? 'A link is required.' : true;
   }
 
+  if (!normalized.label) {
+    return 'Enter a label.';
+  }
+
   if (normalized.type === 'external') {
     if (!normalized.external) return 'Enter a URL.';
     if (!isURL(normalized.external)) {

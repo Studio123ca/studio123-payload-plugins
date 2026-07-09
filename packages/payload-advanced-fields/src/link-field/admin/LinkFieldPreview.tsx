@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@payloadcms/ui/elements/Button';
+import { RxExternalLink } from 'react-icons/rx';
 import type { LinkValue } from '../shared/types.js';
 
 type Props = {
@@ -13,10 +14,15 @@ type Props = {
 export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, value }: Props) {
   const url = value?.url?.trim() || null;
   const label = value?.label?.trim() ?? '';
+  const opensInNewTab = Boolean(value?.newTab);
   const hasDestination = Boolean(value);
+  const hasExternalSelected = value?.type === 'external' && value?.external?.trim();
+  const hasEmailSelected = value?.type === 'email' && value?.email?.trim();
+  const hasPhoneSelected = value?.type === 'phone' && value?.phone?.trim();
   const hasInternalSelected = value?.type === 'internal' && value?.internal?.value;
-  const hasComputedUrl = hasInternalSelected && url;
+  const hasDestinationValue = Boolean(hasInternalSelected || hasExternalSelected || hasEmailSelected || hasPhoneSelected);
   const hasActions = Boolean(onEdit || (hasDestination && onClear));
+  const previewText = url || (hasDestinationValue ? '(Pending changes)' : 'No destination set.');
 
   return (
     <div
@@ -42,11 +48,26 @@ export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, value }: Pr
             {label}
           </div>
         ) : null}
-        {!hasInternalSelected || hasComputedUrl ? (
-          <div style={{ color: 'var(--theme-elevation-500)', wordBreak: 'break-all' }}>
-            {url || 'No destination set.'}
-          </div>
-        ) : null}
+        <div style={{ color: 'var(--theme-elevation-500)', wordBreak: 'break-all' }}>
+          {url ? (
+            <a
+              href={url}
+              rel={opensInNewTab ? 'noopener noreferrer' : undefined}
+              style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+              target={opensInNewTab ? '_blank' : undefined}
+            >
+              {url}
+              {opensInNewTab ? (
+                <RxExternalLink
+                  aria-hidden="true"
+                  focusable="false"
+                  style={{ display: 'inline-block', marginLeft: '0.35em', verticalAlign: '-0.1em' }}
+                />
+              ) : null}
+              {opensInNewTab ? <span className="sr-only"> (opens in a new tab)</span> : null}
+            </a>
+          ) : previewText}
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
         {hasActions ? (

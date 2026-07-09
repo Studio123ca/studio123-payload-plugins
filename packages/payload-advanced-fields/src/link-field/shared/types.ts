@@ -1,4 +1,4 @@
-import type { CollectionSlug, PayloadRequest } from 'payload';
+import type { CollectionSlug, JSONField, PayloadComponent, PayloadRequest } from 'payload';
 
 export type LinkType = 'internal' | 'external' | 'email' | 'phone';
 
@@ -44,14 +44,35 @@ export type LinkInternalHrefResolverArgs = {
 
 export type LinkHrefResolver = (args: LinkInternalHrefResolverArgs) => string | Promise<string>;
 
-export type LinkFieldConfig = {
-  collectionSlugs?: CollectionSlug[];
-  defaultType?: LinkType;
-  label?: string;
-  name?: string;
-  required?: boolean;
-  resolveInternalHref?: LinkHrefResolver;
+export type LinkFieldClientComponent = {
+	collectionSlugs?: CollectionSlug[];
+	defaultType?: LinkType;
+	localized?: boolean;
+	required?: boolean;
 };
+
+export type LinkFieldErrorComponent = {
+	path: string;
+	showError: boolean;
+};
+
+export type LinkFieldLabelComponent = any;
+
+/**
+ * LinkField - A custom JSON field that renders a link editor in the admin UI
+ * Extends Payload's JSONField with link-specific properties
+ */
+export type LinkField = {
+	type: 'json';
+	collectionSlugs?: CollectionSlug[];
+	defaultType?: LinkType;
+	resolveInternalHref?: LinkHrefResolver;
+	admin?: JSONField['admin'] & {
+		components?: {
+			Field?: PayloadComponent<any>;
+		};
+	};
+} & Omit<JSONField, 'admin' | 'type'>;
 
 export type LinkFieldPluginConfig = {
   collections?: LinkCollectionOption[];

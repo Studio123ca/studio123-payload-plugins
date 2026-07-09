@@ -1,44 +1,45 @@
-import type { Field } from 'payload';
+import type { CodeField, CodeLanguage } from '../shared/types.js';
 
-export type CodeFieldConfig = {
-  label?: string;
-  height?: number;
-  language?: 'html' | 'text';
-  description?: string;
-  name?: string;
-  required?: boolean;
+export type CodeFieldConfig = Partial<Omit<CodeField, 'type'>> & {
+	height?: number;
+	language?: CodeLanguage;
 };
 
-export type CodeFieldClientProps = {
-  height?: number;
-  language?: 'html' | 'text';
-};
+export type { CodeField } from '../shared/types.js';
 
-export const codeField = ({
-  label = 'Code',
-  description,
-  height = 360,
-  language = 'html',
-  name = 'code',
-  required = true,
-}: CodeFieldConfig = {}): Field => {
-  return {
-    name,
-    label,
-    type: 'textarea',
-    required,
-    admin: {
-      description,
-      components: {
-        Field: {
-          path: '@studio123/payload-advanced-fields/client',
-          exportName: 'CodeField',
-          clientProps: {
-            height,
-            language,
-          },
-        },
-      },
-    },
-  };
+export const codeField = (config: CodeFieldConfig = {}): CodeField => {
+	const {
+		name = 'code',
+		label = 'Code',
+		height = 360,
+		language = 'html',
+		localized = false,
+		required = true,
+		admin,
+		...rest
+	} = config;
+
+	return {
+		name,
+		label,
+		type: 'textarea',
+		localized,
+		required,
+		admin: {
+			...admin,
+			components: {
+				Field: {
+					path: '@studio123/payload-advanced-fields/code-field/client',
+					exportName: 'CodeField',
+					clientProps: {
+						height,
+						language,
+						localized,
+					},
+				},
+				...(admin?.components || {}),
+			},
+		},
+		...rest,
+	} as CodeField;
 };

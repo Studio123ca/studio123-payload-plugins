@@ -1,7 +1,7 @@
-import type { Field } from 'payload';
-import { getAdvancedFieldsConfig, getLinkCollections } from '../../config.js';
+import type { getAdvancedFieldsConfig, getLinkCollections } from '../../config.js';
+import { getAdvancedFieldsConfig as getAdvancedFieldsConfigDefault, getLinkCollections as getLinkCollectionsDefault } from '../../config.js';
 import { DEFAULT_LINK_COLLECTIONS } from '../shared/constants.js';
-import type { LinkCollectionOption, LinkFieldConfig, LinkValue } from '../shared/types.js';
+import type { LinkField, LinkCollectionOption, LinkType, LinkValue, LinkHrefResolver } from '../shared/types.js';
 import { validateLink } from '../shared/validateLink.js';
 import { createLinkFieldHooks } from './hooks.js';
 
@@ -22,8 +22,8 @@ const sanitizeCollections = (collections?: LinkCollectionOption[]) => {
   return collections;
 };
 
-const filterCollections = (collectionSlugs?: LinkFieldConfig['collectionSlugs']) => {
-  const globalCollections = sanitizeCollections(getLinkCollections());
+const filterCollections = (collectionSlugs?: string[], getLinkCollectionsFn?: typeof getLinkCollections) => {
+  const globalCollections = sanitizeCollections(getLinkCollectionsFn?.());
   if (!collectionSlugs || collectionSlugs.length === 0) return globalCollections;
   return globalCollections.filter(collection => collectionSlugs.includes(collection.slug));
 };
@@ -32,45 +32,68 @@ const toClientCollection = (collection: LinkCollectionOption): { slug: string } 
   slug: collection.slug,
 });
 
+export type LinkFieldConfig = Partial<Omit<LinkField, 'type'>> & {
+  collectionSlugs?: string[];
+  defaultType?: LinkType;
+  resolveInternalHref?: LinkHrefResolver;
+};
+
+export type { LinkField } from '../shared/types.js';
+
 export const linkField = (
-  {
+  config: LinkFieldConfig = {},
+  getAdvancedFieldsConfigFn?: typeof getAdvancedFieldsConfig,
+  getLinkCollectionsFn?: typeof getLinkCollections,
+): LinkField => {
+  const {
     collectionSlugs,
     defaultType,
     label = 'Link',
+    localized = false,
     name = 'link',
     required = false,
     resolveInternalHref,
-  }: LinkFieldConfig = {},
-): Field => {
-  const globalConfig = getAdvancedFieldsConfig().link;
+    admin,
+    ...rest
+  } = config;
+
+  const getConfigFn = getAdvancedFieldsConfigFn || getAdvancedFieldsConfigDefault;
+  const getCollectionsFn = getLinkCollectionsFn || getLinkCollectionsDefault;
+
+  const globalConfig = getConfigFn().link;
   const normalizedDefaultType = defaultType ?? globalConfig?.defaultType ?? 'external';
 
   return {
     name,
     label,
     type: 'json',
+    localized,
     defaultValue: { ...defaultValue, type: normalizedDefaultType },
     validate: value => {
       // Get collections at validate time, not at field definition time
-      const normalizedCollections = filterCollections(collectionSlugs);
+      const normalizedCollections = filterCollections(collectionSlugs, getCollectionsFn);
       return validateLink(value as LinkValue | null | undefined, { collections: normalizedCollections, required });
     },
     admin: {
+      ...admin,
       components: {
         Field: {
-          path: '@studio123/payload-advanced-fields/client',
+          path: '@studio123/payload-advanced-fields/link-field/client',
           exportName: 'LinkField',
           clientProps: {
-            // Pass collectionSlugs to client - it will resolve from global config at runtime
             collectionSlugs: collectionSlugs,
             defaultType: normalizedDefaultType,
+            localized,
+            required,
           },
         },
+        ...(admin?.components || {}),
       },
     },
     hooks: (() => {
       // Pass the collectionSlugs, not the collections - hooks will resolve at runtime
       return createLinkFieldHooks(collectionSlugs, resolveInternalHref ?? globalConfig?.resolveInternalHref);
     })(),
-  };
+    ...rest,
+  } as LinkField;
 };

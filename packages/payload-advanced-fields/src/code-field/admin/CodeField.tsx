@@ -1,3 +1,3 @@
 'use client';
 
-export { default } from './CodeField.client.js';
+export { default, default as CodeField } from './CodeField.client.js';
