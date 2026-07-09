@@ -20,27 +20,27 @@
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
     },
-    "./code-field": {
+    "./code": {
       "types": "./dist/code-field/index.d.ts",
       "default": "./dist/code-field/index.js"
     },
-    "./code-field/client": {
+    "./code/client": {
       "types": "./dist/code-field/client.d.ts",
       "default": "./dist/code-field/client.js"
     },
-    "./link-field": {
+    "./link": {
       "types": "./dist/link-field/index.d.ts",
       "default": "./dist/link-field/index.js"
     },
-    "./link-field/client": {
+    "./link/client": {
       "types": "./dist/link-field/client.d.ts",
       "default": "./dist/link-field/client.js"
     },
-    "./color-field": {
+    "./color": {
       "types": "./dist/color-field/index.d.ts",
       "default": "./dist/color-field/index.js"
     },
-    "./color-field/client": {
+    "./color/client": {
       "types": "./dist/color-field/client.d.ts",
       "default": "./dist/color-field/client.js"
     },

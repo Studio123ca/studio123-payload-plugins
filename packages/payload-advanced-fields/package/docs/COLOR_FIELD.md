@@ -5,7 +5,7 @@ A flexible color picker field supporting 10 different picker interfaces (Sketch,
 ## Import
 
 ```typescript
-import { colorField } from '@studio123/payload-advanced-fields/color-field';
+import { colorField } from '@studio123/payload-advanced-fields/color';
 ```
 
 ## Basic Configuration
@@ -21,7 +21,7 @@ import { colorField } from '@studio123/payload-advanced-fields/color-field';
 ## Full Configuration
 
 ```typescript
-import { colorField } from '@studio123/payload-advanced-fields/color-field';
+import { colorField } from '@studio123/payload-advanced-fields/color';
 
 colorField({
   name: 'brandColor',
@@ -155,7 +155,7 @@ The field stores colors as JSON objects with all supported color formats:
 
 ```typescript
 import { GlobalConfig } from 'payload';
-import { colorField } from '@studio123/payload-advanced-fields/color-field';
+import { colorField } from '@studio123/payload-advanced-fields/color';
 
 export const SiteOptions: GlobalConfig = {
   slug: 'site-options',

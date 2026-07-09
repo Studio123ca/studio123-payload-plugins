@@ -77,16 +77,14 @@ export const linkField = (
     admin: {
       ...admin,
       components: {
-        Field: {
-          path: '@studio123/payload-advanced-fields/link-field/client',
-          exportName: 'LinkField',
-          clientProps: {
-            collectionSlugs: collectionSlugs,
-            defaultType: normalizedDefaultType,
-            localized,
-            required,
-          },
-        },
+				Field: {
+					path: '@studio123/payload-advanced-fields/link/client',
+					exportName: 'LinkField',
+					clientProps: {
+						collectionSlugs: collectionSlugs,
+						defaultType: normalizedDefaultType,
+					},
+				},
         ...(admin?.components || {}),
       },
     },

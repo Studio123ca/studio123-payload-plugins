@@ -5,7 +5,7 @@ A syntax-highlighted code editor field powered by CodeMirror with support for mu
 ## Import
 
 ```typescript
-import { codeField } from '@studio123/payload-advanced-fields/code-field';
+import { codeField } from '@studio123/payload-advanced-fields/code';
 ```
 
 ## Basic Configuration
@@ -21,7 +21,7 @@ import { codeField } from '@studio123/payload-advanced-fields/code-field';
 ## Full Configuration
 
 ```typescript
-import { codeField } from '@studio123/payload-advanced-fields/code-field';
+import { codeField } from '@studio123/payload-advanced-fields/code';
 
 codeField({
   name: 'htmlCode',
@@ -55,7 +55,7 @@ codeField({
 
 ```typescript
 import { CollectionConfig } from 'payload';
-import { codeField } from '@studio123/payload-advanced-fields/code-field';
+import { codeField } from '@studio123/payload-advanced-fields/code';
 
 export const Pages: CollectionConfig = {
   slug: 'pages',

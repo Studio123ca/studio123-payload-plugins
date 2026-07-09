@@ -6,27 +6,15 @@ import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
 import { FieldError } from '@payloadcms/ui/fields/FieldError';
 import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
 import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
+import type { JSONFieldClientProps } from 'payload';
 import type { LinkType, LinkValue } from '../shared/types.js';
 import { LinkFieldPreview } from './LinkFieldPreview.js';
 import { LinkFieldModal } from './LinkFieldModal.js';
 
-type Props = {
-	field: {
-		admin?: {
-			description?: string;
-			readOnly?: boolean;
-		};
-		label?: string;
-		localized?: boolean;
-		name: string;
-		required?: boolean;
-	};
-	path: string;
-	label?: string;
+type Props = JSONFieldClientProps & {
 	collectionSlugs?: string[];
 	defaultType?: LinkType;
-	localized?: boolean;
-	required?: boolean;
+	label?: string;
 };
 
 const resolveLocalizedLabel = (value: unknown, fallback: string) => {
@@ -39,7 +27,7 @@ const resolveLocalizedLabel = (value: unknown, fallback: string) => {
 };
 
 export function LinkField(props: Props) {
-	const { collectionSlugs, defaultType = 'external', field, label, localized, path, required } = props;
+	const { collectionSlugs, defaultType = 'external', field, label, path } = props;
 	const { disabled, showError, value, setValue } = useField<LinkValue | null>({ potentiallyStalePath: path });
 	const { openModal } = useModal();
 
@@ -47,8 +35,8 @@ export function LinkField(props: Props) {
 	const fieldLabel = resolveLocalizedLabel(label || field.label, field.name);
 	const description = resolveLocalizedLabel(field.admin?.description, '');
 	const modalSlug = `link-field-${path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-	const isRequired = required ?? field.required ?? false;
-	const isLocalized = localized ?? field.localized ?? false;
+	const isRequired = Boolean(field.required);
+	const isLocalized = Boolean(field.localized);
 	const className = [fieldBaseClass, 'link', showError && 'error', disabled && 'read-only'].filter(Boolean).join(' ');
 
 	return (

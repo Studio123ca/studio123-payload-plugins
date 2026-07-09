@@ -7,27 +7,14 @@ import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
 import { FieldError } from '@payloadcms/ui/fields/FieldError';
 import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
 import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
+import type { TextareaFieldClientProps } from 'payload';
 
 export type CodeFieldClientProps = {
 	height?: number;
 	language?: 'html' | 'text';
-	localized?: boolean;
 };
 
-type Props = CodeFieldClientProps & {
-	field: {
-		admin?: {
-			description?: unknown;
-			readOnly?: boolean;
-		};
-		label?: unknown;
-		localized?: boolean;
-		name: string;
-		required?: boolean;
-	};
-	path: string;
-	readOnly?: boolean;
-};
+type Props = TextareaFieldClientProps & CodeFieldClientProps;
 
 const resolveLocalizedLabel = (value: unknown, localeCode: string, fallback: string) => {
 	if (typeof value === 'string') return value;
@@ -48,12 +35,11 @@ const CodeField = ({
 	readOnly,
 	height = 360,
 	language = 'html',
-	localized,
 }: Props) => {
 	const { value = '', setValue, showError, disabled } = useField<string>({ path });
 	const label = resolveLocalizedLabel(field.label, 'en', field.name);
 	const description = resolveLocalizedLabel(field.admin?.description, 'en', '');
-	const isLocalized = localized ?? field.localized ?? false;
+	const isLocalized = Boolean(field.localized);
 	const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
 	const extensions = language === 'html' ? [html()] : [];
 	const className = [fieldBaseClass, 'textarea', showError && 'error', isReadOnly && 'read-only'].filter(Boolean).join(' ');

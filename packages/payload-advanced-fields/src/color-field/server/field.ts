@@ -52,7 +52,7 @@ export const colorField = (config: ColorFieldConfig = {}): ColorField => {
 			...admin,
 			components: {
 				Field: {
-					path: '@studio123/payload-advanced-fields/color-field/client',
+					path: '@studio123/payload-advanced-fields/color/client',
 					exportName: 'ColorField',
 					clientProps: {
 						pickerType,
@@ -61,7 +61,6 @@ export const colorField = (config: ColorFieldConfig = {}): ColorField => {
 						disableAlpha,
 						swatchRadius,
 						swatchSize,
-						localized,
 					},
 				},
 				...(admin?.components || {}),

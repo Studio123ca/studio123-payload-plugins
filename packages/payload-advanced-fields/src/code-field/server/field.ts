@@ -13,7 +13,6 @@ export const codeField = (config: CodeFieldConfig = {}): CodeField => {
 		label = 'Code',
 		height = 360,
 		language = 'html',
-		localized = false,
 		required = true,
 		admin,
 		...rest
@@ -23,18 +22,16 @@ export const codeField = (config: CodeFieldConfig = {}): CodeField => {
 		name,
 		label,
 		type: 'textarea',
-		localized,
 		required,
 		admin: {
 			...admin,
 			components: {
 				Field: {
-					path: '@studio123/payload-advanced-fields/code-field/client',
+					path: '@studio123/payload-advanced-fields/code/client',
 					exportName: 'CodeField',
 					clientProps: {
 						height,
 						language,
-						localized,
 					},
 				},
 				...(admin?.components || {}),

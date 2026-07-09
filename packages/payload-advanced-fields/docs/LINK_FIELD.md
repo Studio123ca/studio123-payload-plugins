@@ -5,7 +5,7 @@ A comprehensive link field supporting internal Payload relationships and externa
 ## Import
 
 ```typescript
-import { linkField } from '@studio123/payload-advanced-fields/link-field';
+import { linkField } from '@studio123/payload-advanced-fields/link';
 ```
 
 ## Basic Configuration
@@ -20,7 +20,7 @@ import { linkField } from '@studio123/payload-advanced-fields/link-field';
 ## Full Configuration
 
 ```typescript
-import { linkField } from '@studio123/payload-advanced-fields/link-field';
+import { linkField } from '@studio123/payload-advanced-fields/link';
 
 linkField({
   name: 'navigationLink',
@@ -103,7 +103,7 @@ advancedFieldsPlugin({
 
 ```typescript
 import { CollectionConfig } from 'payload';
-import { linkField } from '@studio123/payload-advanced-fields/link-field';
+import { linkField } from '@studio123/payload-advanced-fields/link';
 
 export const Menus: CollectionConfig = {
   slug: 'menus',

@@ -31,9 +31,9 @@ npm install @studio123/payload-advanced-fields
 
 | Field | Docs | Import | Summary |
 |---|---|---|---|
-| Color | [Documentation](docs/COLOR_FIELD.md) | `@studio123/payload-advanced-fields/color-field` | Color picker field with swatches and multiple `react-color` styles. |
-| Code | [Documentation](docs/CODE_FIELD.md) | `@studio123/payload-advanced-fields/code-field` | Syntax-highlighted code editor powered by CodeMirror. |
-| Link | [Documentation](docs/LINK_FIELD.md) | `@studio123/payload-advanced-fields/link-field` | Internal/external link field with plugin-level collection config. |
+| Color | [Documentation](docs/COLOR_FIELD.md) | `@studio123/payload-advanced-fields/color` | Color picker field with swatches and multiple `react-color` styles. |
+| Code | [Documentation](docs/CODE_FIELD.md) | `@studio123/payload-advanced-fields/code` | Syntax-highlighted code editor powered by CodeMirror. |
+| Link | [Documentation](docs/LINK_FIELD.md) | `@studio123/payload-advanced-fields/link` | Internal/external link field with plugin-level collection config. |
 
 ---
 
@@ -43,9 +43,9 @@ npm install @studio123/payload-advanced-fields
 
 ```typescript
 import { GlobalConfig } from 'payload';
-import { colorField } from '@studio123/payload-advanced-fields/color-field';
-import { codeField } from '@studio123/payload-advanced-fields/code-field';
-import { linkField } from '@studio123/payload-advanced-fields/link-field';
+import { colorField } from '@studio123/payload-advanced-fields/color';
+import { codeField } from '@studio123/payload-advanced-fields/code';
+import { linkField } from '@studio123/payload-advanced-fields/link';
 
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
@@ -101,8 +101,8 @@ export const SiteSettings: GlobalConfig = {
 
 ```typescript
 import { CollectionConfig } from 'payload';
-import { colorField } from '@studio123/payload-advanced-fields/color-field';
-import { linkField } from '@studio123/payload-advanced-fields/link-field';
+import { colorField } from '@studio123/payload-advanced-fields/color';
+import { linkField } from '@studio123/payload-advanced-fields/link';
 
 export const Products: CollectionConfig = {
   slug: 'products',
@@ -145,10 +145,10 @@ Each field has its own entry point to minimize bundle size. Import only what you
 
 ```typescript
 // Import server-side field factory
-import { colorField } from '@studio123/payload-advanced-fields/color-field';
+import { colorField } from '@studio123/payload-advanced-fields/color';
 
 // Import client-side component (bundled with dependencies)
-import { ColorField } from '@studio123/payload-advanced-fields/color-field/client';
+import { ColorField } from '@studio123/payload-advanced-fields/color/client';
 ```
 
 ### Bundling Strategy

@@ -18,6 +18,7 @@ import { FieldError } from '@payloadcms/ui/fields/FieldError';
 import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
 import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
 import { Button } from '@payloadcms/ui/elements/Button';
+import type { JSONFieldClientProps } from 'payload';
 import { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import type { ColorValue, RGB, HSL, ColorOption } from '../shared/types.js';
 import { generateColorSlug, normalizeColorValue, colorValueToHsva, resolveColorOption } from '../shared/utils.js';
@@ -163,25 +164,11 @@ export type ColorFieldClientProps = {
 	presetColors?: ColorOption[];
 	defaultColor?: ColorOption;
 	disableAlpha?: boolean;
-	localized?: boolean;
 	swatchRadius?: string; // '50%' (circles), '4px' (rounded squares), '0' (sharp squares)
 	swatchSize?: string; // Size of swatches in swatches picker, e.g. '40px' (default), '32px'
 };
 
-type Props = ColorFieldClientProps & {
-	field: {
-		admin?: {
-			description?: unknown;
-			readOnly?: boolean;
-		};
-		label?: unknown;
-		localized?: boolean;
-		name: string;
-		required?: boolean;
-	};
-	path: string;
-	readOnly?: boolean;
-};
+type Props = JSONFieldClientProps & ColorFieldClientProps;
 
 const resolveLocalizedLabel = (value: unknown, localeCode: string, fallback: string) => {
 	if (typeof value === 'string') return value;
@@ -221,14 +208,13 @@ const ColorField = ({
 	presetColors = [],
 	defaultColor,
 	disableAlpha = false,
-	localized,
 	swatchRadius = '50%',
 	swatchSize = '40px',
 }: Props) => {
 	const { value = null, setValue, showError, disabled } = useField<ColorValue | null>({ path });
 	const label = resolveLocalizedLabel(field.label, 'en', field.name);
 	const description = resolveLocalizedLabel(field.admin?.description, 'en', '');
-	const isLocalized = localized ?? field.localized ?? false;
+	const isLocalized = Boolean(field.localized);
 	const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
 	const className = [fieldBaseClass, showError && 'error', isReadOnly && 'read-only'].filter(Boolean).join(' ');
 
