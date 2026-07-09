@@ -27,3 +27,7 @@ export type {
 export { colorField } from './color-field/server/field.js';
 export type { ColorField, ColorFieldConfig } from './color-field/server/field.js';
 export type { ColorValue, ColorPickerType, ColorOption, RGB, HSL } from './color-field/shared/types.js';
+
+export { phoneField } from './phone-field/server/field.js';
+export type { PhoneField, PhoneFieldConfig } from './phone-field/server/field.js';
+export type { PhoneFieldValue } from './phone-field/shared/types.js';

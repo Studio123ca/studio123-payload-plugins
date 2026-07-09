@@ -16,6 +16,7 @@ A collection of enhanced field types for Payload CMS.
 - **Color Picker Field** - 10 different color picker styles with preset colors
 - **Code Editor Field** - Syntax-highlighted code editing with CodeMirror
 - **Link Field** - Internal/external link management with validation
+- **Phone Field** - Canonical phone data with optional country selection
 - **Optimized Bundling** - Each field is independently bundled for minimal bloat
 - **Tree-shakeable** - Import only what you need
 - **Full TypeScript Support** - Complete type definitions included
@@ -34,6 +35,7 @@ npm install @studio123/payload-advanced-fields
 | Color | [Documentation](docs/COLOR_FIELD.md) | `@studio123/payload-advanced-fields/color` | Color picker field with swatches and multiple `react-color` styles. |
 | Code | [Documentation](docs/CODE_FIELD.md) | `@studio123/payload-advanced-fields/code` | Syntax-highlighted code editor powered by CodeMirror. |
 | Link | [Documentation](docs/LINK_FIELD.md) | `@studio123/payload-advanced-fields/link` | Internal/external link field with plugin-level collection config. |
+| Phone | [Documentation](docs/PHONE_FIELD.md) | `@studio123/payload-advanced-fields/phone` | Canonical phone data field with optional country selection. |
 
 ---
 
@@ -46,6 +48,7 @@ import { GlobalConfig } from 'payload';
 import { colorField } from '@studio123/payload-advanced-fields/color';
 import { codeField } from '@studio123/payload-advanced-fields/code';
 import { linkField } from '@studio123/payload-advanced-fields/link';
+import { phoneField } from '@studio123/payload-advanced-fields/phone';
 
 export const SiteSettings: GlobalConfig = {
   slug: 'site-settings',
@@ -84,6 +87,12 @@ export const SiteSettings: GlobalConfig = {
               language: 'html',
               height: 400,
             }),
+            phoneField({
+              name: 'supportPhone',
+              label: 'Support Phone',
+              defaultCountry: 'US',
+              showCountrySelector: true,
+            }),
             linkField({
               name: 'privacyPolicy',
               label: 'Privacy Policy Link',
@@ -103,6 +112,7 @@ export const SiteSettings: GlobalConfig = {
 import { CollectionConfig } from 'payload';
 import { colorField } from '@studio123/payload-advanced-fields/color';
 import { linkField } from '@studio123/payload-advanced-fields/link';
+import { phoneField } from '@studio123/payload-advanced-fields/phone';
 
 export const Products: CollectionConfig = {
   slug: 'products',
@@ -130,6 +140,11 @@ export const Products: CollectionConfig = {
       name: 'externalLink',
       label: 'Product Link',
       description: 'Link to the product page or storefront',
+    }),
+    phoneField({
+      name: 'supportPhone',
+      label: 'Support Phone',
+      defaultCountry: 'US',
     }),
   ],
 };
