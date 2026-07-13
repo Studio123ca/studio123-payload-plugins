@@ -33,6 +33,41 @@ export const formatPhoneInput = (value: string, country?: CountryCode) => {
 	return formatter.input(value);
 };
 
+export const getCountryFlagEmoji = (country?: CountryCode) => {
+	if (!country) return '🌐';
+	return country
+		.toUpperCase()
+		.split('')
+		.map(letter => String.fromCodePoint(letter.charCodeAt(0) + 127397))
+		.join('');
+};
+
+export const parsePhoneDraft = (value: string) => {
+	const match = value.match(/^(.*?)(\s*([,x]|ext\.?|extension)\s*[\d\s-]*)?\s*$/i);
+	if (!match) {
+		return { base: value, extension: '', separator: '', suffix: '' };
+	}
+
+	const base = match[1] ?? value;
+	const suffix = match[2] ?? '';
+	const separator = (match[3] ?? '').trim().toLowerCase();
+	const extension = suffix.replace(/^[\s,x]+|^ext\.?|^extension/i, '').replace(/\D+/g, '');
+	return { base, extension, separator, suffix };
+};
+
+export const phoneToValueWithExtension = (phoneNumber: PhoneNumber, extension?: string): PhoneFieldValue => {
+	if (extension) {
+		phoneNumber.setExt(extension);
+	}
+
+	const value = phoneToValue(phoneNumber);
+	if (extension && value.number) {
+		value.uri = `tel:${value.number},${extension}`;
+	}
+
+	return value;
+};
+
 export const phoneToValue = (phoneNumber: PhoneNumber): PhoneFieldValue => ({
 	number: phoneNumber.number,
 	country: phoneNumber.country,
@@ -48,7 +83,8 @@ export const validatePhoneInput = (
 	input: string,
 	options: { allowedCountries?: string[]; defaultCountry?: CountryCode; required?: boolean } = {},
 ) => {
-	const trimmed = input.trim();
+	const { base } = parsePhoneDraft(input);
+	const trimmed = base.trim();
 	if (!trimmed) {
 		return options.required ? 'Enter a phone number.' : true;
 	}
@@ -93,7 +129,18 @@ export const normalizePhoneValue = (
 	const allowedCountries = normalizeAllowedCountries(options.allowedCountries);
 	if (allowedCountries && phoneNumber.country && !allowedCountries.includes(phoneNumber.country)) return null;
 
-	return phoneToValue(phoneNumber);
+	return {
+		...phoneToValue(phoneNumber),
+		raw: value.raw ?? value.number,
+	};
+};
+
+export const formatPhoneDisplayValue = (rawValue: string, country?: CountryCode) => {
+	const { base, extension } = parsePhoneDraft(rawValue);
+	const formattedBase = base.trim() ? new AsYouType(country).input(base) : '';
+	if (!formattedBase) return '';
+
+	return extension ? `${formattedBase} ext. ${extension}` : formattedBase;
 };
 
 export const getCountryCallingCodeLabel = (country: CountryCode) => {

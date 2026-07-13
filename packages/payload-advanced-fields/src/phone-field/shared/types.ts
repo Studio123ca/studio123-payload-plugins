@@ -1,6 +1,7 @@
 import type { JSONField, PayloadComponent } from 'payload';
 
 export type PhoneFieldValue = {
+	raw?: string;
 	number: string;
 	country?: string;
 	countryCallingCode?: string;

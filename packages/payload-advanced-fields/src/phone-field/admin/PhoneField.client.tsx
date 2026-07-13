@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useField } from '@payloadcms/ui/forms/useField';
 import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
 import { FieldError } from '@payloadcms/ui/fields/FieldError';
@@ -10,7 +10,16 @@ import type { JSONFieldClientProps } from 'payload';
 import { AsYouType, getCountries, parsePhoneNumber } from 'libphonenumber-js/max';
 import type { CountryCode } from 'libphonenumber-js/max';
 import type { PhoneFieldClientProps, PhoneFieldValue } from '../shared/types.js';
-import { getCountryCallingCodeLabel, normalizeAllowedCountries, phoneToValue, resolveDefaultCountry, validatePhoneInput } from '../shared/utils.js';
+import {
+	formatPhoneDisplayValue,
+	getCountryCallingCodeLabel,
+	getCountryFlagEmoji,
+	normalizeAllowedCountries,
+	phoneToValueWithExtension,
+	parsePhoneDraft,
+	resolveDefaultCountry,
+	validatePhoneInput,
+} from '../shared/utils.js';
 
 type Props = JSONFieldClientProps & PhoneFieldClientProps;
 
@@ -39,28 +48,32 @@ const getInitialCountry = (value: PhoneFieldValue | null | undefined, defaultCou
 	return resolveDefaultCountry(defaultCountry, allowedCountries);
 };
 
-const getDisplayValue = (value: PhoneFieldValue | null | undefined) => {
+const getStoredDraft = (value: PhoneFieldValue | null | undefined) => {
 	if (!value) return '';
-	return value.national || value.international || value.number || '';
+	return value.raw || value.national || value.international || value.number || '';
 };
 
 export function PhoneField(props: Props) {
 	const { field, path, readOnly, defaultCountry, showCountrySelector = false, allowedCountries } = props;
 	const normalizedAllowedCountries = useMemo(() => normalizeAllowedCountries(allowedCountries), [allowedCountries]);
-	const [selectedCountry, setSelectedCountry] = useState<CountryCode | undefined>(resolveDefaultCountry(defaultCountry, normalizedAllowedCountries));
-	const [inputValue, setInputValue] = useState<string>('');
-	const [liveError, setLiveError] = useState<string | null>(null);
+	const [draftValue, setDraftValue] = useState<string>('');
 	const { value = null, setValue, showError, disabled } = useField<PhoneFieldValue | null>({
 		path,
-		validate: () => validatePhoneInput(inputValue, {
+		validate: (): true | string => validatePhoneInput(draftValue, {
 			allowedCountries,
 			defaultCountry: resolveDefaultCountry(defaultCountry, allowedCountries),
 			required: field.required,
 		}),
 	});
+	const [selectedCountry, setSelectedCountry] = useState<CountryCode | undefined>(resolveDefaultCountry(defaultCountry, normalizedAllowedCountries));
+	const [isFocused, setIsFocused] = useState(false);
+	const [liveError, setLiveError] = useState<string | null>(null);
+	const [countryMenuOpen, setCountryMenuOpen] = useState(false);
+	const wrapperRef = useRef<HTMLDivElement>(null);
 
 	const label = resolveLocalizedLabel(field.label, 'en', field.name);
 	const description = resolveLocalizedLabel(field.admin?.description, 'en', '');
+	const placeholderText = resolveLocalizedLabel((field.admin as any)?.placeholder, 'en', '');
 	const isLocalized = Boolean(field.localized);
 	const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
 	const countryOptions = useMemo(() => {
@@ -72,25 +85,37 @@ export function PhoneField(props: Props) {
 	}, [normalizedAllowedCountries]);
 
 	useEffect(() => {
-		setInputValue(getDisplayValue(value));
+		if (isFocused) return;
+		setDraftValue(getStoredDraft(value));
 		setSelectedCountry(getInitialCountry(value, defaultCountry, normalizedAllowedCountries));
-	}, [defaultCountry, normalizedAllowedCountries, value]);
+	}, [defaultCountry, isFocused, normalizedAllowedCountries, value]);
 
-	const processInput = (rawValue: string, countryOverride?: CountryCode) => {
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+				setCountryMenuOpen(false);
+			}
+		};
+
+		if (countryMenuOpen) {
+			document.addEventListener('mousedown', handleClickOutside);
+			return () => document.removeEventListener('mousedown', handleClickOutside);
+		}
+	}, [countryMenuOpen]);
+
+	const commitDraft = (rawValue: string, countryOverride?: CountryCode) => {
 		const country = countryOverride ?? selectedCountry ?? resolveDefaultCountry(defaultCountry, normalizedAllowedCountries);
-		const trimmed = rawValue.trim();
+		const { base, extension } = parsePhoneDraft(rawValue);
+		const trimmedBase = base.trim();
 
-		if (!trimmed) {
+		setDraftValue(rawValue);
+		if (!trimmedBase) {
 			setLiveError(null);
 			setValue(null);
 			return;
 		}
 
-		const formatter = new AsYouType(country);
-		const formatted = formatter.input(rawValue);
-		setInputValue(formatted);
-
-		const validation = validatePhoneInput(formatted, {
+		const validation = validatePhoneInput(rawValue, {
 			allowedCountries: normalizedAllowedCountries,
 			defaultCountry: country,
 			required: field.required,
@@ -102,7 +127,7 @@ export function PhoneField(props: Props) {
 			return;
 		}
 
-		const parsed = parsePhoneNumber(formatted, { defaultCountry: country });
+		const parsed = parsePhoneNumber(base, country ? { defaultCountry: country } : undefined);
 		if (!parsed) {
 			setLiveError('Enter a valid phone number.');
 			setValue(null);
@@ -115,21 +140,39 @@ export function PhoneField(props: Props) {
 			return;
 		}
 
-		const normalized = phoneToValue(parsed);
-		if (!normalized) {
-			setLiveError('Enter a valid phone number.');
-			setValue(null);
-			return;
-		}
-
+		const normalized = phoneToValueWithExtension(parsed, extension);
+		normalized.raw = rawValue;
 		setLiveError(null);
 		setValue(normalized);
+		if (parsed.country) {
+			setSelectedCountry(parsed.country as CountryCode);
+		}
 	};
 
 	const className = [fieldBaseClass, 'text', showError || Boolean(liveError) ? 'error' : null, isReadOnly && 'read-only'].filter(Boolean).join(' ');
 	const fieldId = `field-${path.replace(/\./g, '__')}`;
 	const inputError = liveError || undefined;
 	const showInputError = Boolean(liveError) || showError;
+	const selectedFlag = getCountryFlagEmoji(selectedCountry);
+	const previewContent = !isFocused
+		? (() => {
+			const { base, extension } = parsePhoneDraft(draftValue);
+			const formattedBase = base.trim() ? new AsYouType(selectedCountry).input(base) : '';
+			if (!formattedBase) {
+				return <span style={{ color: 'var(--theme-text-light)' }}>{placeholderText || ''}</span>;
+			}
+
+			return extension ? (
+				<>
+					<span>{formattedBase}</span>
+					<span style={{ color: 'var(--theme-text-light)' }}> ext. </span>
+					<span>{extension}</span>
+				</>
+			) : (
+				<span>{formattedBase}</span>
+			);
+		})()
+		: null;
 
 	return (
 		<div className={className} data-size="large" id={fieldId}>
@@ -138,39 +181,116 @@ export function PhoneField(props: Props) {
 			</div>
 			<div className={`${fieldBaseClass}__wrap`}>
 				<FieldError message={inputError} path={path} showError={showInputError} />
-				<div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: showCountrySelector ? 'minmax(12rem, 14rem) minmax(0, 1fr)' : '1fr' }}>
-						{showCountrySelector ? (
-							<select
-								aria-label="Country"
-								className="form-input"
-								disabled={isReadOnly}
-							value={selectedCountry || ''}
-							onChange={event => {
-								const nextCountry = (event.target.value || undefined) as CountryCode | undefined;
-								setSelectedCountry(nextCountry);
-								processInput(inputValue, nextCountry);
+				<div ref={wrapperRef} style={{ position: 'relative' }}>
+					<div
+						style={{
+							alignItems: 'stretch',
+							background: 'var(--theme-elevation-50)',
+							border: '1px solid var(--theme-elevation-150)',
+							borderRadius: '4px',
+							display: 'flex',
+							overflow: 'hidden',
+							position: 'relative',
+						}}
+					>
+						<button
+							type="button"
+							disabled={isReadOnly || !showCountrySelector}
+							aria-label="Choose country"
+							title={selectedCountry ? getCountryLabel(selectedCountry, 'en') : 'Choose country'}
+							style={{
+								alignItems: 'center',
+								background: 'transparent',
+								border: 'none',
+								borderRight: '1px solid var(--theme-elevation-150)',
+								color: 'var(--theme-text)',
+								cursor: isReadOnly || !showCountrySelector ? 'default' : 'pointer',
+								display: 'inline-flex',
+								fontSize: '1.1rem',
+								justifyContent: 'center',
+								minWidth: '3.25rem',
+								padding: '0.625rem 0.75rem',
+								position: 'relative',
+								userSelect: 'none',
+							}}
+							onClick={() => {
+								if (showCountrySelector && !isReadOnly) setCountryMenuOpen(prev => !prev);
 							}}
 						>
-							<option value="">Select country</option>
+							<span aria-hidden="true">{selectedFlag}</span>
+							{showCountrySelector ? <span aria-hidden="true" style={{ marginLeft: '0.35rem', fontSize: '0.7rem' }}>▾</span> : null}
+						</button>
+						<div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+							{previewContent ? (
+								<div
+									aria-hidden="true"
+									style={{
+										alignItems: 'center',
+										color: 'var(--theme-text)',
+										display: 'flex',
+										gap: '0.25rem',
+										inset: 0,
+										paddingLeft: '0.875rem',
+										paddingRight: '0.875rem',
+										pointerEvents: 'none',
+										position: 'absolute',
+										whiteSpace: 'nowrap',
+									}}
+								>
+									{previewContent}
+								</div>
+							) : null}
+							<input
+								className="form-input"
+								disabled={isReadOnly}
+								name={path}
+								placeholder=""
+								style={{
+									background: 'transparent',
+									border: 'none',
+									boxShadow: 'none',
+									caretColor: 'var(--theme-text)',
+									color: isFocused ? 'var(--theme-text)' : 'transparent',
+									flex: 1,
+									minWidth: 0,
+									paddingLeft: '0.875rem',
+									paddingRight: '0.875rem',
+									position: 'relative',
+									zIndex: 1,
+								}}
+								type="text"
+								value={draftValue}
+								onChange={event => {
+									commitDraft(event.target.value);
+								}}
+								onFocus={() => setIsFocused(true)}
+								onBlur={() => setIsFocused(false)}
+								onKeyDown={event => {
+									if (event.key === 'Escape') setCountryMenuOpen(false);
+								}}
+							/>
+						</div>
+					</div>
+					{countryMenuOpen && showCountrySelector && !isReadOnly ? (
+						<div style={{ background: 'var(--theme-elevation-50)', border: '1px solid var(--theme-elevation-150)', borderRadius: '4px', boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)', left: 0, marginTop: '0.35rem', maxHeight: '18rem', overflow: 'auto', position: 'absolute', top: '100%', width: 'min(100%, 22rem)', zIndex: 30 }}>
 							{countryOptions.map(option => (
-								<option key={option.value} value={option.value}>
-									{option.label}
-								</option>
+								<button
+									key={option.value}
+									type="button"
+									style={{ alignItems: 'center', background: option.value === selectedCountry ? 'var(--theme-elevation-100)' : 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', gap: '0.625rem', padding: '0.625rem 0.875rem', textAlign: 'left', width: '100%' }}
+									title={option.label}
+									onClick={() => {
+										setSelectedCountry(option.value);
+										setCountryMenuOpen(false);
+										commitDraft(draftValue, option.value);
+									}}
+								>
+									<span aria-hidden="true" style={{ fontSize: '1.1rem' }}>{getCountryFlagEmoji(option.value)}</span>
+									<span style={{ fontSize: '0.9rem' }}>{option.value}</span>
+								</button>
 							))}
-						</select>
+						</div>
 					) : null}
-					<input
-						className="form-input"
-						disabled={isReadOnly}
-						name={path}
-						placeholder={showCountrySelector ? undefined : defaultCountry ? '+1 213 373 4253' : '+1 213 373 4253'}
-						style={{ width: '100%' }}
-						type="text"
-						value={inputValue}
-						onChange={event => {
-							processInput(event.target.value);
-						}}
-					/>
 				</div>
 				<FieldDescription description={description} path={path} />
 			</div>
