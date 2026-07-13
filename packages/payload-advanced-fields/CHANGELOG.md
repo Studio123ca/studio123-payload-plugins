@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4
+
+- Added the new phone field with `libphonenumber-js` parsing, country selection, allowed-country validation, extension support, canonical metadata storage, and configurable formatting.
+- Improved phone field editing behavior so invalid drafts stay visible with their selected country instead of reverting to the previously saved value.
+
 ## 1.0.3
 
 - Introduced the color field with a polished swatch picker UI and other picker options via `react-color`.

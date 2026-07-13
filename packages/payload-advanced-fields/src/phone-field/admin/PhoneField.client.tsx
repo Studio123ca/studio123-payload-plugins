@@ -1,22 +1,25 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { FocusEvent } from 'react';
 import { useField } from '@payloadcms/ui/forms/useField';
 import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
 import { FieldError } from '@payloadcms/ui/fields/FieldError';
 import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
 import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
 import type { JSONFieldClientProps } from 'payload';
-import { AsYouType, getCountries, parsePhoneNumber } from 'libphonenumber-js/max';
 import type { CountryCode } from 'libphonenumber-js/max';
-import type { PhoneFieldClientProps, PhoneFieldValue } from '../shared/types.js';
+import type { PhoneFieldClientProps, PhoneFieldValue, PhoneNumberFormatter } from '../shared/types.js';
 import {
+	composePhoneDraft,
 	formatPhoneDisplayValue,
 	getCountryCallingCodeLabel,
 	getCountryFlagEmoji,
+	inferPhoneCountry,
 	normalizeAllowedCountries,
-	phoneToValueWithExtension,
 	parsePhoneDraft,
+	parsePhoneInput,
+	toPhoneFormatterParts,
 	resolveDefaultCountry,
 	validatePhoneInput,
 } from '../shared/utils.js';
@@ -36,261 +39,327 @@ const resolveLocalizedLabel = (value: unknown, localeCode: string, fallback: str
 	return fallback;
 };
 
-const getCountryLabel = (country: CountryCode, localeCode: string) => {
+const getCountryLabel = (
+	country: CountryCode,
+	localeCode: string,
+	options?: { showFlag?: boolean; showCountryCode?: boolean; countryLabelStyle?: 'long' | 'short' },
+) => {
 	const displayNames = typeof Intl !== 'undefined' && 'DisplayNames' in Intl ? new Intl.DisplayNames([localeCode], { type: 'region' }) : null;
-	const countryName = displayNames?.of(country) || country;
-	const callingCode = getCountryCallingCodeLabel(country);
-	return callingCode ? `${countryName} (${callingCode})` : countryName;
+	const countryName = options?.countryLabelStyle === 'short' ? country : displayNames?.of(country) || country;
+	const callingCode = options?.showCountryCode === false ? '' : getCountryCallingCodeLabel(country);
+	const label = callingCode ? `${countryName} (${callingCode})` : countryName;
+	return label;
 };
 
-const getInitialCountry = (value: PhoneFieldValue | null | undefined, defaultCountry?: string, allowedCountries?: CountryCode[]) => {
+const getCountrySelectLabel = (
+	country: CountryCode,
+	localeCode: string,
+	options?: { showFlag?: boolean; showCountryCode?: boolean; countryLabelStyle?: 'long' | 'short' },
+) => {
+	const flag = options?.showFlag === false ? '' : `${getCountryFlagEmoji(country)} `;
+	return `${flag}${getCountryLabel(country, localeCode, options)}`;
+};
+
+const mergeFieldStyles = (field: Props['field']) => ({
+	...(field?.admin?.style || {}),
+	...(field?.admin?.width ? { '--field-width': field.admin.width } : { flex: '1 1 0%' }),
+	...(field?.admin?.style?.flex ? { flex: field.admin.style.flex } : {}),
+});
+
+const getInitialCountry = (value: PhoneFieldValue | null | undefined, defaultCountry?: string, enabledCountries?: CountryCode[]) => {
 	if (value?.country) return value.country as CountryCode;
-	return resolveDefaultCountry(defaultCountry, allowedCountries);
+	return resolveDefaultCountry(defaultCountry, enabledCountries);
 };
 
-const getStoredDraft = (value: PhoneFieldValue | null | undefined) => {
-	if (!value) return '';
-	return value.raw || value.national || value.international || value.number || '';
+const getDraftPartsFromValue = (value: PhoneFieldValue | null | undefined) => {
+	if (!value) return { number: '', extension: '' };
+	return {
+		number: value.national || value.international || value.number || '',
+		extension: value.ext || '',
+	};
 };
+
+const isFormatablePhoneValue = (value: PhoneFieldValue | null | undefined) => Boolean(value?.number && (value.national || value.international));
 
 export function PhoneField(props: Props) {
-	const { field, path, readOnly, defaultCountry, showCountrySelector = false, allowedCountries } = props;
-	const normalizedAllowedCountries = useMemo(() => normalizeAllowedCountries(allowedCountries), [allowedCountries]);
-	const [draftValue, setDraftValue] = useState<string>('');
+	const { field, path, readOnly, defaultCountry, countries, extension, formatterMode = 'international', formatterSource } = props;
+	const countriesEnabled = Boolean(countries?.enabled);
+	const extensionEnabled = Boolean(extension?.enabled);
+	const normalizedEnabledCountries = useMemo(() => normalizeAllowedCountries(countries?.enabledCountries), [countries?.enabledCountries]);
+	const normalizedDefaultCountry = resolveDefaultCountry(defaultCountry, normalizedEnabledCountries);
+	const customFormatter = useMemo(() => {
+		if (formatterMode !== 'custom' || !formatterSource) return undefined;
+		try {
+			return new Function('parts', `return (${formatterSource})(parts);`) as PhoneNumberFormatter;
+		} catch {
+			return undefined;
+		}
+	}, [formatterMode, formatterSource]);
+	const getDisplayValue = (phoneValue: PhoneFieldValue) => {
+		if (formatterMode === 'national') return formatPhoneDisplayValue(phoneValue, 'national');
+		if (formatterMode === 'custom' && customFormatter) return customFormatter(toPhoneFormatterParts(phoneValue));
+		return formatPhoneDisplayValue(phoneValue, 'international');
+	};
+	const [draftNumber, setDraftNumber] = useState<string>('');
+	const [draftExtension, setDraftExtension] = useState<string>('');
+	const [selectedCountry, setSelectedCountry] = useState<CountryCode | undefined>(getInitialCountry(undefined, normalizedDefaultCountry, normalizedEnabledCountries));
+	const [isDraftDirty, setIsDraftDirty] = useState(false);
 	const { value = null, setValue, showError, disabled } = useField<PhoneFieldValue | null>({
 		path,
-		validate: (): true | string => validatePhoneInput(draftValue, {
-			allowedCountries,
-			defaultCountry: resolveDefaultCountry(defaultCountry, allowedCountries),
-			required: field.required,
-		}),
+		validate: (): true | string => validatePhoneInput(
+			composePhoneDraft(draftNumber, extensionEnabled ? draftExtension : undefined),
+			{
+				allowedCountries: normalizedEnabledCountries,
+				defaultCountry: selectedCountry || normalizedDefaultCountry,
+				required: field.required,
+				promptForCountry: countriesEnabled,
+			},
+		),
 	});
-	const [selectedCountry, setSelectedCountry] = useState<CountryCode | undefined>(resolveDefaultCountry(defaultCountry, normalizedAllowedCountries));
 	const [isFocused, setIsFocused] = useState(false);
 	const [liveError, setLiveError] = useState<string | null>(null);
-	const [countryMenuOpen, setCountryMenuOpen] = useState(false);
 	const wrapperRef = useRef<HTMLDivElement>(null);
+	const lastCommittedRef = useRef<string>('');
 
 	const label = resolveLocalizedLabel(field.label, 'en', field.name);
 	const description = resolveLocalizedLabel(field.admin?.description, 'en', '');
 	const placeholderText = resolveLocalizedLabel((field.admin as any)?.placeholder, 'en', '');
+	const extensionPlaceholder = extension?.placeholder || 'ext.';
 	const isLocalized = Boolean(field.localized);
 	const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
-	const countryOptions = useMemo(() => {
-		const countries = normalizedAllowedCountries || getCountries();
-		return countries.map(country => ({
-			label: getCountryLabel(country, 'en'),
-			value: country,
-		}));
-	}, [normalizedAllowedCountries]);
+	const styles = useMemo(() => mergeFieldStyles(field), [field]);
+	const countryOptions = useMemo(() => normalizedEnabledCountries || [normalizedDefaultCountry || 'US'], [normalizedDefaultCountry, normalizedEnabledCountries]);
+	const inferredCountry = useMemo(() => {
+		return inferPhoneCountry(draftNumber, { defaultCountry: selectedCountry || normalizedDefaultCountry || 'US' });
+	}, [draftNumber, normalizedDefaultCountry, selectedCountry]);
+	const indicatorCountry = selectedCountry || inferredCountry || normalizedDefaultCountry || 'US';
+	const countryIndicatorLabel = useMemo(() => {
+		if (!countriesEnabled) return '';
+		return getCountryLabel(indicatorCountry, 'en', countries);
+	}, [countries, countriesEnabled, indicatorCountry]);
+	const countryIndicatorWidth = useMemo(() => {
+		if (!countriesEnabled) return undefined;
+		const estimated = Math.max(4.75, Math.min(13, countryIndicatorLabel.length * 0.42 + (countries?.showFlag === false ? 2.2 : 3.6)));
+		return `${estimated}rem`;
+	}, [countries?.showFlag, countryIndicatorLabel, countriesEnabled]);
 
 	useEffect(() => {
 		if (isFocused) return;
-		setDraftValue(getStoredDraft(value));
-		setSelectedCountry(getInitialCountry(value, defaultCountry, normalizedAllowedCountries));
-	}, [defaultCountry, isFocused, normalizedAllowedCountries, value]);
 
-	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
-			if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-				setCountryMenuOpen(false);
-			}
-		};
+		if (isDraftDirty) return;
 
-		if (countryMenuOpen) {
-			document.addEventListener('mousedown', handleClickOutside);
-			return () => document.removeEventListener('mousedown', handleClickOutside);
+		if (!value) {
+			setDraftNumber('');
+			setDraftExtension('');
+			setSelectedCountry(selectedCountry || normalizedDefaultCountry);
+			return;
 		}
-	}, [countryMenuOpen]);
 
-	const commitDraft = (rawValue: string, countryOverride?: CountryCode) => {
-		const country = countryOverride ?? selectedCountry ?? resolveDefaultCountry(defaultCountry, normalizedAllowedCountries);
-		const { base, extension } = parsePhoneDraft(rawValue);
-		const trimmedBase = base.trim();
+		const valueSignature = value.number || '';
+		if (valueSignature && valueSignature === lastCommittedRef.current && value.number) {
+			return;
+		}
 
-		setDraftValue(rawValue);
-		if (!trimmedBase) {
+		if (!isFormatablePhoneValue(value)) {
+			setDraftNumber(value.number);
+			setDraftExtension(extensionEnabled ? value.ext || '' : '');
+			return;
+		}
+
+		if (liveError && value.number !== draftNumber) return;
+
+		const parts = getDraftPartsFromValue(value);
+		setSelectedCountry((value.country as CountryCode | undefined) || normalizedDefaultCountry);
+		setDraftNumber(value.custom || getDisplayValue(value));
+		setDraftExtension(extensionEnabled ? parts.extension : '');
+	}, [customFormatter, extensionEnabled, formatterMode, isDraftDirty, isFocused, normalizedDefaultCountry, selectedCountry, value]);
+
+	const commitDraft = (rawNumber: string, rawExtension: string, countryOverride?: CountryCode) => {
+		const country = countryOverride ?? selectedCountry ?? inferredCountry ?? normalizedDefaultCountry;
+		const parsedNumber = parsePhoneDraft(rawNumber);
+		const extensionValue = extensionEnabled ? (rawExtension.trim() || parsedNumber.extension) : parsedNumber.extension;
+		const shouldReinterpretInternationalInput = Boolean(countryOverride && parsedNumber.base.trim().startsWith('+'));
+		const previousCallingCode = normalizedEnabledCountries?.find(country => parsedNumber.base.trim().startsWith(getCountryCallingCodeLabel(country)));
+		const inputBase = shouldReinterpretInternationalInput && previousCallingCode
+			? parsedNumber.base.trim().replace(getCountryCallingCodeLabel(previousCallingCode), '').trim()
+			: parsedNumber.base;
+		const combinedInput = composePhoneDraft(inputBase, extensionValue);
+
+		lastCommittedRef.current = combinedInput;
+		setDraftNumber(rawNumber);
+		if (extensionEnabled) setDraftExtension(rawExtension);
+
+		if (!parsedNumber.base.trim()) {
 			setLiveError(null);
+			setIsDraftDirty(false);
+			setDraftNumber('');
+			setDraftExtension('');
 			setValue(null);
 			return;
 		}
 
-		const validation = validatePhoneInput(rawValue, {
-			allowedCountries: normalizedAllowedCountries,
+		const validation = validatePhoneInput(combinedInput, {
+			allowedCountries: normalizedEnabledCountries,
 			defaultCountry: country,
 			required: field.required,
+			promptForCountry: countriesEnabled,
 		});
 
 		if (validation !== true) {
 			setLiveError(validation);
-			setValue(null);
+			setIsDraftDirty(true);
+			setValue({ number: rawNumber, ext: extensionEnabled ? rawExtension : undefined } as PhoneFieldValue);
 			return;
 		}
 
-		const parsed = parsePhoneNumber(base, country ? { defaultCountry: country } : undefined);
-		if (!parsed) {
+		const normalized = parsePhoneInput(combinedInput, {
+			allowedCountries: normalizedEnabledCountries,
+			defaultCountry: country,
+			extension: extensionValue,
+		});
+
+		if (!normalized) {
 			setLiveError('Enter a valid phone number.');
-			setValue(null);
+			setIsDraftDirty(true);
+			setValue({ number: rawNumber, ext: extensionEnabled ? rawExtension : undefined } as PhoneFieldValue);
 			return;
 		}
 
-		if (normalizedAllowedCountries && parsed.country && !normalizedAllowedCountries.includes(parsed.country)) {
-			setLiveError('Choose an allowed country.');
-			setValue(null);
-			return;
-		}
-
-		const normalized = phoneToValueWithExtension(parsed, extension);
-		normalized.raw = rawValue;
 		setLiveError(null);
-		setValue(normalized);
-		if (parsed.country) {
-			setSelectedCountry(parsed.country as CountryCode);
-		}
+		setIsDraftDirty(false);
+		const displayValue = getDisplayValue(normalized);
+		setValue(customFormatter ? { ...normalized, custom: displayValue } : normalized);
+		setSelectedCountry(normalized.country as CountryCode | undefined);
+		setDraftNumber(displayValue);
+		setDraftExtension(extensionEnabled ? normalized.ext || extensionValue : '');
 	};
 
-	const className = [fieldBaseClass, 'text', showError || Boolean(liveError) ? 'error' : null, isReadOnly && 'read-only'].filter(Boolean).join(' ');
+	const handleFocus = () => setIsFocused(true);
+	const handleBlur = (event: FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+		setIsFocused(false);
+		commitDraft(draftNumber, draftExtension);
+	};
+	const handleCountryChange = (country: CountryCode) => {
+		setSelectedCountry(country);
+		setIsDraftDirty(true);
+		commitDraft(draftNumber, draftExtension, country);
+	};
+
+	const className = [fieldBaseClass, 'text', isReadOnly && 'read-only'].filter(Boolean).join(' ');
 	const fieldId = `field-${path.replace(/\./g, '__')}`;
 	const inputError = liveError || undefined;
 	const showInputError = Boolean(liveError) || showError;
-	const selectedFlag = getCountryFlagEmoji(selectedCountry);
-	const previewContent = !isFocused
-		? (() => {
-			const { base, extension } = parsePhoneDraft(draftValue);
-			const formattedBase = base.trim() ? new AsYouType(selectedCountry).input(base) : '';
-			if (!formattedBase) {
-				return <span style={{ color: 'var(--theme-text-light)' }}>{placeholderText || ''}</span>;
-			}
-
-			return extension ? (
-				<>
-					<span>{formattedBase}</span>
-					<span style={{ color: 'var(--theme-text-light)' }}> ext. </span>
-					<span>{extension}</span>
-				</>
-			) : (
-				<span>{formattedBase}</span>
-			);
-		})()
-		: null;
+	const hasInputError = showInputError;
+	const sharedControlStyle = {
+		background: 'transparent',
+		border: 'none',
+		borderRadius: 0,
+		boxShadow: 'none',
+	};
+	const controlBorderColor = hasInputError ? 'var(--field-color-border-error)' : 'var(--theme-elevation-150)';
+	const rootStyle = {
+		...styles,
+		...(field.admin?.width ? { width: field.admin.width } : { flex: '1 1 0%' }),
+	};
 
 	return (
-		<div className={className} data-size="large" id={fieldId}>
+		<div className={className} data-size="large" id={fieldId} style={rootStyle}>
 			<div style={{ whiteSpace: 'nowrap' }}>
 				<FieldLabel label={label} localized={isLocalized} path={path} required={field.required} />
 			</div>
 			<div className={`${fieldBaseClass}__wrap`}>
 				<FieldError message={inputError} path={path} showError={showInputError} />
-				<div ref={wrapperRef} style={{ position: 'relative' }}>
+				<div ref={wrapperRef} style={{ display: 'grid', gap: '0.5rem', width: '100%' }}>
 					<div
 						style={{
 							alignItems: 'stretch',
-							background: 'var(--theme-elevation-50)',
-							border: '1px solid var(--theme-elevation-150)',
-							borderRadius: '4px',
+							border: `1px solid ${controlBorderColor}`,
+							borderRadius: '8px',
 							display: 'flex',
 							overflow: 'hidden',
-							position: 'relative',
+							width: '100%',
 						}}
 					>
-						<button
-							type="button"
-							disabled={isReadOnly || !showCountrySelector}
-							aria-label="Choose country"
-							title={selectedCountry ? getCountryLabel(selectedCountry, 'en') : 'Choose country'}
-							style={{
-								alignItems: 'center',
-								background: 'transparent',
-								border: 'none',
-								borderRight: '1px solid var(--theme-elevation-150)',
-								color: 'var(--theme-text)',
-								cursor: isReadOnly || !showCountrySelector ? 'default' : 'pointer',
-								display: 'inline-flex',
-								fontSize: '1.1rem',
-								justifyContent: 'center',
-								minWidth: '3.25rem',
-								padding: '0.625rem 0.75rem',
-								position: 'relative',
-								userSelect: 'none',
-							}}
-							onClick={() => {
-								if (showCountrySelector && !isReadOnly) setCountryMenuOpen(prev => !prev);
-							}}
+				{countriesEnabled ? (
+							<label
+								aria-label="Country"
+								style={{
+									...sharedControlStyle,
+									alignItems: 'center',
+									background: 'var(--theme-elevation-100)',
+									borderRight: `1px solid ${controlBorderColor}`,
+									color: 'var(--theme-text)',
+									display: 'inline-flex',
+									flex: '0 0 auto',
+									fontSize: 'inherit',
+									gap: '0.4rem',
+									justifyContent: 'center',
+									padding: '0 0.75rem',
+									whiteSpace: 'nowrap',
+									width: countryIndicatorWidth,
+								}}
 						>
-							<span aria-hidden="true">{selectedFlag}</span>
-							{showCountrySelector ? <span aria-hidden="true" style={{ marginLeft: '0.35rem', fontSize: '0.7rem' }}>▾</span> : null}
-						</button>
-						<div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-							{previewContent ? (
-								<div
-									aria-hidden="true"
+								<select
+									disabled={isReadOnly}
 									style={{
-										alignItems: 'center',
-										color: 'var(--theme-text)',
-										display: 'flex',
-										gap: '0.25rem',
-										inset: 0,
-										paddingLeft: '0.875rem',
-										paddingRight: '0.875rem',
-										pointerEvents: 'none',
-										position: 'absolute',
-										whiteSpace: 'nowrap',
+										...sharedControlStyle,
+										appearance: 'auto',
+										color: 'inherit',
+										cursor: isReadOnly ? 'default' : 'pointer',
+										font: 'inherit',
+										padding: '0.625rem 0',
 									}}
+									value={indicatorCountry}
+									onChange={event => handleCountryChange(event.target.value as CountryCode)}
+									onFocus={handleFocus}
+									onBlur={handleBlur}
 								>
-									{previewContent}
-								</div>
-							) : null}
+									{countryOptions.map(country => (
+										<option key={country} value={country}>{getCountrySelectLabel(country, 'en', countries)}</option>
+									))}
+								</select>
+							</label>
+					) : null}
+						<input
+							aria-label={label}
+							className="form-input"
+							disabled={isReadOnly}
+							name={path}
+							placeholder={placeholderText}
+							style={{ ...sharedControlStyle, flex: 1, minWidth: 0 }}
+							type="text"
+							value={draftNumber}
+								onChange={event => {
+								setDraftNumber(event.target.value);
+								setLiveError(null);
+								setIsDraftDirty(true);
+							}}
+							onFocus={handleFocus}
+							onBlur={handleBlur}
+							onKeyDown={event => {
+								if (event.key === 'Escape') setLiveError(null);
+							}}
+						/>
+							{extensionEnabled ? (
 							<input
+								aria-label="Extension"
 								className="form-input"
 								disabled={isReadOnly}
-								name={path}
-								placeholder=""
-								style={{
-									background: 'transparent',
-									border: 'none',
-									boxShadow: 'none',
-									caretColor: 'var(--theme-text)',
-									color: isFocused ? 'var(--theme-text)' : 'transparent',
-									flex: 1,
-									minWidth: 0,
-									paddingLeft: '0.875rem',
-									paddingRight: '0.875rem',
-									position: 'relative',
-									zIndex: 1,
-								}}
+								inputMode="numeric"
+								pattern="[0-9]*"
+								placeholder={extensionPlaceholder}
+								style={{ ...sharedControlStyle, width: '8rem', maxWidth: '8rem', borderLeft: `1px solid ${controlBorderColor}` }}
 								type="text"
-								value={draftValue}
+								value={draftExtension}
 								onChange={event => {
-									commitDraft(event.target.value);
+									setDraftExtension(event.target.value.replace(/\D+/g, ''));
+									setIsDraftDirty(true);
 								}}
-								onFocus={() => setIsFocused(true)}
-								onBlur={() => setIsFocused(false)}
-								onKeyDown={event => {
-									if (event.key === 'Escape') setCountryMenuOpen(false);
-								}}
+								onFocus={handleFocus}
+								onBlur={handleBlur}
 							/>
+							) : null}
 						</div>
-					</div>
-					{countryMenuOpen && showCountrySelector && !isReadOnly ? (
-						<div style={{ background: 'var(--theme-elevation-50)', border: '1px solid var(--theme-elevation-150)', borderRadius: '4px', boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)', left: 0, marginTop: '0.35rem', maxHeight: '18rem', overflow: 'auto', position: 'absolute', top: '100%', width: 'min(100%, 22rem)', zIndex: 30 }}>
-							{countryOptions.map(option => (
-								<button
-									key={option.value}
-									type="button"
-									style={{ alignItems: 'center', background: option.value === selectedCountry ? 'var(--theme-elevation-100)' : 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', gap: '0.625rem', padding: '0.625rem 0.875rem', textAlign: 'left', width: '100%' }}
-									title={option.label}
-									onClick={() => {
-										setSelectedCountry(option.value);
-										setCountryMenuOpen(false);
-										commitDraft(draftValue, option.value);
-									}}
-								>
-									<span aria-hidden="true" style={{ fontSize: '1.1rem' }}>{getCountryFlagEmoji(option.value)}</span>
-									<span style={{ fontSize: '0.9rem' }}>{option.value}</span>
-								</button>
-							))}
-						</div>
-					) : null}
 				</div>
 				<FieldDescription description={description} path={path} />
 			</div>

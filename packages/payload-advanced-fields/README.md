@@ -16,7 +16,7 @@ A collection of enhanced field types for Payload CMS.
 - **Color Picker Field** - 10 different color picker styles with preset colors
 - **Code Editor Field** - Syntax-highlighted code editing with CodeMirror
 - **Link Field** - Internal/external link management with validation
-- **Phone Field** - Canonical phone data with optional country selection
+- **Phone Field** - Canonical phone data with country selector, extension input, validation, and custom formatting
 - **Optimized Bundling** - Each field is independently bundled for minimal bloat
 - **Tree-shakeable** - Import only what you need
 - **Full TypeScript Support** - Complete type definitions included
@@ -35,7 +35,7 @@ npm install @studio123/payload-advanced-fields
 | Color | [Documentation](docs/COLOR_FIELD.md) | `@studio123/payload-advanced-fields/color` | Color picker field with swatches and multiple `react-color` styles. |
 | Code | [Documentation](docs/CODE_FIELD.md) | `@studio123/payload-advanced-fields/code` | Syntax-highlighted code editor powered by CodeMirror. |
 | Link | [Documentation](docs/LINK_FIELD.md) | `@studio123/payload-advanced-fields/link` | Internal/external link field with plugin-level collection config. |
-| Phone | [Documentation](docs/PHONE_FIELD.md) | `@studio123/payload-advanced-fields/phone` | Canonical phone data field with optional country selection. |
+| Phone | [Documentation](docs/PHONE_FIELD.md) | `@studio123/payload-advanced-fields/phone` | Canonical phone data field with country selector, extension input, validation, and custom formatting. |
 
 ---
 
@@ -91,7 +91,17 @@ export const SiteSettings: GlobalConfig = {
               name: 'supportPhone',
               label: 'Support Phone',
               defaultCountry: 'US',
-              showCountrySelector: true,
+              admin: {
+                placeholder: 'Enter a support phone number',
+                width: '50%',
+              },
+              countries: {
+                enabled: true,
+                enabledCountries: ['US', 'CA'],
+              },
+              extension: {
+                enabled: true,
+              },
             }),
             linkField({
               name: 'privacyPolicy',
@@ -145,6 +155,12 @@ export const Products: CollectionConfig = {
       name: 'supportPhone',
       label: 'Support Phone',
       defaultCountry: 'US',
+      admin: {
+        width: '50%',
+      },
+      countries: {
+        enabled: false,
+      },
     }),
   ],
 };
@@ -171,6 +187,7 @@ import { ColorField } from '@studio123/payload-advanced-fields/color/client';
 - **Color Field** - Bundled with esbuild (includes @uiw/react-color and dependencies)
 - **Code Field** - Compiled with TypeScript (uses external @codemirror)
 - **Link Field** - Compiled with TypeScript (minimal dependencies)
+- **Phone Field** - Compiled with TypeScript and powered by `libphonenumber-js`
 
 This ensures users only pay for what they use - if you only use ColorField, you don't load CodeMirror.
 
