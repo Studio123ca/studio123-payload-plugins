@@ -14,9 +14,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { LINK_TYPES } from '../shared/constants.js';
 import { normalizeLinkValue, validateLink } from '../shared/validateLink.js';
 import type { LinkValue } from '../shared/types.js';
+import type { LinkFieldExtension } from './LinkField.client.js';
 type Props = {
   collectionSlugs?: string[];
   defaultType: LinkValue['type'];
+  extension?: LinkFieldExtension;
   modalSlug: string;
   onCancel: () => void;
   onSave: (value: LinkValue | null) => void;
@@ -48,9 +50,10 @@ const getInternalValueId = (value: unknown): string | number | null => {
   return null;
 };
 
-function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel, onSave, value }: Props) {
+function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug, onCancel, onSave, value }: Props) {
   const { closeModal } = useModal();
   const [draft, setDraft] = useState<LinkValue>(value ?? emptyDraft(defaultType));
+  const [extensionDraft, setExtensionDraft] = useState<unknown>(extension?.value ?? null);
   const [errors, setErrors] = useState<DrawerErrors>({});
   const lastDocTitleRef = useRef<string | null>(draft.internal?.title ?? null);
 
@@ -156,6 +159,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
 
     setErrors({});
     onSave(draft);
+    extension?.onSave?.(extensionDraft ?? null);
     closeModal(modalSlug);
   };
 
@@ -173,6 +177,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
   return (
     <div className="field-type">
       <div style={{ display: 'grid', gap: '1rem' }}>
+        {extension?.render?.({ setValue: setExtensionDraft, value: extensionDraft ?? null })}
           <TextInput
           Error={<FieldError message={errors.label} path={paths.label} showError={Boolean(errors.label)} />}
           label="Label"
@@ -349,7 +354,9 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, modalSlug, onCancel,
             margin={false}
             onClick={() => {
               setDraft(emptyDraft(defaultType));
+              setExtensionDraft(null);
               onSave(null);
+              extension?.onSave?.(null);
               closeModal(modalSlug);
             }}
             size="medium"
@@ -371,7 +378,7 @@ export function LinkFieldModal(props: Props) {
     <Drawer className="link-field-modal" slug={props.modalSlug} title="Link">
       <div style={{ padding: '1.5rem 1.5rem 0' }}>
         <LinkFieldModalBody
-          key={`${props.modalSlug}-${String(getInternalValueId(props.value?.internal) ?? 'empty')}`}
+          key={`${props.modalSlug}-${String(getInternalValueId(props.value?.internal) ?? 'empty')}-${JSON.stringify(props.extension?.value ?? null)}`}
           {...props}
         />
       </div>

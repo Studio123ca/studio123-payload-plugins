@@ -1,17 +1,20 @@
 'use client';
 
 import { Button } from '@payloadcms/ui/elements/Button';
+import type { ReactNode } from 'react';
 import { RxExternalLink } from 'react-icons/rx';
 import type { LinkValue } from '../shared/types.js';
 
 type Props = {
   collectionSlugs?: string[];
   onEdit?: () => void;
+  /** Overrides the label content; receives the default label text and link value. */
+  renderLabel?: (args: { label: string; value: LinkValue | null }) => ReactNode;
   value: LinkValue | null;
   onClear?: () => void;
 };
 
-export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, value }: Props) {
+export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, renderLabel, value }: Props) {
   const url = value?.url?.trim() || null;
   const label = value?.label?.trim() ?? '';
   const opensInNewTab = Boolean(value?.newTab);
@@ -43,9 +46,21 @@ export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, value }: Pr
       }}
     >
       <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-        {label ? (
-          <div style={{ fontWeight: 600, minHeight: '1.25rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {label}
+        {label || renderLabel ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              fontWeight: 600,
+              minHeight: '1.25rem',
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {renderLabel ? renderLabel({ label, value }) : label}
           </div>
         ) : null}
         <div style={{ color: 'var(--theme-elevation-500)', wordBreak: 'break-all' }}>
