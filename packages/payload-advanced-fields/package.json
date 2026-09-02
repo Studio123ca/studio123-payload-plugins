@@ -70,6 +70,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node esbuild.js",
+    "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
