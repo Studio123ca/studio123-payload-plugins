@@ -82,8 +82,7 @@
     "build": "tsc -p tsconfig.json && node esbuild.js",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test tests/*.test.mjs",
-    "preview:table": "node scripts/table-preview.mjs"
+    "test": "npm run build && node --test tests/*.test.mjs"
   },
   "peerDependencies": {
     "@payloadcms/ui": "4.0.0-canary.37",

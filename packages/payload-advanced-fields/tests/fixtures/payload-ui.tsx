@@ -65,3 +65,13 @@ export function FieldError() {
 export function FieldDescription({ description }: any) {
   return <p>{typeof description === 'string' ? description : ''}</p>;
 }
+
+// Expose popup contents to the DOM adapter; real portal behavior is exercised in Storybook.
+export function Popup({ button, buttonAriaLabel, render }: any) {
+  return (
+    <div>
+      <button aria-label={buttonAriaLabel}>{button}</button>
+      {render({ close() {} })}
+    </div>
+  );
+}

@@ -3,12 +3,12 @@
   margin-bottom: 1.5rem;
 }
 .advanced-table {
-  --table-border: var(--theme-elevation-150, #d5d5d5);
+  --table-border: var(--color-border, #d5d5d5);
   border: 1px solid var(--table-border);
   border-radius: 6px;
   padding: 12px;
-  background: var(--theme-elevation-0, #fff);
-  color: var(--theme-text, #222);
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #222);
 }
 .advanced-table__toolbar,
 .advanced-table__settings {
@@ -18,25 +18,26 @@
   flex-wrap: wrap;
   margin-bottom: 8px;
 }
-.advanced-table button,
-.advanced-table summary {
+.advanced-table__toolbar button,
+.advanced-table__menu-trigger {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
-.advanced-table button {
+.advanced-table__toolbar button,
+.advanced-table__menu-trigger {
   color: inherit;
-  background: var(--theme-elevation-50, #f8f8f8);
+  background: var(--color-bg-secondary, #f8f8f8);
   border: 1px solid var(--table-border);
   border-radius: 4px;
   padding: 6px 10px;
 }
-.advanced-table button:disabled {
+.advanced-table__toolbar button:disabled {
   cursor: default;
   opacity: 0.45;
 }
-.advanced-table button:hover:not(:disabled) {
-  background: var(--theme-elevation-100, #eee);
+.advanced-table__toolbar button:hover:not(:disabled) {
+  background: var(--color-bg-hover, #eee);
 }
 .advanced-table :focus-visible {
   outline: 2px solid var(--theme-success-500, #297b64);
@@ -51,7 +52,6 @@
   border-collapse: separate;
   border-spacing: 0;
   width: max-content;
-  min-width: 100%;
   table-layout: fixed;
 }
 .advanced-table th,
@@ -63,7 +63,7 @@
   vertical-align: top;
 }
 .advanced-table th {
-  background: var(--theme-elevation-50, #f8f8f8);
+  background: var(--color-bg-secondary, #f8f8f8);
   font-weight: 500;
 }
 .advanced-table thead th {
@@ -72,9 +72,8 @@
   z-index: 2;
 }
 .advanced-table th:first-child {
-  min-width: 48px;
-  width: 48px;
-  padding: 8px;
+  width: 64px;
+  padding: 0;
 }
 .advanced-table td[data-selected] {
   box-shadow: inset 0 0 0 2px var(--theme-success-500, #297b64);
@@ -127,30 +126,56 @@
   gap: 6px;
   align-items: center;
 }
-.advanced-table details {
-  position: relative;
-}
-.advanced-table summary {
-  padding: 2px 4px;
-  list-style: none;
-}
-.advanced-table details[open] {
-  z-index: 4;
-}
+/* Popup contents are portalled outside .advanced-table. */
 .advanced-table__menu {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   padding: 6px;
-  min-width: 145px;
-  background: var(--theme-elevation-0, #fff);
-  border: 1px solid var(--table-border);
+  min-width: 180px;
+  color: var(--color-text, #222);
+}
+.advanced-table__menu button {
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  border: 0;
   border-radius: 4px;
+  padding: 8px 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.advanced-table__menu button:hover:not(:disabled),
+.advanced-table__menu button:focus-visible {
+  background: var(--color-bg-hover, #eee);
+}
+.advanced-table__menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 .advanced-table__menu label {
-  font-size: 12px;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.advanced-table__toolbar {
+  gap: 2px;
+  border-bottom: 1px solid var(--table-border);
+  padding-bottom: 8px;
+}
+.advanced-table .advanced-table__menu-trigger {
+  background: transparent;
+  border: 0;
+}
+.advanced-table__fixed-heading {
+  min-height: 42px;
+  padding: 10px;
+}
+.advanced-table__fixed-heading .field-label {
+  margin: 0;
 }
 .advanced-table__help,
 .advanced-table__footer,
@@ -179,8 +204,8 @@
   margin: 0;
 }
 .advanced-table__native-cell {
-  min-width: 220px;
-  padding: 10px !important;
+  min-width: 0;
+  padding: 0 !important;
 }
 .advanced-table__native-cell .field-type {
   margin-bottom: 0;
@@ -192,4 +217,140 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Visually hide cell labels, preserving native label associations and validation. */
+.advanced-table__native-cell .field-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.advanced-table__native-cell .render-fields {
+  gap: 0;
+}
+.advanced-table__native-cell .text input,
+.advanced-table__native-cell .number input,
+.advanced-table__native-cell textarea {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 10px;
+}
+.advanced-table__native-cell .checkbox-input {
+  padding: 10px;
+}
+.advanced-table__native-cell .field-type {
+  padding: 0;
+}
+.advanced-table__native-cell .field-error {
+  padding: 4px 10px;
+}
+
+.advanced-table__row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 8px 6px;
+  min-height: 42px;
+  white-space: nowrap;
+}
+.advanced-table__row-heading .advanced-table__menu-trigger {
+  padding: 2px;
+}
+.advanced-table__resize {
+  position: absolute;
+  right: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 3;
+}
+.advanced-table__resize:hover,
+.advanced-table__resize:focus-visible {
+  background: var(--color-border-selected, #297b64);
+}
+.advanced-table__column-heading {
+  min-width: 0;
+}
+.advanced-table__column-heading input {
+  min-width: 0;
+  flex: 1;
+}
+.advanced-table__native-cell .form-input-group,
+.advanced-table__native-cell .rs__control {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  min-height: 42px;
+}
+.advanced-table__native-cell .rs__value-container {
+  padding: 4px 10px;
+}
+.advanced-table__native-cell .rs__input-container {
+  margin: 0;
+  padding: 0;
+}
+.advanced-table__native-cell .rs__input-container input {
+  min-height: 0;
+  padding: 0;
+}
+.advanced-table__native-cell .input-stepper {
+  margin-right: 8px;
+}
+.advanced-table__native-cell .input-stepper button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.advanced-table__native-cell:focus-within {
+  outline: 2px solid var(--color-border-selected, #297b64);
+  outline-offset: -2px;
+}
+.advanced-table__native-cell .checkbox-input {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+.advanced-table__native-cell .rs__indicators {
+  top: 0;
+  bottom: 0;
+  min-height: 0;
+  align-items: center;
+}
+.advanced-table__native-cell .rs__indicator {
+  display: flex;
+  align-items: center;
+}
+.advanced-table__native-cell .clear-indicator,
+.advanced-table__native-cell .dropdown-indicator {
+  margin: 0;
+  align-self: center;
+}
+.advanced-table__input,
+.advanced-table__native-cell .text input,
+.advanced-table__native-cell .number input,
+.advanced-table__native-cell textarea,
+.advanced-table__native-cell .form-input-group,
+.advanced-table__native-cell .rs__control,
+.advanced-table__native-cell .checkbox-input {
+  min-height: var(--table-row-height, 42px);
+}
+.advanced-table__input[readonly] {
+  resize: none;
+}
+
+.advanced-table__input,
+.advanced-table__native-cell textarea {
+  min-height: 42px;
+  height: var(--table-row-height, 42px);
 }

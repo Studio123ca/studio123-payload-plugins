@@ -32,13 +32,12 @@ tableField({
   maxRows: 50,
   maxColumns: 8,
   headerRow: true,
-  caption: true,
   localized: true,
   admin: { description: 'Compare features across models.' },
 });
 ```
 
-Editors can edit cells and headers, add/duplicate/delete/reorder rows and columns, adjust column widths, show or hide the header row, and enter a caption. Text is stored as text, including numbers, leading zeros, and strings beginning with `=`. No HTML or rich text is interpreted.
+Editors can edit cells and headers, add/duplicate/delete/reorder rows and columns, drag column borders to resize them. The field configuration controls header visibility; the editor has no caption input. Text is stored as text, including numbers, leading zeros, and strings beginning with `=`. No HTML or rich text is interpreted.
 
 An unset field stays unset until the editor chooses **Create table**, imports CSV, or supplies data through the API. `initialRows` and `initialColumns` determine the dimensions created by that button; they are not database defaults.
 
@@ -63,7 +62,7 @@ Product,Price
 Widget small,9.95
 ```
 
-`headerRow: true` treats the first CSV row as column labels. With `false`, every row is body data and the editor shows lettered column headings. This setting is fixed by the field configuration for CSV storage, because CSV contains no header metadata.
+`headerRow: true` treats the first CSV row as column labels. With `false`, every row is body data and the editor shows lettered column headings. This setting is fixed by the field configuration in every mode. For JSON, the stored header flag is synchronized on the next editor change.
 
 The editor supports commas, escaped quotes, CRLF/LF line endings, embedded newlines, Unicode, blank cells, and a UTF-8 BOM. Ragged rows are padded with empty cells. Editing normalizes serialization to comma delimiters and CRLF line endings; it preserves cell text, not the original file's exact bytes. Blank cells are quoted when serialized to preserve empty final rows.
 
@@ -161,19 +160,19 @@ Standard Payload field options such as `name`, `label`, `required`, `localized`,
 
 Content/spreadsheet options:
 
-| Option           | Default                       | Meaning                                                |
-| ---------------- | ----------------------------- | ------------------------------------------------------ |
-| `mode`           | `'content'`                   | `'content'` or `'spreadsheet'`                         |
-| `storage`        | `'json'`                      | `'csv'` is supported only for content                  |
-| `initialRows`    | 2, adjusted to limits         | Rows on Create table                                   |
-| `initialColumns` | 2, adjusted to limits         | Columns on Create table                                |
-| `minRows`        | 0                             | Minimum body rows when a table is present              |
-| `maxRows`        | 100 content / 500 spreadsheet | Maximum body rows                                      |
-| `minColumns`     | 1                             | Minimum columns when a table is present                |
-| `maxColumns`     | 20 content / 30 spreadsheet   | Maximum columns                                        |
-| `headerRow`      | `true`                        | Initial JSON header setting; fixed CSV parsing setting |
-| `caption`        | `true` JSON / `false` CSV     | Show caption input; must be false for CSV              |
-| `formulas`       | `false`                       | Enable the spreadsheet expression grammar              |
+| Option           | Default                       | Meaning                                                   |
+| ---------------- | ----------------------------- | --------------------------------------------------------- |
+| `mode`           | `'content'`                   | `'content'` or `'spreadsheet'`                            |
+| `storage`        | `'json'`                      | `'csv'` is supported only for content                     |
+| `initialRows`    | 2, adjusted to limits         | Rows on Create table                                      |
+| `initialColumns` | 2, adjusted to limits         | Columns on Create table                                   |
+| `minRows`        | 0                             | Minimum body rows when a table is present                 |
+| `maxRows`        | 100 content / 500 spreadsheet | Maximum body rows                                         |
+| `minColumns`     | 1                             | Minimum columns when a table is present                   |
+| `maxColumns`     | 20 content / 30 spreadsheet   | Maximum columns                                           |
+| `headerRow`      | `true`                        | Fixed editor header visibility and CSV parsing setting    |
+| `caption`        | `true` JSON / `false` CSV     | Legacy compatibility option; no caption input is rendered |
+| `formulas`       | `false`                       | Enable the spreadsheet expression grammar                 |
 
 Limits are checked at configuration time. The hard ceiling is 1,000 rows and 100 columns, and each cell/header/caption is limited to 10,000 characters. The editor renders the whole table without virtualization: use conservative limits for responsive editing. It is intended for content tables, not large analytical datasets.
 
@@ -246,9 +245,19 @@ Malformed or unsupported stored data is displayed as an error in the admin and p
 ```sh
 npm test --workspace @studio123/payload-advanced-fields
 npm run typecheck
-npm run preview:table --workspace @studio123/payload-advanced-fields
+npm run storybook
 ```
 
-Tests cover parsing/serialization, validation, immutable paste/reorder operations, formulas, React editing/history/read-only behavior, nested path delegation, and real canary config sanitization for collections, globals, arrays, and blocks. UI tests use a small Payload context adapter and do not require a database. The preview uses the same adapter for JSON/CSV editors; it is not a full Payload admin deployment.
+Tests cover parsing/serialization, validation, immutable paste/reorder operations, formulas, React editing/history/read-only behavior, nested path delegation, and real canary config sanitization for collections, globals, arrays, and blocks. UI tests use a small Payload context adapter and do not require a database. Storybook uses real Payload providers and controls with local API fixtures for all three table modes and JSON/CSV storage. See the [Storybook guide](../../../storybook/README.md).
 
 Before releasing into a consuming app, also verify its import map, database save/reload, drafts/version restore, locale switching, and restricted-user permissions in that app's real admin. No database-backed admin is bundled in this repository.
+
+### Admin menus and structured headers
+
+Content and spreadsheet tables use a compact menu row: **Table** contains create/clear and CSV import/export, **Edit** contains undo/redo and copy/clear cells, and **Insert** adds rows or columns, and **View → Reset column widths** restores the default sizes. Row and column ellipsis buttons use Payload's portalled popup, including keyboard navigation and Escape dismissal, without expanding or clipping the grid.
+
+Structured tables display fixed headers from each configured column's label (falling back to its field name). Editors cannot rename these headers. Native input labels remain available to assistive technology while the visible label appears once above the column; native field permissions, validation, and controls are retained.
+
+Drag the right border of a column header to resize it from 100–600px. Focus the border and use Left/Right arrows for 10px increments (Shift for 50px). JSON widths are persisted with a single undo entry per drag; CSV and structured widths remain local to the editing session. Resetting JSON widths is also undoable. Existing JSON caption metadata is preserved, but no caption input is shown.
+
+Dragging a textarea's lower corner adjusts the height of all editable cells in that row, including when shrinking it again. Row heights are session-only. Column borders track the cursor directly; columns are not redistributed to fill unused viewport space. Native structured selects and number inputs share the same cell height and vertically centered controls.

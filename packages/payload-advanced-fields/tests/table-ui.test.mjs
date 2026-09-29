@@ -190,6 +190,8 @@ test('structured editor delegates nested row operations and cell permissions to 
       ),
     ),
   );
+  assert.equal(document.querySelector('thead th:nth-child(2)').textContent, 'qty');
+  assert.equal(document.querySelectorAll('thead input').length, 0);
   await click(button('Add row'));
   assert.deepEqual(calls.find((call) => call.action === 'addFieldRow').args, {
     path: 'blocks.0.records',
@@ -285,4 +287,53 @@ test('locale switches clear session history even when the underlying value is un
   await render({ value: original, locale: 'fr' });
   assert.equal(button('Undo').disabled, true);
   assert.equal(cell().value, 'Shared text');
+});
+
+test('column resizing commits once per drag, supports undo and resets widths', async () => {
+  await reset();
+  const table = createTable(options);
+  await render({ value: table });
+  let handle = document.querySelector('[aria-label="Resize column A"]');
+  handle.setPointerCapture = () => {};
+  handle.releasePointerCapture = () => {};
+  handle.parentElement.getBoundingClientRect = () => ({ width: 180, left: 0 });
+  const pointer = async (type, x) =>
+    act(async () => handle.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 })));
+  await pointer('pointerdown', 180);
+  await pointer('pointermove', 220);
+  await pointer('pointermove', 260);
+  assert.equal(value().columns[0].width, undefined);
+  await pointer('pointerup', 260);
+  assert.equal(value().columns[0].width, 260);
+  await click(button('Undo'));
+  assert.equal(value().columns[0].width, undefined);
+  handle = document.querySelector('[aria-label="Resize column A"]');
+  await act(async () => handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+  assert.equal(value().columns[0].width, 190);
+  await click(button('Reset column widths'));
+  assert.equal(value().columns[0].width, undefined);
+});
+
+test('header visibility is configured and caption controls are absent', async () => {
+  await reset();
+  const table = createTable(options);
+  table.caption = 'Existing caption';
+  await render({ value: table, config: resolveTableOptions({ headerRow: false }) });
+  assert.equal(document.querySelector('[aria-label="Header A"]'), null);
+  assert.equal(document.querySelector('.advanced-table__settings'), null);
+  await input(cell(), 'Edited');
+  assert.equal(value().headerRow, false);
+  assert.equal(value().caption, 'Existing caption');
+});
+
+test('CSV resize stays local and does not modify stored text', async () => {
+  await reset();
+  const csv = 'Name,Value\r\nExample,123';
+  await render({ value: csv, config: resolveTableOptions({ storage: 'csv' }) });
+  const handle = document.querySelector('[aria-label="Resize column A"]');
+  await act(async () => handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+  assert.equal(value(), csv);
+  assert.equal(handle.getAttribute('aria-valuenow'), '190');
+  await click(button('Reset column widths'));
+  assert.equal(handle.getAttribute('aria-valuenow'), '180');
 });

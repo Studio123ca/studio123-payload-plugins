@@ -5,3 +5,5 @@ build/
 coverage/
 package-lock.json
 *.tsbuildinfo
+storybook-static/
+.storybook/public/mockServiceWorker.js

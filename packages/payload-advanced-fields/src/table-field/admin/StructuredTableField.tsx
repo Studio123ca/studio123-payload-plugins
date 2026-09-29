@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import {
   FieldDescription,
   FieldError,
@@ -14,6 +14,9 @@ import {
 } from '@payloadcms/ui';
 import type { ArrayFieldClientProps, Validate } from 'payload';
 import './styles.css';
+import { useRowSizing } from './useRowSizing.js';
+import { ColumnResize } from './ColumnResize.js';
+import { TableMenu } from './TableMenu.js';
 
 export function StructuredTableField({
   field,
@@ -23,6 +26,9 @@ export function StructuredTableField({
   readOnly,
   validate,
 }: ArrayFieldClientProps) {
+  const root = useRef<HTMLDivElement>(null);
+  useRowSizing(root);
+  const [widths, setWidths] = useState<Record<string, number>>({});
   const {
     config: { localization },
   } = useConfig();
@@ -62,7 +68,7 @@ export function StructuredTableField({
   const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
   const atMax = field.maxRows !== undefined && rows.length >= field.maxRows;
   // RenderFields keeps each cell on Payload's native permissions, hooks and validation path.
-  // Retain labels inside each cell to support translated and custom field labels.
+  // Keep native labels accessible while showing column labels only once in the header.
   const columns = field.fields.filter(
     (column) =>
       'name' in column && column.name !== 'id' && !column.hidden && !column.admin?.hidden && !column.admin?.disabled,
@@ -82,33 +88,89 @@ export function StructuredTableField({
         Fallback={<FieldError path={path} showError={showError} />}
       />
       {BeforeInput}
-      <div className="advanced-table">
+      <div className="advanced-table" ref={root}>
         <div className="advanced-table__toolbar">
           {!isReadOnly && (
-            <button
-              type="button"
-              disabled={atMax}
-              onClick={() => addFieldRow({ path, schemaPath, rowIndex: rows.length })}
-            >
-              Add row
-            </button>
+            <TableMenu label="Insert">
+              <button
+                type="button"
+                disabled={atMax}
+                onClick={() => addFieldRow({ path, schemaPath, rowIndex: rows.length })}
+              >
+                Add row
+              </button>
+            </TableMenu>
           )}
+          <TableMenu label="View">
+            <button type="button" onClick={() => setWidths({})}>
+              Reset column widths
+            </button>
+          </TableMenu>
           <span>{rows.length} rows · Structured records</span>
         </div>
         {/* The fieldset enforces parent read-only even when a column explicitly sets admin.readOnly=false. */}
         <fieldset disabled={isReadOnly} className="advanced-table__fieldset">
           <legend className="advanced-table__sr">Table records</legend>
           <div className="advanced-table__scroll">
-            <table aria-label="Table records">
+            <table
+              aria-label="Table records"
+              style={{
+                width:
+                  64 +
+                  columns.reduce(
+                    (sum, column) => sum + (widths['name' in column ? column.name : column.type] ?? 180),
+                    0,
+                  ),
+              }}
+            >
+              <colgroup>
+                <col style={{ width: 64 }} />
+                {columns.map((column) => (
+                  <col
+                    key={'name' in column ? column.name : column.type}
+                    style={{ width: widths['name' in column ? column.name : column.type] ?? 180 }}
+                  />
+                ))}
+              </colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">
+                    <span className="advanced-table__sr">Row</span>
+                  </th>
+                  {columns.map((column) => (
+                    <th scope="col" key={'name' in column ? column.name : column.type}>
+                      <div className="advanced-table__column-heading advanced-table__fixed-heading">
+                        <FieldLabel
+                          label={
+                            ('label' in column ? column.label : undefined) ?? ('name' in column ? column.name : '')
+                          }
+                          required={'required' in column && column.required}
+                        />
+                      </div>
+                      {!isReadOnly && (
+                        <ColumnResize
+                          label={'name' in column ? column.name : column.type}
+                          width={widths['name' in column ? column.name : column.type] ?? 180}
+                          onResize={(width) =>
+                            setWidths((previous) => ({
+                              ...previous,
+                              ['name' in column ? column.name : column.type]: width,
+                            }))
+                          }
+                        />
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
                 {rows.map((row, index) => (
                   <tr key={row.id}>
                     <th scope="row">
-                      {index + 1}
-                      {!isReadOnly && (
-                        <details>
-                          <summary aria-label={`Row ${index + 1} actions`}>⋯</summary>
-                          <div className="advanced-table__menu">
+                      <div className="advanced-table__row-heading">
+                        <span>{index + 1}</span>
+                        {!isReadOnly && (
+                          <TableMenu compact label={`Row ${index + 1} actions`}>
                             {field.admin?.isSortable !== false && (
                               <>
                                 <button
@@ -144,9 +206,9 @@ export function StructuredTableField({
                             >
                               Delete row
                             </button>
-                          </div>
-                        </details>
-                      )}
+                          </TableMenu>
+                        )}
+                      </div>
                     </th>
                     {row.isLoading ? (
                       <td colSpan={columns.length}>Loading row…</td>

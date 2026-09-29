@@ -19,6 +19,9 @@ import {
 import { evaluateTable } from '../shared/formulas.js';
 import { parseDelimited, safeCSVCell, stringifyDelimited } from '../shared/clipboard.js';
 import './styles.css';
+import { useRowSizing } from './useRowSizing.js';
+import { ColumnResize } from './ColumnResize.js';
+import { TableMenu } from './TableMenu.js';
 
 type Props = {
   value: TableValue | null;
@@ -75,6 +78,7 @@ function Cell({
 
 export function TableEditor({ value, onChange, options, readOnly = false }: Props) {
   const root = useRef<HTMLDivElement>(null);
+  useRowSizing(root);
   const fileInput = useRef<HTMLInputElement>(null);
   const lastValue = useRef(value);
   const current = useRef({ value, readOnly });
@@ -91,6 +95,8 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
   const [revision, refresh] = useState(0);
   const [selection, setSelection] = useState(initialSelection);
   const [message, setMessage] = useState('');
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const columnWidth = (column: TableValue['columns'][number]) => widths[column.id] ?? column.width ?? 180;
   const results = useMemo(() => (value ? evaluateTable(value) : []), [value]);
   const bounds = selectionBounds(selection);
   // External form resets, locale changes and version restores start a new history.
@@ -99,11 +105,13 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
       history.current = { undo: [], redo: [] };
       lastValue.current = value;
       setSelection(initialSelection);
+      setWidths({});
       refresh((n) => n + 1);
     }
   }, [value]);
   const commit = (next: TableValue | null) => {
     if (readOnly || next === value) return;
+    if (next) next = { ...next, headerRow: options.headerRow };
     history.current.undo = [...history.current.undo.slice(-49), value];
     history.current.redo = [];
     lastValue.current = next;
@@ -112,7 +120,8 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
   };
   const travel = (direction: 'undo' | 'redo') => {
     if (readOnly || !history.current[direction].length) return;
-    const next = history.current[direction].pop()!;
+    const previous = history.current[direction].pop()!;
+    const next = previous ? { ...previous, headerRow: options.headerRow } : previous;
     history.current[direction === 'undo' ? 'redo' : 'undo'].push(value);
     lastValue.current = next;
     onChange(next);
@@ -194,7 +203,7 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
     try {
       const text = await file.text();
       if (!mounted.current || current.current.value !== target || current.current.readOnly) return;
-      const hasHeader = target?.headerRow ?? options.headerRow;
+      const hasHeader = options.headerRow;
       const matrix = parseDelimited(text, ',', options.maxRows + (hasHeader ? 1 : 0), options.maxColumns);
       const headers = hasHeader ? (matrix.shift() ?? []) : [];
       const width = Math.max(options.minColumns, headers.length, ...matrix.map((row) => row.length));
@@ -219,7 +228,7 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
   const exportCSV = () => {
     if (!value) return;
     const matrix = [
-      ...(value.headerRow ? [value.columns.map((column) => column.label)] : []),
+      ...(options.headerRow ? [value.columns.map((column) => column.label)] : []),
       ...results.map((row) => row.map((cell) => String(cell ?? ''))),
     ];
     const blob = new Blob(
@@ -241,57 +250,114 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
   return (
     <div className="advanced-table" ref={root}>
       <div className="advanced-table__toolbar" aria-label="Table actions">
-        {!readOnly && (
-          <>
-            {!value && (
-              <button type="button" onClick={() => commit(createTable(options))}>
-                Create table
+        <TableMenu label="Table">
+          {!readOnly && (
+            <>
+              {!value && (
+                <button type="button" onClick={() => commit(createTable(options))}>
+                  Create table
+                </button>
+              )}
+              <button type="button" onClick={() => fileInput.current?.click()}>
+                Import CSV
               </button>
-            )}
-            {value && (
-              <>
-                <button
-                  type="button"
-                  disabled={value.rows.length >= options.maxRows}
-                  onClick={() =>
-                    commit({
-                      ...value,
-                      rows: [...value.rows, { id: createTableID(), cells: value.columns.map(() => '') }],
-                    })
-                  }
-                >
-                  Add row
-                </button>
-                <button
-                  type="button"
-                  disabled={value.columns.length >= options.maxColumns}
-                  onClick={() =>
-                    commit({
-                      ...value,
-                      columns: [...value.columns, { id: createTableID(), label: `Column ${value.columns.length + 1}` }],
-                      rows: value.rows.map((row) => ({ ...row, cells: [...row.cells, ''] })),
-                    })
-                  }
-                >
-                  Add column
-                </button>
-                <button type="button" onClick={clearSelection}>
-                  Clear cells
-                </button>
+              {value && (
                 <button type="button" onClick={() => commit(null)}>
                   Clear table
                 </button>
-              </>
-            )}
-            <button type="button" disabled={!history.current.undo.length} onClick={() => travel('undo')}>
-              Undo
+              )}
+            </>
+          )}
+          {value && (
+            <>
+              <button type="button" onClick={exportCSV}>
+                Export CSV
+              </button>
+            </>
+          )}
+        </TableMenu>
+        <TableMenu label="Edit">
+          {!readOnly && (
+            <>
+              <button type="button" disabled={!history.current.undo.length} onClick={() => travel('undo')}>
+                Undo
+              </button>
+              <button type="button" disabled={!history.current.redo.length} onClick={() => travel('redo')}>
+                Redo
+              </button>
+              {value && (
+                <button type="button" onClick={clearSelection}>
+                  Clear cells
+                </button>
+              )}
+            </>
+          )}
+          {value && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!navigator.clipboard?.writeText) {
+                    setMessage('Clipboard unavailable. Select cells and use your browser’s Copy command.');
+                    return;
+                  }
+                  void navigator.clipboard.writeText(stringifyDelimited(copyMatrix())).then(
+                    () => setMessage('Selection copied.'),
+                    () => setMessage('Clipboard unavailable. Select cells and use your browser’s Copy command.'),
+                  );
+                }}
+              >
+                Copy cells
+              </button>
+            </>
+          )}
+        </TableMenu>
+        {!readOnly && value && (
+          <TableMenu label="Insert">
+            <button
+              type="button"
+              disabled={value.rows.length >= options.maxRows}
+              onClick={() =>
+                commit({
+                  ...value,
+                  rows: [...value.rows, { id: createTableID(), cells: value.columns.map(() => '') }],
+                })
+              }
+            >
+              Add row
             </button>
-            <button type="button" disabled={!history.current.redo.length} onClick={() => travel('redo')}>
-              Redo
+            <button
+              type="button"
+              disabled={value.columns.length >= options.maxColumns}
+              onClick={() =>
+                commit({
+                  ...value,
+                  columns: [...value.columns, { id: createTableID(), label: `Column ${value.columns.length + 1}` }],
+                  rows: value.rows.map((row) => ({ ...row, cells: [...row.cells, ''] })),
+                })
+              }
+            >
+              Add column
             </button>
-            <button type="button" onClick={() => fileInput.current?.click()}>
-              Import CSV
+          </TableMenu>
+        )}
+        {value && (
+          <TableMenu label="View">
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={() => {
+                setWidths({});
+                if (options.storage === 'json')
+                  commit({ ...value, columns: value.columns.map(({ width: _width, ...column }) => column) });
+              }}
+            >
+              Reset column widths
             </button>
+          </TableMenu>
+        )}
+        {!readOnly && (
+          <>
             <input
               hidden
               ref={fileInput}
@@ -305,28 +371,6 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
             />
           </>
         )}
-        {value && (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                if (!navigator.clipboard?.writeText) {
-                  setMessage('Clipboard unavailable. Select cells and use your browser’s Copy command.');
-                  return;
-                }
-                void navigator.clipboard.writeText(stringifyDelimited(copyMatrix())).then(
-                  () => setMessage('Selection copied.'),
-                  () => setMessage('Clipboard unavailable. Select cells and use your browser’s Copy command.'),
-                );
-              }}
-            >
-              Copy cells
-            </button>
-            <button type="button" onClick={exportCSV}>
-              Export CSV
-            </button>
-          </>
-        )}
       </div>
       <div role="status" className="advanced-table__status">
         {message}
@@ -335,28 +379,6 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
         <p>No table content.</p>
       ) : (
         <>
-          <div className="advanced-table__settings">
-            {options.caption && (
-              <label>
-                Caption{' '}
-                <input
-                  readOnly={readOnly}
-                  value={value.caption}
-                  maxLength={MAX_CELL_LENGTH}
-                  onChange={(event) => commit({ ...value, caption: event.target.value })}
-                />
-              </label>
-            )}
-            <label>
-              <input
-                type="checkbox"
-                disabled={readOnly || options.storage === 'csv'}
-                checked={value.headerRow}
-                onChange={(event) => commit({ ...value, headerRow: event.target.checked })}
-              />{' '}
-              Header row
-            </label>
-          </div>
           <p className="advanced-table__help">
             Tab and Enter move between cells. Alt+Enter adds a line break. Shift-click selects a rectangle;
             Alt+Shift+Arrow extends it.
@@ -389,21 +411,26 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
               event.clipboardData.setData('text/plain', stringifyDelimited(copyMatrix()));
             }}
           >
-            <table aria-label="Table content">
+            <table
+              aria-label="Table content"
+              style={{ width: 64 + value.columns.reduce((sum, column) => sum + columnWidth(column), 0) }}
+            >
+              <colgroup>
+                <col style={{ width: 64 }} />
+                {value.columns.map((column) => (
+                  <col key={column.id} style={{ width: columnWidth(column) }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   <th scope="col">
                     <span className="advanced-table__sr">Row</span>
                   </th>
                   {value.columns.map((column, c) => (
-                    <th
-                      scope="col"
-                      key={column.id}
-                      style={{ minWidth: column.width ?? 180, width: column.width ?? 180 }}
-                    >
+                    <th scope="col" key={column.id} style={{ width: columnWidth(column) }}>
                       <div className="advanced-table__column-heading">
                         <span>{columnName(c)}</span>
-                        {value.headerRow && (
+                        {options.headerRow && (
                           <input
                             aria-label={`Header ${columnName(c)}`}
                             readOnly={readOnly}
@@ -420,90 +447,88 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
                           />
                         )}
                         {!readOnly && (
-                          <details>
-                            <summary aria-label={`Column ${columnName(c)} actions`}>⋯</summary>
-                            <div className="advanced-table__menu">
-                              <button
-                                type="button"
-                                disabled={c === 0}
-                                onClick={() => {
-                                  commit(moveColumn(value, c, c - 1));
-                                  setSelection(initialSelection);
-                                }}
-                              >
-                                Move left
-                              </button>
-                              <button
-                                type="button"
-                                disabled={c === value.columns.length - 1}
-                                onClick={() => {
-                                  commit(moveColumn(value, c, c + 1));
-                                  setSelection(initialSelection);
-                                }}
-                              >
-                                Move right
-                              </button>
-                              <button
-                                type="button"
-                                disabled={value.columns.length >= options.maxColumns}
-                                onClick={() => {
-                                  const columns = [...value.columns];
-                                  columns.splice(c + 1, 0, { ...column, id: createTableID() });
-                                  commit({
-                                    ...value,
-                                    columns,
-                                    rows: value.rows.map((row) => {
-                                      const cells = [...row.cells];
-                                      cells.splice(c + 1, 0, row.cells[c]);
-                                      return { ...row, cells };
-                                    }),
-                                  });
-                                }}
-                              >
-                                Duplicate column
-                              </button>
-                              <button
-                                type="button"
-                                disabled={value.columns.length <= options.minColumns}
-                                onClick={() => {
-                                  commit({
-                                    ...value,
-                                    columns: value.columns.filter((_, i) => i !== c),
-                                    rows: value.rows.map((row) => ({
-                                      ...row,
-                                      cells: row.cells.filter((_, i) => i !== c),
-                                    })),
-                                  });
-                                  setSelection(initialSelection);
-                                }}
-                              >
-                                Delete column
-                              </button>
-                              {options.storage === 'json' && (
-                                <label>
-                                  Width{' '}
-                                  <input
-                                    type="range"
-                                    aria-label={`Width ${columnName(c)}`}
-                                    min={100}
-                                    max={600}
-                                    step={20}
-                                    value={column.width ?? 180}
-                                    onChange={(event) =>
-                                      commit({
-                                        ...value,
-                                        columns: value.columns.map((item, i) =>
-                                          i === c ? { ...item, width: Number(event.target.value) } : item,
-                                        ),
-                                      })
-                                    }
-                                  />
-                                </label>
-                              )}
-                            </div>
-                          </details>
+                          <TableMenu compact label={`Column ${columnName(c)} actions`}>
+                            <button
+                              type="button"
+                              disabled={c === 0}
+                              onClick={() => {
+                                commit(moveColumn(value, c, c - 1));
+                                setSelection(initialSelection);
+                              }}
+                            >
+                              Move left
+                            </button>
+                            <button
+                              type="button"
+                              disabled={c === value.columns.length - 1}
+                              onClick={() => {
+                                commit(moveColumn(value, c, c + 1));
+                                setSelection(initialSelection);
+                              }}
+                            >
+                              Move right
+                            </button>
+                            <button
+                              type="button"
+                              disabled={value.columns.length >= options.maxColumns}
+                              onClick={() => {
+                                const columns = [...value.columns];
+                                columns.splice(c + 1, 0, { ...column, id: createTableID() });
+                                commit({
+                                  ...value,
+                                  columns,
+                                  rows: value.rows.map((row) => {
+                                    const cells = [...row.cells];
+                                    cells.splice(c + 1, 0, row.cells[c]);
+                                    return { ...row, cells };
+                                  }),
+                                });
+                              }}
+                            >
+                              Duplicate column
+                            </button>
+                            <button
+                              type="button"
+                              disabled={value.columns.length <= options.minColumns}
+                              onClick={() => {
+                                commit({
+                                  ...value,
+                                  columns: value.columns.filter((_, i) => i !== c),
+                                  rows: value.rows.map((row) => ({
+                                    ...row,
+                                    cells: row.cells.filter((_, i) => i !== c),
+                                  })),
+                                });
+                                setSelection(initialSelection);
+                              }}
+                            >
+                              Delete column
+                            </button>
+                          </TableMenu>
                         )}
                       </div>
+                      {!readOnly && (
+                        <ColumnResize
+                          label={`column ${columnName(c)}`}
+                          width={columnWidth(column)}
+                          onResize={(width, final) => {
+                            setWidths((previous) => ({ ...previous, [column.id]: width }));
+                            if (final && options.storage === 'json') {
+                              commit({
+                                ...value,
+                                columns: value.columns.map((item) =>
+                                  item.id === column.id ? { ...item, width } : item,
+                                ),
+                              });
+                              setWidths((previous) => {
+                                const next = { ...previous };
+                                delete next[column.id];
+                                return next;
+                              });
+                            }
+                          }}
+                        />
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -512,11 +537,10 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
                 {value.rows.map((row, r) => (
                   <tr key={`${row.id}:${revision}`}>
                     <th scope="row">
-                      <span>{r + 1}</span>
-                      {!readOnly && (
-                        <details>
-                          <summary aria-label={`Row ${r + 1} actions`}>⋯</summary>
-                          <div className="advanced-table__menu">
+                      <div className="advanced-table__row-heading">
+                        <span>{r + 1}</span>
+                        {!readOnly && (
+                          <TableMenu compact label={`Row ${r + 1} actions`}>
                             <button
                               type="button"
                               disabled={r === 0}
@@ -558,9 +582,9 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
                             >
                               Delete row
                             </button>
-                          </div>
-                        </details>
-                      )}
+                          </TableMenu>
+                        )}
+                      </div>
                     </th>
                     {row.cells.map((cell, c) => (
                       <td
@@ -586,7 +610,7 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
                           result={results[r][c]}
                           options={options}
                           readOnly={readOnly}
-                          label={`${columnName(c)}${r + 1}${value.headerRow ? `: ${value.columns[c].label}` : ''}`}
+                          label={`${columnName(c)}${r + 1}${options.headerRow ? `: ${value.columns[c].label}` : ''}`}
                           onChange={(next) => attempt(() => updateCell(r, c, parseCell(next, options)))}
                           onFocus={() => {
                             if (!selecting.current)
