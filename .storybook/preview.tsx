@@ -10,7 +10,7 @@ const preview: Preview = {
     layout: 'padded',
     controls: { expanded: true },
     msw: { handlers },
-    options: { storySort: { order: ['Fields', ['Code', 'Color', 'Link', 'Phone', 'Table']] } },
+    options: { storySort: { method: 'alphabetical', includeNames: false } },
   },
   globalTypes: {
     theme: {
