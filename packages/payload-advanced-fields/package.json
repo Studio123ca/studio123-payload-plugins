@@ -52,11 +52,21 @@
       "types": "./dist/phone-field/client.d.ts",
       "default": "./dist/phone-field/client.js"
     },
+    "./table": {
+      "types": "./dist/table-field/index.d.ts",
+      "default": "./dist/table-field/index.js"
+    },
+    "./table/client": {
+      "types": "./dist/table-field/client.d.ts",
+      "default": "./dist/table-field/client.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "README.md",
+    "docs",
+    "CHANGELOG.md",
     "LICENSE",
     "LICENSES.md"
   ],
@@ -71,11 +81,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node esbuild.js",
     "prepublishOnly": "npm run build",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "preview:table": "node scripts/table-preview.mjs"
   },
   "peerDependencies": {
-    "@payloadcms/ui": "^4.0.0-canary.9",
-    "payload": "^4.0.0-canary.9",
+    "@payloadcms/ui": "4.0.0-canary.37",
+    "payload": "4.0.0-canary.37",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
@@ -92,6 +104,7 @@
     "@types/react-dom": "19.2.3",
     "@types/validator": "^13.15.10",
     "esbuild": "^0.28.1",
+    "jsdom": "26.1.0",
     "typescript": "6.0.3"
   },
   "engines": {

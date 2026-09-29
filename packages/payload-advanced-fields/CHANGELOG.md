@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Pinned Payload and `@payloadcms/ui` to `4.0.0-canary.37`, replacing the older canary declarations and internal-build lockfile resolution.
+- Added `tableField()` with JSON-backed content tables, CSV-string content tables, native array-backed structured records, and JSON spreadsheets with optional bounded formulas.
+- Added table editing, row/column operations, rectangular selection, TSV copy/paste, session undo/redo, CSV import/export, generated JSON schema, and server validation.
+- Added the `/table` and `/table/client` entry points, shared formula/CSV helpers, field documentation, a local editor preview, and data/component/config integration tests.
+- Included field guides and the changelog in the published package.
+- Added workspace Prettier configuration and `format` / `format:check` scripts, and formatted existing sources and documentation.
+
 ## 1.0.4
 
 - Added the new phone field with `libphonenumber-js` parsing, country selection, allowed-country validation, extension support, canonical metadata storage, and configurable formatting.

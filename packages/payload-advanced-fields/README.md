@@ -17,6 +17,7 @@ A collection of enhanced field types for Payload CMS.
 - **Code Editor Field** - Syntax-highlighted code editing with CodeMirror
 - **Link Field** - Internal/external link management with validation
 - **Phone Field** - Canonical phone data with country selector, extension input, validation, and custom formatting
+- **Table Field** - Content tables with JSON or CSV storage, native structured records, and spreadsheets with optional formulas
 - **Optimized Bundling** - Each field is independently bundled for minimal bloat
 - **Tree-shakeable** - Import only what you need
 - **Full TypeScript Support** - Complete type definitions included
@@ -30,16 +31,39 @@ npm install @studio123/payload-advanced-fields
 
 ## Field Types
 
-| Field | Docs | Import | Summary |
-|---|---|---|---|
-| Color | [Documentation](docs/COLOR_FIELD.md) | `@studio123/payload-advanced-fields/color` | Color picker field with swatches and multiple `react-color` styles. |
-| Code | [Documentation](docs/CODE_FIELD.md) | `@studio123/payload-advanced-fields/code` | Syntax-highlighted code editor powered by CodeMirror. |
-| Link | [Documentation](docs/LINK_FIELD.md) | `@studio123/payload-advanced-fields/link` | Internal/external link field with plugin-level collection config. |
-| Phone | [Documentation](docs/PHONE_FIELD.md) | `@studio123/payload-advanced-fields/phone` | Canonical phone data field with country selector, extension input, validation, and custom formatting. |
+| Field | Docs                                 | Import                                     | Summary                                                                                                                             |
+| ----- | ------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Color | [Documentation](docs/COLOR_FIELD.md) | `@studio123/payload-advanced-fields/color` | Color picker field with swatches and multiple `react-color` styles.                                                                 |
+| Code  | [Documentation](docs/CODE_FIELD.md)  | `@studio123/payload-advanced-fields/code`  | Syntax-highlighted code editor powered by CodeMirror.                                                                               |
+| Link  | [Documentation](docs/LINK_FIELD.md)  | `@studio123/payload-advanced-fields/link`  | Internal/external link field with plugin-level collection config.                                                                   |
+| Phone | [Documentation](docs/PHONE_FIELD.md) | `@studio123/payload-advanced-fields/phone` | Canonical phone data field with country selector, extension input, validation, and custom formatting.                               |
+| Table | [Documentation](docs/TABLE_FIELD.md) | `@studio123/payload-advanced-fields/table` | Content tables (JSON or CSV), typed native array records, and spreadsheets with formulas, clipboard editing, and CSV import/export. |
 
 ---
 
 ## Usage Examples
+
+### Table fields
+
+```typescript
+import { tableField } from '@studio123/payload-advanced-fields/table';
+
+const fields = [
+  tableField({ name: 'specifications', mode: 'content' }),
+  tableField({ name: 'priceListCSV', storage: 'csv', headerRow: true }),
+  tableField({
+    name: 'lineItems',
+    mode: 'structured',
+    columns: [
+      { name: 'description', type: 'text', required: true },
+      { name: 'quantity', type: 'number', min: 0 },
+    ],
+  }),
+  tableField({ name: 'estimates', mode: 'spreadsheet', formulas: true }),
+];
+```
+
+See the [Table field guide](docs/TABLE_FIELD.md) for storage contracts, formula syntax, configuration, keyboard controls, and migration notes. This package currently pins Payload and `@payloadcms/ui` to `4.0.0-canary.37`.
 
 ### Complete Global Configuration with Multiple Fields
 
@@ -188,6 +212,7 @@ import { ColorField } from '@studio123/payload-advanced-fields/color/client';
 - **Code Field** - Compiled with TypeScript (uses external @codemirror)
 - **Link Field** - Compiled with TypeScript (minimal dependencies)
 - **Phone Field** - Compiled with TypeScript and powered by `libphonenumber-js`
+- **Table Field** - Compiled with TypeScript, with a separate client entry point and packaged CSS; no additional runtime dependency
 
 This ensures users only pay for what they use - if you only use ColorField, you don't load CodeMirror.
 

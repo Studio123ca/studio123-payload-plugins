@@ -45,15 +45,15 @@ export type LinkInternalHrefResolverArgs = {
 export type LinkHrefResolver = (args: LinkInternalHrefResolverArgs) => string | Promise<string>;
 
 export type LinkFieldClientComponent = {
-	collectionSlugs?: CollectionSlug[];
-	defaultType?: LinkType;
-	localized?: boolean;
-	required?: boolean;
+  collectionSlugs?: CollectionSlug[];
+  defaultType?: LinkType;
+  localized?: boolean;
+  required?: boolean;
 };
 
 export type LinkFieldErrorComponent = {
-	path: string;
-	showError: boolean;
+  path: string;
+  showError: boolean;
 };
 
 export type LinkFieldLabelComponent = any;
@@ -63,15 +63,15 @@ export type LinkFieldLabelComponent = any;
  * Extends Payload's JSONField with link-specific properties
  */
 export type LinkField = {
-	type: 'json';
-	collectionSlugs?: CollectionSlug[];
-	defaultType?: LinkType;
-	resolveInternalHref?: LinkHrefResolver;
-	admin?: JSONField['admin'] & {
-		components?: {
-			Field?: PayloadComponent<any>;
-		};
-	};
+  type: 'json';
+  collectionSlugs?: CollectionSlug[];
+  defaultType?: LinkType;
+  resolveInternalHref?: LinkHrefResolver;
+  admin?: JSONField['admin'] & {
+    components?: {
+      Field?: PayloadComponent<any>;
+    };
+  };
 } & Omit<JSONField, 'admin' | 'type'>;
 
 export type LinkFieldPluginConfig = {

@@ -1,5 +1,8 @@
 import type { getAdvancedFieldsConfig, getLinkCollections } from '../../config.js';
-import { getAdvancedFieldsConfig as getAdvancedFieldsConfigDefault, getLinkCollections as getLinkCollectionsDefault } from '../../config.js';
+import {
+  getAdvancedFieldsConfig as getAdvancedFieldsConfigDefault,
+  getLinkCollections as getLinkCollectionsDefault,
+} from '../../config.js';
 import { DEFAULT_LINK_COLLECTIONS } from '../shared/constants.js';
 import type { LinkField, LinkCollectionOption, LinkType, LinkValue, LinkHrefResolver } from '../shared/types.js';
 import { validateLink } from '../shared/validateLink.js';
@@ -25,7 +28,7 @@ const sanitizeCollections = (collections?: LinkCollectionOption[]) => {
 const filterCollections = (collectionSlugs?: string[], getLinkCollectionsFn?: typeof getLinkCollections) => {
   const globalCollections = sanitizeCollections(getLinkCollectionsFn?.());
   if (!collectionSlugs || collectionSlugs.length === 0) return globalCollections;
-  return globalCollections.filter(collection => collectionSlugs.includes(collection.slug));
+  return globalCollections.filter((collection) => collectionSlugs.includes(collection.slug));
 };
 
 const toClientCollection = (collection: LinkCollectionOption): { slug: string } => ({
@@ -69,7 +72,7 @@ export const linkField = (
     type: 'json',
     localized,
     defaultValue: { ...defaultValue, type: normalizedDefaultType },
-    validate: value => {
+    validate: (value) => {
       // Get collections at validate time, not at field definition time
       const normalizedCollections = filterCollections(collectionSlugs, getCollectionsFn);
       return validateLink(value as LinkValue | null | undefined, { collections: normalizedCollections, required });
@@ -77,14 +80,14 @@ export const linkField = (
     admin: {
       ...admin,
       components: {
-				Field: {
-					path: '@studio123/payload-advanced-fields/link/client',
-					exportName: 'LinkField',
-					clientProps: {
-						collectionSlugs: collectionSlugs,
-						defaultType: normalizedDefaultType,
-					},
-				},
+        Field: {
+          path: '@studio123/payload-advanced-fields/link/client',
+          exportName: 'LinkField',
+          clientProps: {
+            collectionSlugs: collectionSlugs,
+            defaultType: normalizedDefaultType,
+          },
+        },
         ...(admin?.components || {}),
       },
     },

@@ -31,20 +31,20 @@ codeField({
   localized: false,
   language: 'html',
   height: 400,
-})
+});
 ```
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | string | `'code'` | Field name in the database |
-| `label` | string | `'Code'` | Display label in admin UI |
-| `description` | string | `undefined` | Help text for the field |
-| `required` | boolean | `true` | Whether the field is required |
-| `localized` | boolean | `false` | Enable multi-language support |
-| `language` | 'html' \| 'text' | `'html'` | Syntax highlighting language |
-| `height` | number | `360` | Editor height in pixels |
+| Option        | Type             | Default     | Description                   |
+| ------------- | ---------------- | ----------- | ----------------------------- |
+| `name`        | string           | `'code'`    | Field name in the database    |
+| `label`       | string           | `'Code'`    | Display label in admin UI     |
+| `description` | string           | `undefined` | Help text for the field       |
+| `required`    | boolean          | `true`      | Whether the field is required |
+| `localized`   | boolean          | `false`     | Enable multi-language support |
+| `language`    | 'html' \| 'text' | `'html'`    | Syntax highlighting language  |
+| `height`      | number           | `360`       | Editor height in pixels       |
 
 ## Supported Languages
 
@@ -81,7 +81,7 @@ The field stores the code as a plain text string:
 
 ```typescript
 {
-  customCode: '<div class="hero">...</div>'
+  customCode: '<div class="hero">...</div>';
 }
 ```
 

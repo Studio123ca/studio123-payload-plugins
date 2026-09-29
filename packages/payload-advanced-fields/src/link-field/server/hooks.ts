@@ -70,7 +70,10 @@ const populateInternalLink = async (
   if (selectedID === null || selectedID === undefined || selectedID === '') return { hydrated: current, doc: null };
 
   const doc = await fetchInternalDoc(req, current.internal.relationTo, selectedID);
-  const title = doc && typeof (doc as Record<string, unknown>).title === 'string' ? ((doc as Record<string, unknown>).title as string) : current.internal.title ?? null;
+  const title =
+    doc && typeof (doc as Record<string, unknown>).title === 'string'
+      ? ((doc as Record<string, unknown>).title as string)
+      : (current.internal.title ?? null);
   const hydrated = {
     ...current,
     internal: {
@@ -93,7 +96,7 @@ const resolveStoredHref = async (
   if (!value) return null;
 
   if (value.type === 'internal' && value.internal) {
-    const collection = collections.find(item => item.slug === value.internal?.relationTo);
+    const collection = collections.find((item) => item.slug === value.internal?.relationTo);
     if (collection) {
       // Try custom resolver first
       if (hrefResolver) {
@@ -107,18 +110,19 @@ const resolveStoredHref = async (
         if (resolvedHref) return appendAnchor(resolvedHref, value.anchor);
       }
 
-       // Fall back to collection's generateURL
-       if (collection.generateURL && doc) {
-         // Prefer request locale, fall back to doc locale
-         const locale = typeof req?.locale === 'string' ? req.locale : typeof doc.locale === 'string' ? doc.locale : undefined;
-         const generatedHref = await collection.generateURL({
-           collection,
-           doc,
-           locale,
-           req,
-         });
-         return appendAnchor(generatedHref, value.anchor);
-       }
+      // Fall back to collection's generateURL
+      if (collection.generateURL && doc) {
+        // Prefer request locale, fall back to doc locale
+        const locale =
+          typeof req?.locale === 'string' ? req.locale : typeof doc.locale === 'string' ? doc.locale : undefined;
+        const generatedHref = await collection.generateURL({
+          collection,
+          doc,
+          locale,
+          req,
+        });
+        return appendAnchor(generatedHref, value.anchor);
+      }
     } else {
       // collection not found
     }
@@ -151,7 +155,7 @@ const sanitizeCollections = (collections?: LinkCollectionOption[]) => {
 const filterCollections = (collectionSlugs?: string[]) => {
   const globalCollections = sanitizeCollections(getLinkCollections());
   if (!collectionSlugs || collectionSlugs.length === 0) return globalCollections;
-  return globalCollections.filter(collection => collectionSlugs.includes(collection.slug));
+  return globalCollections.filter((collection) => collectionSlugs.includes(collection.slug));
 };
 
 export function createLinkFieldHooks(collectionSlugs?: string[], resolveInternalHref?: LinkHrefResolver) {
@@ -171,7 +175,7 @@ export function createLinkFieldHooks(collectionSlugs?: string[], resolveInternal
 
     // Get collections at hook EXECUTION time, not definition time
     const normalizedCollections = filterCollections(collectionSlugs);
-    
+
     const result = await populateInternalLink(value as LinkValue | null | undefined, normalizedCollections, req);
     const hydrated = result.hydrated;
     if (!hydrated) {

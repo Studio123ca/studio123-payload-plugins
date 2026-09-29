@@ -30,7 +30,7 @@ linkField({
   localized: false,
   collectionSlugs: ['pages', 'posts'],
   defaultType: 'internal',
-})
+});
 ```
 
 ## Plugin Configuration
@@ -75,22 +75,22 @@ advancedFieldsPlugin({
       },
     ],
   },
-})
+});
 ```
 
 `collectionSlugs` on `linkField(...)` narrows the available collections for a specific field, while the plugin config defines the global collection registry and URL generation.
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | string | `'link'` | Field name in the database |
-| `label` | string | `'Link'` | Display label in admin UI |
-| `description` | string | `undefined` | Help text for the field |
-| `required` | boolean | `false` | Whether the field is required |
-| `localized` | boolean | `false` | Enable multi-language support |
-| `collectionSlugs` | string[] | `[]` | Collections available for internal links |
-| `defaultType` | LinkType | `undefined` | Default link type (internal/external/email/phone) |
+| Option            | Type     | Default     | Description                                       |
+| ----------------- | -------- | ----------- | ------------------------------------------------- |
+| `name`            | string   | `'link'`    | Field name in the database                        |
+| `label`           | string   | `'Link'`    | Display label in admin UI                         |
+| `description`     | string   | `undefined` | Help text for the field                           |
+| `required`        | boolean  | `false`     | Whether the field is required                     |
+| `localized`       | boolean  | `false`     | Enable multi-language support                     |
+| `collectionSlugs` | string[] | `[]`        | Collections available for internal links          |
+| `defaultType`     | LinkType | `undefined` | Default link type (internal/external/email/phone) |
 
 ## Link Types
 

@@ -41,7 +41,7 @@ phoneField({
     enabled: true,
   },
   formatter: 'international',
-})
+});
 ```
 
 ## Custom Formatting
@@ -51,16 +51,14 @@ phoneField({
   name: 'billingPhone',
   label: 'Billing Phone',
   defaultCountry: 'US',
-  formatter: parts => {
+  formatter: (parts) => {
     if (!parts.national) {
       return parts.international || parts.number;
     }
 
-    return parts.national
-      .replace(/\D/g, '')
-      .replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3');
+    return parts.national.replace(/\D/g, '').replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3');
   },
-})
+});
 ```
 
 ## Country Selection
@@ -73,23 +71,23 @@ If the number is invalid for the selected country, the draft value and selected 
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | string | `'phone'` | Field name in the database |
-| `label` | string | `'Phone'` | Display label in admin UI |
-| `required` | boolean | `false` | Whether the field is required |
-| `localized` | boolean | `false` | Enable multi-language support |
-| `defaultCountry` | string | `'US'` | Default country for national-format parsing |
-| `admin.placeholder` | string | `undefined` | Input placeholder (Payload standard) |
-| `admin.width` | string | `undefined` | Field width (Payload standard) |
-| `countries.enabled` | boolean | `false` | Render the country selector |
-| `countries.enabledCountries` | string[] | all countries | Restrict country validation and selector options |
-| `countries.showFlag` | boolean | `true` | Show the country flag in the selector |
-| `countries.showCountryCode` | boolean | `true` | Show the calling code in the selector |
-| `countries.countryLabelStyle` | `long` \| `short` | `'short'` | Country label style in the selector |
-| `extension.enabled` | boolean | `false` | Render an inline extension input |
-| `extension.placeholder` | string | `'ext.'` | Placeholder text for the extension input |
-| `formatter` | `'international' \| 'national' \| function` | `'international'` | Format the number visually on blur |
+| Option                        | Type                                        | Default           | Description                                      |
+| ----------------------------- | ------------------------------------------- | ----------------- | ------------------------------------------------ |
+| `name`                        | string                                      | `'phone'`         | Field name in the database                       |
+| `label`                       | string                                      | `'Phone'`         | Display label in admin UI                        |
+| `required`                    | boolean                                     | `false`           | Whether the field is required                    |
+| `localized`                   | boolean                                     | `false`           | Enable multi-language support                    |
+| `defaultCountry`              | string                                      | `'US'`            | Default country for national-format parsing      |
+| `admin.placeholder`           | string                                      | `undefined`       | Input placeholder (Payload standard)             |
+| `admin.width`                 | string                                      | `undefined`       | Field width (Payload standard)                   |
+| `countries.enabled`           | boolean                                     | `false`           | Render the country selector                      |
+| `countries.enabledCountries`  | string[]                                    | all countries     | Restrict country validation and selector options |
+| `countries.showFlag`          | boolean                                     | `true`            | Show the country flag in the selector            |
+| `countries.showCountryCode`   | boolean                                     | `true`            | Show the calling code in the selector            |
+| `countries.countryLabelStyle` | `long` \| `short`                           | `'short'`         | Country label style in the selector              |
+| `extension.enabled`           | boolean                                     | `false`           | Render an inline extension input                 |
+| `extension.placeholder`       | string                                      | `'ext.'`          | Placeholder text for the extension input         |
+| `formatter`                   | `'international' \| 'national' \| function` | `'international'` | Format the number visually on blur               |
 
 ## Stored Data
 

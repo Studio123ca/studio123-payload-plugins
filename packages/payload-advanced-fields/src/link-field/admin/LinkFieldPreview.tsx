@@ -23,7 +23,9 @@ export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, renderLabel
   const hasEmailSelected = value?.type === 'email' && value?.email?.trim();
   const hasPhoneSelected = value?.type === 'phone' && value?.phone?.trim();
   const hasInternalSelected = value?.type === 'internal' && value?.internal?.value;
-  const hasDestinationValue = Boolean(hasInternalSelected || hasExternalSelected || hasEmailSelected || hasPhoneSelected);
+  const hasDestinationValue = Boolean(
+    hasInternalSelected || hasExternalSelected || hasEmailSelected || hasPhoneSelected,
+  );
   const hasActions = Boolean(onEdit || (hasDestination && onClear));
   const previewText = url || (hasDestinationValue ? '(Pending changes)' : 'No destination set.');
 
@@ -81,7 +83,9 @@ export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, renderLabel
               ) : null}
               {opensInNewTab ? <span className="sr-only"> (opens in a new tab)</span> : null}
             </a>
-          ) : previewText}
+          ) : (
+            previewText
+          )}
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>

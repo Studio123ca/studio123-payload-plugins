@@ -10,10 +10,7 @@ export type { CodeField, CodeFieldConfig } from './code-field/server/field.js';
 export { linkField } from './link-field/server/field.js';
 export { getLinkHref } from './link-field/shared/getLinkHref.js';
 export { getLinkLabel } from './link-field/shared/getLinkLabel.js';
-export type {
-  LinkField,
-  LinkFieldConfig,
-} from './link-field/server/field.js';
+export type { LinkField, LinkFieldConfig } from './link-field/server/field.js';
 export type {
   LinkCollectionOption,
   LinkFieldPluginConfig,
@@ -31,3 +28,17 @@ export type { ColorValue, ColorPickerType, ColorOption, RGB, HSL } from './color
 export { phoneField } from './phone-field/server/field.js';
 export type { PhoneField, PhoneFieldConfig } from './phone-field/server/field.js';
 export type { PhoneFieldValue } from './phone-field/shared/types.js';
+
+export { tableField, evaluateTable, csvToTable, tableToCSV } from './table-field/index.js';
+export type {
+  CSVTableFieldConfig,
+  JSONTableFieldConfig,
+  StructuredTableFieldConfig,
+  TableCell,
+  TableColumn,
+  TableField,
+  TableFieldConfig,
+  TableOptions,
+  TableValue,
+  TableResult,
+} from './table-field/index.js';

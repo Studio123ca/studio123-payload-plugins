@@ -38,24 +38,24 @@ colorField({
     { hex: '#4ECDC4', label: 'Teal', slug: 'teal' },
   ],
   defaultColor: { hex: '#4ECDC4', label: 'Teal', slug: 'teal' },
-})
+});
 ```
 
 ## Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | string | `'color'` | Field name in the database |
-| `label` | string | `'Color'` | Display label in admin UI |
-| `description` | string | `undefined` | Help text for the field |
-| `required` | boolean | `false` | Whether the field is required |
-| `localized` | boolean | `false` | Enable multi-language support |
-| `pickerType` | string | `'sketch'` | Color picker interface style |
-| `disableAlpha` | boolean | `false` | Disable alpha channel slider |
-| `presetColors` | ColorOption[] | `[]` | Predefined color options |
-| `defaultColor` | ColorOption \| string | `undefined` | Initial color value |
-| `swatches.size` | string | `'40px'` | Size of swatches in the swatches picker |
-| `swatches.radius` | string | `'50%'` | Border radius for the swatches picker (e.g., '50%' for circles, '4px' for rounded, '0' for squares) |
+| Option            | Type                  | Default     | Description                                                                                         |
+| ----------------- | --------------------- | ----------- | --------------------------------------------------------------------------------------------------- |
+| `name`            | string                | `'color'`   | Field name in the database                                                                          |
+| `label`           | string                | `'Color'`   | Display label in admin UI                                                                           |
+| `description`     | string                | `undefined` | Help text for the field                                                                             |
+| `required`        | boolean               | `false`     | Whether the field is required                                                                       |
+| `localized`       | boolean               | `false`     | Enable multi-language support                                                                       |
+| `pickerType`      | string                | `'sketch'`  | Color picker interface style                                                                        |
+| `disableAlpha`    | boolean               | `false`     | Disable alpha channel slider                                                                        |
+| `presetColors`    | ColorOption[]         | `[]`        | Predefined color options                                                                            |
+| `defaultColor`    | ColorOption \| string | `undefined` | Initial color value                                                                                 |
+| `swatches.size`   | string                | `'40px'`    | Size of swatches in the swatches picker                                                             |
+| `swatches.radius` | string                | `'50%'`     | Border radius for the swatches picker (e.g., '50%' for circles, '4px' for rounded, '0' for squares) |
 
 ## Picker Types
 
@@ -78,31 +78,31 @@ You can pass multiple color formats in `presetColors` - each preset can use any 
 presetColors: [
   // Hex format (opaque)
   { hex: '#000000', label: 'Black', slug: 'black' },
-  
+
   // Hex format with separate alpha value
   { hex: '#FF0000', alpha: 0.5, label: 'Semi-transparent Red', slug: 'red-transparent' },
-  
+
   // RGBA format (alpha included in color data)
   {
     rgba: { r: 255, g: 0, b: 0, a: 0.5 },
     label: 'Semi-transparent Red',
     slug: 'semi-transparent-red',
   },
-  
+
   // HSL format
   {
     hsl: { h: 120, s: 100, l: 50 },
     label: 'Pure Green',
     slug: 'pure-green',
   },
-  
+
   // HSV format
   {
     hsv: { h: 240, s: 100, v: 100 },
     label: 'Pure Blue',
     slug: 'pure-blue',
   },
-]
+];
 ```
 
 **Note:** Each ColorOption must have exactly ONE color format. If multiple formats are provided, an error will be thrown.
@@ -112,6 +112,7 @@ presetColors: [
 Transparent colors are supported in two ways:
 
 1. **Separate alpha property** - Add `alpha?: number` (0-1) to any color format:
+
    ```typescript
    { hex: '#FF0000', alpha: 0.5, label: 'Semi-transparent Red', slug: 'red-transparent' }
    ```
@@ -194,7 +195,7 @@ export const SiteOptions: GlobalConfig = {
       defaultColor: { hex: '#4ECDC4', label: 'Teal', slug: 'teal' },
       disableAlpha: false,
     }),
-    
+
     // Swatches picker with transparent presets
     colorField({
       name: 'overlayColor',
@@ -210,7 +211,7 @@ export const SiteOptions: GlobalConfig = {
       ],
       disableAlpha: false,
     }),
-    
+
     // Swatches picker with rounded square swatches
     colorField({
       name: 'accentColor',
@@ -225,7 +226,7 @@ export const SiteOptions: GlobalConfig = {
       ],
       disableAlpha: true,
     }),
-    
+
     // Swatches picker with square swatches
     colorField({
       name: 'borderColor',
@@ -261,8 +262,8 @@ Once stored, you can access the color in multiple formats:
 const color = doc.brandColor;
 
 // Use any format you need
-const hexValue = color.hex;           // '#4ECDC4'
-const rgbValue = color.rgb;           // { r: 78, g: 205, b: 196 }
-const hslValue = color.hsl;           // { h: 174, s: 44, l: 54 }
+const hexValue = color.hex; // '#4ECDC4'
+const rgbValue = color.rgb; // { r: 78, g: 205, b: 196 }
+const hslValue = color.hsl; // { h: 174, s: 44, l: 54 }
 const tailwindClass = `bg-${color.slug}`; // e.g., 'bg-teal'
 ```

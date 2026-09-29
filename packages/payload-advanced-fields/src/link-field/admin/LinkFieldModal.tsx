@@ -65,13 +65,15 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
     label: `${modalSlug}.label`,
     phone: `${modalSlug}.phone`,
   };
-  const relationshipValue = draft.internal ? { 
-    value: draft.internal.value,
-    relationTo: draft.internal.relationTo 
-  } : null;
+  const relationshipValue = draft.internal
+    ? {
+        value: draft.internal.value,
+        relationTo: draft.internal.relationTo,
+      }
+    : null;
 
   const clearError = (key: keyof DrawerErrors) => {
-    setErrors(prev => {
+    setErrors((prev) => {
       if (!prev[key]) return prev;
       const next = { ...prev };
       delete next[key];
@@ -102,7 +104,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
         const shouldAutoFill = currentLabel === '' || currentLabel === lastDocTitleRef.current;
         if (!shouldAutoFill) return;
 
-        setDraft(prev => {
+        setDraft((prev) => {
           if (prev.type !== 'internal') return prev;
           if (getInternalValueId(prev.internal) !== selectedID) return prev;
           const prevLabel = prev.label?.trim() ?? '';
@@ -164,7 +166,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
   };
 
   const setType = (type: LinkValue['type']) => {
-    setDraft(prev => ({
+    setDraft((prev) => ({
       ...emptyDraft(type),
       label: prev.label,
       newTab: prev.newTab,
@@ -178,7 +180,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
     <div className="field-type">
       <div style={{ display: 'grid', gap: '1rem' }}>
         {extension?.render?.({ setValue: setExtensionDraft, value: extensionDraft ?? null })}
-          <TextInput
+        <TextInput
           Error={<FieldError message={errors.label} path={paths.label} showError={Boolean(errors.label)} />}
           label="Label"
           path={paths.label}
@@ -187,7 +189,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
           value={draft.label ?? ''}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {
             clearError('label');
-            setDraft(prev => ({ ...prev, label: event.target.value }));
+            setDraft((prev) => ({ ...prev, label: event.target.value }));
           }}
         />
 
@@ -195,9 +197,9 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
           label="Type"
           name={`${modalSlug}.type`}
           path={`${modalSlug}.type`}
-          options={LINK_TYPES.map(option => ({ label: option.label, value: option.value }))}
+          options={LINK_TYPES.map((option) => ({ label: option.label, value: option.value }))}
           value={draft.type}
-          onChange={selectedOption => {
+          onChange={(selectedOption) => {
             if (!selectedOption || Array.isArray(selectedOption)) return;
             setType(selectedOption.value as LinkValue['type']);
           }}
@@ -223,13 +225,15 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
                 localized={false}
                 relationTo={relationTo}
                 required
-                Error={<FieldError message={errors.internal} path={paths.internal} showError={Boolean(errors.internal)} />}
+                Error={
+                  <FieldError message={errors.internal} path={paths.internal} showError={Boolean(errors.internal)} />
+                }
                 showError={Boolean(errors.internal)}
                 value={relationshipValue as ValueWithRelation | null}
                 onChange={(nextValue: ValueWithRelation | null) => {
                   clearError('internal');
                   if (!nextValue) {
-                    setDraft(prev => ({
+                    setDraft((prev) => ({
                       ...prev,
                       internal: null,
                     }));
@@ -237,15 +241,20 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
                   }
 
                   const nextTitle =
-                    typeof nextValue === 'object' && nextValue !== null && 'label' in nextValue && typeof (nextValue as { label?: unknown }).label === 'string'
+                    typeof nextValue === 'object' &&
+                    nextValue !== null &&
+                    'label' in nextValue &&
+                    typeof (nextValue as { label?: unknown }).label === 'string'
                       ? (nextValue as { label: string }).label
                       : null;
 
-                  setDraft(prev => ({
+                  setDraft((prev) => ({
                     ...prev,
                     internal: {
                       relationTo: nextValue.relationTo,
-                      value: getInternalValueId({ relationTo: nextValue.relationTo, value: nextValue.value }) ?? nextValue.value,
+                      value:
+                        getInternalValueId({ relationTo: nextValue.relationTo, value: nextValue.value }) ??
+                        nextValue.value,
                       title: nextTitle,
                     },
                   }));
@@ -258,7 +267,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
                 name={`${modalSlug}.enableAnchor`}
                 onToggle={(event: ChangeEvent<HTMLInputElement>) => {
                   const checked = event.target.checked;
-                  setDraft(prev => ({
+                  setDraft((prev) => ({
                     ...prev,
                     enableAnchor: checked,
                     anchor: checked ? prev.anchor : null,
@@ -276,7 +285,9 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
                   placeholder="section-2"
                   style={{ marginTop: 0, width: '100%' }}
                   value={draft.anchor ?? ''}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft(prev => ({ ...prev, anchor: event.target.value }))}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                    setDraft((prev) => ({ ...prev, anchor: event.target.value }))
+                  }
                 />
               </div>
             )}
@@ -294,7 +305,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
             value={draft.external ?? ''}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               clearError('external');
-              setDraft(prev => ({ ...prev, external: event.target.value }));
+              setDraft((prev) => ({ ...prev, external: event.target.value }));
             }}
           />
         )}
@@ -310,7 +321,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
             value={draft.email ?? ''}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               clearError('email');
-              setDraft(prev => ({ ...prev, email: event.target.value }));
+              setDraft((prev) => ({ ...prev, email: event.target.value }));
             }}
           />
         )}
@@ -326,7 +337,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
             value={draft.phone ?? ''}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               clearError('phone');
-              setDraft(prev => ({ ...prev, phone: event.target.value }));
+              setDraft((prev) => ({ ...prev, phone: event.target.value }));
             }}
           />
         )}
@@ -335,17 +346,24 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
           checked={Boolean(draft.newTab)}
           label="Open in new tab"
           name={`${modalSlug}.newTab`}
-          onToggle={(event: ChangeEvent<HTMLInputElement>) => setDraft(prev => ({ ...prev, newTab: event.target.checked }))}
+          onToggle={(event: ChangeEvent<HTMLInputElement>) =>
+            setDraft((prev) => ({ ...prev, newTab: event.target.checked }))
+          }
           readOnly={false}
         />
-
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1.5rem' }}>
-        <Button buttonStyle="secondary" margin={false} onClick={() => {
-          onCancel();
-          closeModal(modalSlug);
-        }} size="medium" type="button">
+        <Button
+          buttonStyle="secondary"
+          margin={false}
+          onClick={() => {
+            onCancel();
+            closeModal(modalSlug);
+          }}
+          size="medium"
+          type="button"
+        >
           Cancel
         </Button>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
