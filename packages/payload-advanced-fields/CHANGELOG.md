@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added shared Table configuration, fixed background palettes with Payload theme fallbacks, row/cell styling, and measured top/bottom sticky rows. JSON stores appearance metadata; CSV and structured overrides are session-only.
+- Added Payload confirmation before Clear table and `admin.maxHeight` for the scrollable grid.
+- Sorted Storybook fields alphabetically and added palette, sticky-row, and confirmation examples.
+
 - Synchronized cell height resizing across each row, centered structured select indicators, and made column borders track the cursor without automatic width redistribution.
 
 - Added draggable column borders and View → Reset column widths; aligned row actions inline and removed excess native cell spacing and input chrome. Removed caption/header toggles from the editor; header visibility follows field configuration.

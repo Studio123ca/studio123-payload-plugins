@@ -35,3 +35,5 @@ npm run format:check
 The static build goes into the ignored `storybook-static/` directory. Serve it over HTTP to allow the MSW worker to run. `storybook:build` compiles stories; it does not execute their interaction checks. Open Spreadsheet, Structured, and Menus in the browser to run those checks. No automated browser test runner is installed.
 
 To add a field example, create a `*.stories.tsx` file here, reuse `PayloadField` and common controls, and add explicit fixture API handlers where necessary. Keep stories and backend fixtures outside published packages. After upgrading MSW, regenerate its worker with `npx msw init .storybook/public --save`.
+
+Table also includes Backgrounds and Sticky Rows, Custom Palette, No Styling, and Clear Confirmation examples. Palette/sticky controls mirror the field/shared configuration, and `maxHeight` mirrors `admin.maxHeight`. The clear confirmation interaction checks that canceling preserves the table. Fields are listed alphabetically.

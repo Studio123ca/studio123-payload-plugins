@@ -240,3 +240,93 @@ test('Payload canary sanitizes tables in collections, nested arrays, blocks and 
   assert.equal(schema.properties.csv.type.includes('string'), true);
   assert.equal(schema.properties.records.items.properties.quantity.type.includes('number'), true);
 });
+
+test('table presentation inherits late plugin configuration and field overrides replace palettes', async () => {
+  const { configureAdvancedFields, getAdvancedFieldsConfig } = await import('../dist/config.js');
+  const { advancedFieldsPlugin } = await import('../dist/plugin.js');
+  const { buildConfig } = await import('payload');
+  const previous = getAdvancedFieldsConfig().table;
+  const palette = [{ key: 'brand', label: 'Brand', background: { light: '#eee', dark: '#222' } }];
+  try {
+    const inherited = tableField({ name: 'inherited' });
+    const overridden = tableField({ name: 'overridden', palette: [], stickyRows: { enabled: false } });
+    const config = await buildConfig({
+      secret: 'table-fixture',
+      plugins: [advancedFieldsPlugin({ table: { palette, stickyRows: { top: 2, bottom: 1 } } })],
+      collections: [{ slug: 'palette-tests', fields: [inherited, overridden] }],
+    });
+    const fields = config.collections.find((item) => item.slug === 'palette-tests').fields;
+    const options = fields.find((field) => field.name === 'inherited').admin.components.Field.clientProps.options;
+    assert.deepEqual(options.palette, palette);
+    assert.deepEqual(options.stickyRows, { enabled: true, top: 2, bottom: 1 });
+    const own = fields.find((field) => field.name === 'overridden').admin.components.Field.clientProps.options;
+    assert.deepEqual(own.palette, []);
+    assert.equal(own.stickyRows.enabled, false);
+    const records = tableField({ mode: 'structured', columns: [{ name: 'title', type: 'text' }] });
+    assert.deepEqual(records.admin.components.Field.clientProps.presentation.palette, palette);
+  } finally {
+    configureAdvancedFields({
+      table: {
+        palette: previous?.palette,
+        stickyRows: {
+          enabled: previous?.stickyRows?.enabled,
+          top: previous?.stickyRows?.top,
+          bottom: previous?.stickyRows?.bottom,
+        },
+      },
+    });
+  }
+});
+
+test('appearance validates stable IDs, preserves removed palette keys, and cleans deleted references', async () => {
+  const { cleanAppearance, resolveTablePresentation } = await import('../dist/table-field/shared/presentation.js');
+  const table = fromMatrix(
+    [
+      ['A', 'B'],
+      ['C', 'D'],
+    ],
+    content,
+  );
+  const [row] = table.rows,
+    [column] = table.columns;
+  table.appearance = {
+    rows: { [row.id]: 'removed-color' },
+    cells: { [row.id]: { [column.id]: 'highlight' } },
+    stickyRows: { top: 1, bottom: 1 },
+  };
+  assert.equal(validateTable(table, content), true);
+  const moved = moveColumn(table, 0, 1);
+  assert.equal(moved.appearance.cells[row.id][column.id], 'highlight');
+  const deleted = {
+    ...table,
+    columns: table.columns.slice(1),
+    rows: table.rows.map((row) => ({ ...row, cells: row.cells.slice(1) })),
+  };
+  assert.deepEqual(cleanAppearance(table.appearance, deleted).cells[row.id], {});
+  assert.notEqual(
+    validateTable({ ...table, appearance: { cells: { missing: { [column.id]: 'highlight' } } } }, content),
+    true,
+  );
+  assert.notEqual(validateTable({ ...table, appearance: { stickyRows: { top: -1, bottom: 0 } } }, content), true);
+  assert.throws(() =>
+    resolveTablePresentation({
+      palette: [
+        { key: 'x', label: 'X', background: '#fff' },
+        { key: 'x', label: 'X', background: '#000' },
+      ],
+    }),
+  );
+  assert.throws(() => resolveTablePresentation({ stickyRows: { top: 1.5 } }));
+  assert.ok(resolveTablePresentation().palette.length);
+});
+
+test('admin.maxHeight is forwarded for all table modes without leaking into native admin options', () => {
+  for (const config of [{}, { storage: 'csv' }, { mode: 'structured', columns: [{ name: 'title', type: 'text' }] }]) {
+    const field = tableField({ ...config, admin: { maxHeight: '60vh' } });
+    assert.equal(field.admin.components.Field.clientProps.maxHeight, '60vh');
+    assert.equal(field.admin.maxHeight, undefined);
+    assert.equal(tableField(config).admin.components.Field.clientProps.maxHeight, 640);
+    for (const maxHeight of [-1, 0, Infinity, 'garbage', '-30px'])
+      assert.throws(() => tableField({ ...config, admin: { maxHeight } }));
+  }
+});

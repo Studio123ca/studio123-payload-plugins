@@ -20,6 +20,26 @@ export function tableJSONSchema(
       additionalProperties: false,
       properties: {
         version: { type: 'number', enum: [1] },
+        appearance: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            rows: { type: 'object', additionalProperties: { type: 'string', maxLength: 100 } },
+            cells: {
+              type: 'object',
+              additionalProperties: { type: 'object', additionalProperties: { type: 'string', maxLength: 100 } },
+            },
+            stickyRows: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['top', 'bottom'],
+              properties: {
+                top: { type: 'integer', minimum: 0, maximum: 1000 },
+                bottom: { type: 'integer', minimum: 0, maximum: 1000 },
+              },
+            },
+          },
+        },
         caption: text,
         headerRow: { type: 'boolean' },
         columns: {

@@ -111,6 +111,7 @@ test('JSON table edits, paste, undo, redo and clear update the Payload value', a
   await click(button('Redo'));
   assert.equal(value().rows[1].cells[1], 'D');
   await click(button('Clear table'));
+  await click(document.querySelector('[role=dialog] button:last-child'));
   assert.equal(value(), null);
   await click(button('Undo'));
   assert.equal(value().rows[0].cells[0], 'A');
@@ -336,4 +337,46 @@ test('CSV resize stays local and does not modify stored text', async () => {
   assert.equal(handle.getAttribute('aria-valuenow'), '190');
   await click(button('Reset column widths'));
   assert.equal(handle.getAttribute('aria-valuenow'), '180');
+});
+
+test('Clear table requires confirmation, cancellation preserves values, and confirmed clear is undoable', async () => {
+  await reset();
+  const table = createTable(options);
+  await render({ value: table });
+  await click(button('Clear table'));
+  assert.ok(document.querySelector('[role=dialog]'));
+  assert.deepEqual(value(), table);
+  await click(button('Cancel'));
+  assert.equal(document.querySelector('[role=dialog]'), null);
+  assert.deepEqual(value(), table);
+  await click(button('Clear table'));
+  await click(document.querySelector('[role=dialog] button:last-child'));
+  assert.equal(value(), null);
+  await click(button('Undo'));
+  assert.deepEqual(value(), table);
+});
+
+test('background and freeze changes persist in JSON and participate in undo', async () => {
+  await reset();
+  const table = createTable(options);
+  await render({ value: table });
+  await click(document.querySelector('[aria-label="Cell background"] button'));
+  assert.equal(value().appearance.cells[table.rows[0].id][table.columns[0].id], 'muted');
+  await click(button('Freeze through this row'));
+  assert.deepEqual(value().appearance.stickyRows, { top: 1, bottom: 0 });
+  assert.equal(document.querySelector('tbody tr').dataset.sticky, 'top');
+  await click(button('Undo'));
+  assert.equal(value().appearance.stickyRows, undefined);
+  assert.equal(document.querySelector('tbody tr').dataset.sticky, undefined);
+});
+
+test('CSV appearance changes are session-only', async () => {
+  await reset();
+  const csv = 'Name,Value\r\nExample,123';
+  await render({ value: csv, config: resolveTableOptions({ storage: 'csv' }) });
+  await click(document.querySelector('[aria-label="Cell background"] button'));
+  await click(button('Freeze through this row'));
+  assert.equal(value(), csv);
+  assert.equal(document.querySelector('tbody tr').dataset.sticky, 'top');
+  assert.equal(document.querySelector('[data-cell="0:0"]').dataset.colored, 'true');
 });

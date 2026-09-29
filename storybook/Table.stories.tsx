@@ -8,20 +8,26 @@ import {
   resolveTableOptions,
 } from '../packages/payload-advanced-fields/src/table-field/shared/table.js';
 import { csvToTable, tableToCSV } from '../packages/payload-advanced-fields/src/table-field/shared/csv.js';
-import type { TableValue } from '../packages/payload-advanced-fields/src/table-field/shared/types.js';
+import { resolveTablePresentation } from '../packages/payload-advanced-fields/src/table-field/shared/presentation.js';
+import type {
+  TablePresentationConfig,
+  TableValue,
+} from '../packages/payload-advanced-fields/src/table-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 
-type Args = FieldControls & {
-  mode: 'content' | 'spreadsheet' | 'structured';
-  storage: 'json' | 'csv';
-  formulas: boolean;
-  headerRow: boolean;
-  initialRows: number;
-  initialColumns: number;
-  maxRows: number;
-  maxColumns: number;
-};
+type Args = FieldControls &
+  TablePresentationConfig & {
+    mode: 'content' | 'spreadsheet' | 'structured';
+    storage: 'json' | 'csv';
+    formulas: boolean;
+    headerRow: boolean;
+    initialRows: number;
+    initialColumns: number;
+    maxRows: number;
+    maxColumns: number;
+    maxHeight: number;
+  };
 const columns = [
   { name: 'description', type: 'text' as const, label: 'Description', required: true },
   { name: 'quantity', type: 'number' as const, label: 'Quantity', min: 0, required: true },
@@ -72,9 +78,13 @@ const meta = {
     initialColumns: 2,
     maxRows: 100,
     maxColumns: 20,
+    maxHeight: 420,
   },
   argTypes: {
     ...commonArgTypes,
+    palette: { control: 'object' },
+    maxHeight: { control: { type: 'number', min: 120, max: 1000 }, description: 'Maps to field admin.maxHeight.' },
+    stickyRows: { control: 'object' },
     mode: { control: 'select', options: ['content', 'spreadsheet', 'structured'] },
     storage: { control: 'radio', options: ['json', 'csv'], if: { arg: 'mode', eq: 'content' } },
     formulas: { control: 'boolean', if: { arg: 'mode', eq: 'spreadsheet' } },
@@ -103,6 +113,8 @@ const meta = {
           locale={globals.locale}
         >
           <StructuredTableField
+            presentation={resolveTablePresentation(args)}
+            maxHeight={args.maxHeight}
             path="example"
             schemaPath="stories.example"
             permissions={true}
@@ -136,9 +148,9 @@ const meta = {
       return (
         <PayloadField args={{ ...args, initialValue }} theme={globals.theme} locale={globals.locale}>
           {storage === 'csv' ? (
-            <TableField {...fieldProps(args, 'textarea')} options={options} />
+            <TableField {...fieldProps(args, 'textarea')} options={options} maxHeight={args.maxHeight} />
           ) : (
-            <TableField {...fieldProps(args, 'json')} options={options} />
+            <TableField {...fieldProps(args, 'json')} options={options} maxHeight={args.maxHeight} />
           )}
         </PayloadField>
       );
@@ -198,5 +210,53 @@ export const Menus: Story = {
     await expect(page.getByRole('button', { name: 'Move left' })).toBeDisabled();
     await userEvent.keyboard('{Escape}');
     await expect(page.queryByRole('button', { name: 'Move left' })).not.toBeInTheDocument();
+  },
+};
+
+const longContent = pasteCells(
+  createTable(contentOptions),
+  Array.from({ length: 30 }, (_, i) => [`Item ${i + 1}`, `Details for item ${i + 1}`]),
+  0,
+  0,
+  contentOptions,
+);
+longContent.appearance = {
+  rows: { [longContent.rows[0].id]: 'highlight' },
+  cells: { [longContent.rows[0].id]: { [longContent.columns[1].id]: 'success' } },
+};
+export const BackgroundsAndStickyRows: Story = {
+  args: { initialValue: longContent, stickyRows: { enabled: true, top: 2, bottom: 1 } },
+};
+export const CustomPalette: Story = {
+  args: {
+    initialValue: content,
+    palette: [
+      {
+        key: 'brand',
+        label: 'Brand',
+        background: { light: '#d9eee7', dark: '#24463c' },
+        text: { light: '#163c2e', dark: '#e7fff3' },
+      },
+      {
+        key: 'sand',
+        label: 'Sand',
+        background: { light: '#fff3c4', dark: '#554923' },
+        text: { light: '#403300', dark: '#fff3c4' },
+      },
+    ],
+  },
+};
+export const NoStyling: Story = { args: { initialValue: content, palette: [], stickyRows: { enabled: false } } };
+export const ClearConfirmation: Story = {
+  args: { initialValue: content },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByRole('button', { name: 'Table' }));
+    await userEvent.click(page.getByRole('button', { name: 'Clear table' }));
+    const dialog = await page.findByRole('dialog');
+    await expect(canvas.getByRole('table', { name: 'Table content' })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await expect(canvas.getByRole('table', { name: 'Table content' })).toBeInTheDocument();
   },
 };

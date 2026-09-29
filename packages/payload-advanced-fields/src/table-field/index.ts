@@ -14,3 +14,12 @@ export type {
   TableOptions,
   TableValue,
 } from './shared/types.js';
+
+export type {
+  TablePaletteEntry,
+  TableThemeColor,
+  TablePresentationConfig,
+  TableFieldPluginConfig,
+  TableAppearance,
+  ResolvedTablePresentation,
+} from './shared/types.js';

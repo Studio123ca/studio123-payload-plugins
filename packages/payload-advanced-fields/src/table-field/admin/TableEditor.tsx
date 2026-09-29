@@ -1,8 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BackgroundChoices,
+  FreezeChoices,
+  backgroundStyle,
+  setBackground,
+  stickyCounts,
+  useStickyRows,
+} from './Appearance.js';
+import { cleanAppearance } from '../shared/presentation.js';
+
+import { useEffect, useMemo, useRef, useState, useId } from 'react';
+import { ConfirmationModal, useModal } from '@payloadcms/ui';
 import type { KeyboardEvent } from 'react';
-import type { ResolvedTableOptions, TableCell, TableSelection, TableValue } from '../shared/types.js';
+import type { ResolvedTableOptions, TableCell, TableSelection, TableValue, TableAppearance } from '../shared/types.js';
 import {
   columnName,
   createTable,
@@ -24,6 +35,7 @@ import { ColumnResize } from './ColumnResize.js';
 import { TableMenu } from './TableMenu.js';
 
 type Props = {
+  maxHeight?: number | string;
   value: TableValue | null;
   onChange: (value: TableValue | null) => void;
   options: ResolvedTableOptions;
@@ -76,7 +88,10 @@ function Cell({
   );
 }
 
-export function TableEditor({ value, onChange, options, readOnly = false }: Props) {
+export function TableEditor({ value, onChange, options, readOnly = false, maxHeight = 640 }: Props) {
+  const clearModalSlug = `clear-table-${useId()}`;
+  const { openModal, closeModal } = useModal();
+  useEffect(() => () => closeModal(clearModalSlug), [closeModal, clearModalSlug]);
   const root = useRef<HTMLDivElement>(null);
   useRowSizing(root);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -99,6 +114,16 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
   const columnWidth = (column: TableValue['columns'][number]) => widths[column.id] ?? column.width ?? 180;
   const results = useMemo(() => (value ? evaluateTable(value) : []), [value]);
   const bounds = selectionBounds(selection);
+  const [sessionAppearance, setSessionAppearance] = useState<TableAppearance>({});
+  const appearance = options.storage === 'json' ? (value?.appearance ?? {}) : sessionAppearance;
+  const frozen = stickyCounts(appearance, options, value?.rows.length ?? 0);
+  useStickyRows(root, frozen.top, frozen.bottom, `${revision}:${value?.rows.map((row) => row.id).join(':') ?? ''}`);
+  const changeAppearance = (next: TableAppearance) => {
+    if (readOnly || !value) return;
+    if (options.storage === 'json') commit({ ...value, appearance: next });
+    else setSessionAppearance(next);
+  };
+
   // External form resets, locale changes and version restores start a new history.
   useEffect(() => {
     if (value !== lastValue.current) {
@@ -106,12 +131,18 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
       lastValue.current = value;
       setSelection(initialSelection);
       setWidths({});
+      setSessionAppearance({});
       refresh((n) => n + 1);
     }
   }, [value]);
   const commit = (next: TableValue | null) => {
     if (readOnly || next === value) return;
-    if (next) next = { ...next, headerRow: options.headerRow };
+    if (next)
+      next = {
+        ...next,
+        headerRow: options.headerRow,
+        ...(next.appearance ? { appearance: cleanAppearance(next.appearance, next) } : {}),
+      };
     history.current.undo = [...history.current.undo.slice(-49), value];
     history.current.redo = [];
     lastValue.current = next;
@@ -249,6 +280,19 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
   };
   return (
     <div className="advanced-table" ref={root}>
+      <ConfirmationModal
+        modalSlug={clearModalSlug}
+        heading="Clear table?"
+        body="This removes all rows, columns, and cell content from this table. You can undo this while editing."
+        confirmLabel="Clear table"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          if (!readOnly) {
+            commit(null);
+            setSessionAppearance({});
+          }
+        }}
+      />
       <div className="advanced-table__toolbar" aria-label="Table actions">
         <TableMenu label="Table">
           {!readOnly && (
@@ -262,7 +306,7 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
                 Import CSV
               </button>
               {value && (
-                <button type="button" onClick={() => commit(null)}>
+                <button type="button" onClick={() => openModal(clearModalSlug)}>
                   Clear table
                 </button>
               )}
@@ -341,6 +385,38 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
             </button>
           </TableMenu>
         )}
+        {value && !readOnly && options.palette.length > 0 && (
+          <TableMenu label="Format">
+            <BackgroundChoices
+              options={options}
+              label="Cell background"
+              apply={(key) =>
+                changeAppearance(
+                  setBackground(
+                    appearance,
+                    value.rows.slice(bounds.top, bounds.bottom + 1).map((row) => row.id),
+                    value.columns.slice(bounds.left, bounds.right + 1).map((column) => column.id),
+                    key,
+                  ),
+                )
+              }
+            />
+            <BackgroundChoices
+              options={options}
+              label="Row background"
+              apply={(key) =>
+                changeAppearance(
+                  setBackground(
+                    appearance,
+                    value.rows.slice(bounds.top, bounds.bottom + 1).map((row) => row.id),
+                    undefined,
+                    key,
+                  ),
+                )
+              }
+            />
+          </TableMenu>
+        )}
         {value && (
           <TableMenu label="View">
             <button
@@ -354,6 +430,15 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
             >
               Reset column widths
             </button>
+            {options.stickyRows.enabled && (
+              <button
+                type="button"
+                disabled={readOnly || (!frozen.top && !frozen.bottom)}
+                onClick={() => changeAppearance({ ...appearance, stickyRows: { top: 0, bottom: 0 } })}
+              >
+                Unfreeze rows
+              </button>
+            )}
           </TableMenu>
         )}
         {!readOnly && (
@@ -388,6 +473,7 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
           </p>
           <div
             className="advanced-table__scroll"
+            style={{ maxHeight }}
             onPaste={(event) => {
               if (readOnly || !(event.target instanceof HTMLTextAreaElement)) return;
               const text = event.clipboardData.getData('text/plain');
@@ -536,11 +622,27 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
               <tbody>
                 {value.rows.map((row, r) => (
                   <tr key={`${row.id}:${revision}`}>
-                    <th scope="row">
+                    <th
+                      scope="row"
+                      style={backgroundStyle(appearance, options, row.id)}
+                      data-colored={Boolean(backgroundStyle(appearance, options, row.id)) || undefined}
+                    >
                       <div className="advanced-table__row-heading">
                         <span>{r + 1}</span>
                         {!readOnly && (
                           <TableMenu compact label={`Row ${r + 1} actions`}>
+                            <BackgroundChoices
+                              options={options}
+                              label="Row background"
+                              apply={(key) => changeAppearance(setBackground(appearance, [row.id], undefined, key))}
+                            />
+                            <FreezeChoices
+                              index={r}
+                              count={value.rows.length}
+                              appearance={appearance}
+                              options={options}
+                              apply={changeAppearance}
+                            />
                             <button
                               type="button"
                               disabled={r === 0}
@@ -589,6 +691,10 @@ export function TableEditor({ value, onChange, options, readOnly = false }: Prop
                     {row.cells.map((cell, c) => (
                       <td
                         key={value.columns[c].id}
+                        style={backgroundStyle(appearance, options, row.id, value.columns[c].id)}
+                        data-colored={
+                          Boolean(backgroundStyle(appearance, options, row.id, value.columns[c].id)) || undefined
+                        }
                         data-cell={`${r}:${c}`}
                         data-selected={
                           (r >= bounds.top && r <= bounds.bottom && c >= bounds.left && c <= bounds.right) || undefined

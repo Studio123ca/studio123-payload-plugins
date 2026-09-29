@@ -1,5 +1,5 @@
 // Small adapter for component tests. Native Payload config behavior is tested separately.
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 const Context = createContext<any>(null);
 export const calls: { action: string; args: any }[] = [];
 export function Fixture({
@@ -11,9 +11,10 @@ export function Fixture({
   children,
 }: any) {
   const [value, setValue] = useState(initialValue);
+  const [modal, setModal] = useState<string | null>(null);
   useEffect(() => setValue(initialValue), [initialValue]);
   return (
-    <Context.Provider value={{ value, setValue, path, disabled, locale, rows }}>
+    <Context.Provider value={{ value, setValue, path, disabled, locale, rows, modal, setModal }}>
       {children}
       <pre data-value>{JSON.stringify(value)}</pre>
     </Context.Provider>
@@ -72,6 +73,30 @@ export function Popup({ button, buttonAriaLabel, render }: any) {
     <div>
       <button aria-label={buttonAriaLabel}>{button}</button>
       {render({ close() {} })}
+    </div>
+  );
+}
+
+export function useModal() {
+  const context = useContext(Context);
+  const closeModal = useCallback(() => context.setModal(null), [context.setModal]);
+  return { openModal: context.setModal, closeModal };
+}
+export function ConfirmationModal({ modalSlug, heading, body, onConfirm, confirmLabel, cancelLabel }: any) {
+  const context = useContext(Context);
+  if (context.modal !== modalSlug) return null;
+  return (
+    <div role="dialog" aria-label={heading}>
+      <p>{body}</p>
+      <button onClick={() => context.setModal(null)}>{cancelLabel}</button>
+      <button
+        onClick={() => {
+          onConfirm();
+          context.setModal(null);
+        }}
+      >
+        {confirmLabel}
+      </button>
     </div>
   );
 }

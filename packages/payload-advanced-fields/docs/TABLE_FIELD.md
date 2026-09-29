@@ -176,7 +176,7 @@ Content/spreadsheet options:
 
 Limits are checked at configuration time. The hard ceiling is 1,000 rows and 100 columns, and each cell/header/caption is limited to 10,000 characters. The editor renders the whole table without virtualization: use conservative limits for responsive editing. It is intended for content tables, not large analytical datasets.
 
-For JSON/CSV, `required` means at least one nonblank **body cell**; headers or captions alone do not satisfy it. `0` and `false` count as content in spreadsheets. Optional unset values remain valid even with a configured `minRows`. Built-in shape/limit validation runs before a caller's custom `validate` function. Payload runs these validators for normal server/API writes as well as admin saves; its normal draft-validation behavior still applies.
+For JSON/CSV, `required` means at least one nonblank **body cell**; headers, captions, or appearance metadata alone do not satisfy it. `0` and `false` count as content in spreadsheets. Optional unset values remain valid even with a configured `minRows`. Built-in shape/limit validation runs before a caller's custom `validate` function. Payload runs these validators for normal server/API writes as well as admin saves; its normal draft-validation behavior still applies.
 
 Structured mode accepts native array options and a required `columns` array. Native Payload array/column validation applies, including the usual semantics of custom validators. Standard field labels/descriptions can be localized. Table action text is currently English. JSON/CSV content localization applies to the whole table value, not independent cell translations.
 
@@ -261,3 +261,69 @@ Structured tables display fixed headers from each configured column's label (fal
 Drag the right border of a column header to resize it from 100–600px. Focus the border and use Left/Right arrows for 10px increments (Shift for 50px). JSON widths are persisted with a single undo entry per drag; CSV and structured widths remain local to the editing session. Resetting JSON widths is also undoable. Existing JSON caption metadata is preserved, but no caption input is shown.
 
 Dragging a textarea's lower corner adjusts the height of all editable cells in that row, including when shrinking it again. Row heights are session-only. Column borders track the cursor directly; columns are not redistributed to fill unused viewport space. Native structured selects and number inputs share the same cell height and vertically centered controls.
+
+## Background palettes and sticky rows
+
+Tables accept shared configuration alongside the Link configuration. Use either `configureAdvancedFields` or the `table` option on `advancedFieldsPlugin`:
+
+```ts
+import { advancedFieldsPlugin, tableField } from '@studio123/payload-advanced-fields';
+
+// Inside buildConfig:
+const plugins = [
+  advancedFieldsPlugin({
+    table: {
+      palette: [
+        {
+          key: 'brand',
+          label: 'Brand',
+          background: { light: '#d9eee7', dark: '#24463c' },
+          text: { light: '#163c2e', dark: '#e7fff3' },
+        },
+        { key: 'highlight', label: 'Highlight', background: '#fff3c4', text: '#403300' },
+      ],
+      stickyRows: { enabled: true, top: 1, bottom: 0 },
+    },
+  }),
+];
+
+const comparison = tableField({
+  name: 'comparison',
+  admin: { maxHeight: '60vh' },
+  stickyRows: { bottom: 1 }, // Inherits enabled/top from shared configuration.
+});
+```
+
+`configureAdvancedFields({ table: { ... } })` configures the same registry. Table presentation options are resolved when Payload reads client props or validates the field, so plugin configuration can run after `tableField()` constructs fields. As with the existing Link registry, this is process-wide configuration: configure one Payload app consistently at startup.
+
+Precedence is **field → shared Table config → built-in defaults**. A field palette replaces the entire shared palette; `palette: []` disables background choices. Without a configured palette, the fixed choices are Muted, Highlight, Success, and Danger using Payload semantic theme tokens. Palette entries accept a CSS color string or `{ light, dark }` for `background` and optional `text`. Use contrasting text colors for custom backgrounds; colors are not automatically contrast-corrected. Keys must be unique, 1–100 letters/digits/underscores/hyphens; at most 32 entries are allowed.
+
+Select a cell or rectangle and use **Format → Cell background** or **Row background**. Structured tables style the focused/clicked cell or its row. Row menus also expose row backgrounds. A cell override wins over the row background; clearing the cell override restores inheritance. Removed palette keys remain in JSON metadata but display the normal table background until configured again. No arbitrary color picker or raw CSS is stored in document values.
+
+Row menus provide **Freeze through this row** and **Freeze from this row to bottom**. Freezing keeps contiguous top/bottom groups in their existing order. The header remains above frozen top rows. **View → Unfreeze rows** clears both groups. Top rows take priority if counts would overlap, and counts are clamped to available rows. `stickyRows.enabled: false` hides these actions and ignores stored freeze settings without deleting them. Row reordering preserves background assignments by stable IDs; frozen groups follow positions. Offsets update when rows resize or their content changes.
+
+| Mode                        | Background/freeze changes                                      |
+| --------------------------- | -------------------------------------------------------------- |
+| JSON content or spreadsheet | Saved as optional `appearance` metadata; included in undo/redo |
+| CSV                         | Session-only; CSV text is unchanged                            |
+| Structured                  | Session-only; native array records are unchanged               |
+
+JSON `version: 1` values remain compatible: older values need no migration. Optional appearance metadata is:
+
+```ts
+appearance?: {
+  rows?: Record<RowID, PaletteKey>;
+  cells?: Record<RowID, Record<ColumnID, PaletteKey>>;
+  stickyRows?: { top: number; bottom: number };
+};
+```
+
+Missing `stickyRows` uses configured defaults; explicit `{ top: 0, bottom: 0 }` overrides defaults. Deleted rows/columns have their styling references removed on editor changes. CSV import replaces the grid and discards JSON appearance; CSV export contains data only. For frontend rendering, resolve the stored keys against the same palette and apply row backgrounds before cell overrides. Sticky behavior applies to the admin's scroll container, not automatically to frontend output.
+
+### Grid height
+
+`admin.maxHeight` applies to the scrollable grid in every mode, leaving menus outside it. The default is `640` pixels. It accepts positive pixel numbers or CSS lengths such as `'32rem'`, `'60vh'`, or `'480px'`. It does not change row heights or stored data. Choose enough space for the configured frozen rows and a scrollable body.
+
+### Clearing a table
+
+**Table → Clear table** opens Payload's confirmation dialog. Cancel, Escape, or closing the dialog preserves the table. Confirming clears the value; the change remains undoable during the current editing session. Read-only tables cannot clear data.

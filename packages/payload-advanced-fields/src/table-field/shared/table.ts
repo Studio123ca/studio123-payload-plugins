@@ -1,3 +1,4 @@
+import { resolveTablePresentation, validateAppearance } from './presentation.js';
 import type { ResolvedTableOptions, TableCell, TableOptions, TableSelection, TableValue } from './types.js';
 
 export const MAX_CELL_LENGTH = 10000;
@@ -8,6 +9,7 @@ export function resolveTableOptions(options: TableOptions = {}): ResolvedTableOp
   const mode = options.mode ?? 'content';
   if (mode !== 'content' && mode !== 'spreadsheet') throw new Error('Unknown table mode.');
   const resolved: ResolvedTableOptions = {
+    ...resolveTablePresentation(options),
     mode,
     storage: options.storage ?? 'json',
     minRows: options.minRows ?? 0,
@@ -123,7 +125,14 @@ export function validateTable(value: unknown, options: ResolvedTableOptions, req
     return `Use between ${options.minRows} and ${options.maxRows} rows.`;
   const ids = new Set<string>();
   const checkID = (id: unknown) => {
-    if (typeof id !== 'string' || !id || id.length > 100 || ids.has(id)) return false;
+    if (
+      typeof id !== 'string' ||
+      !id ||
+      id.length > 100 ||
+      ['__proto__', 'constructor', 'prototype'].includes(id) ||
+      ids.has(id)
+    )
+      return false;
     ids.add(id);
     return true;
   };
@@ -141,6 +150,12 @@ export function validateTable(value: unknown, options: ResolvedTableOptions, req
     )
       return 'Invalid column metadata or duplicate ID.';
   }
+  const appearance = validateAppearance(
+    value.appearance,
+    value.rows.map((row) => String(row?.id)),
+    value.columns.map((column) => String(column.id)),
+  );
+  if (appearance !== true) return appearance;
   let hasContent = false;
   for (const [rowIndex, row] of value.rows.entries()) {
     if (!record(row) || !checkID(row.id) || !Array.isArray(row.cells) || row.cells.length !== value.columns.length)

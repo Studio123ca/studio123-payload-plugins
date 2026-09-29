@@ -42,3 +42,12 @@ export type {
   TableValue,
   TableResult,
 } from './table-field/index.js';
+
+export type {
+  TablePaletteEntry,
+  TableThemeColor,
+  TablePresentationConfig,
+  TableFieldPluginConfig,
+  TableAppearance,
+  ResolvedTablePresentation,
+} from './table-field/shared/types.js';

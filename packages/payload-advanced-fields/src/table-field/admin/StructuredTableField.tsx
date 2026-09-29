@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import {
   FieldDescription,
   FieldError,
@@ -14,6 +14,16 @@ import {
 } from '@payloadcms/ui';
 import type { ArrayFieldClientProps, Validate } from 'payload';
 import './styles.css';
+import type { TableAppearance, ResolvedTablePresentation } from '../shared/types.js';
+import { resolveTablePresentation } from '../shared/presentation.js';
+import {
+  BackgroundChoices,
+  FreezeChoices,
+  backgroundStyle,
+  setBackground,
+  stickyCounts,
+  useStickyRows,
+} from './Appearance.js';
 import { useRowSizing } from './useRowSizing.js';
 import { ColumnResize } from './ColumnResize.js';
 import { TableMenu } from './TableMenu.js';
@@ -25,7 +35,9 @@ export function StructuredTableField({
   permissions,
   readOnly,
   validate,
-}: ArrayFieldClientProps) {
+  presentation = resolveTablePresentation(),
+  maxHeight = 640,
+}: ArrayFieldClientProps & { presentation?: ResolvedTablePresentation; maxHeight?: number | string }) {
   const root = useRef<HTMLDivElement>(null);
   useRowSizing(root);
   const [widths, setWidths] = useState<Record<string, number>>({});
@@ -64,6 +76,14 @@ export function StructuredTableField({
     validate: validateRows,
   });
   const { addFieldRow, removeFieldRow, moveFieldRow, dispatchFields, setModified } = useForm();
+  const [appearance, setAppearance] = useState<TableAppearance>({});
+  const [selected, setSelected] = useState<{ row: string; column: string } | null>(null);
+  useEffect(() => {
+    setAppearance({});
+    setSelected(null);
+  }, [path, locale?.code]);
+  const frozen = stickyCounts(appearance, presentation, rows.length);
+  useStickyRows(root, frozen.top, frozen.bottom, rows.map((row) => row.id).join(':'));
   const schemaPath = incomingSchemaPath ?? field.name;
   const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
   const atMax = field.maxRows !== undefined && rows.length >= field.maxRows;
@@ -101,17 +121,58 @@ export function StructuredTableField({
               </button>
             </TableMenu>
           )}
+          {!isReadOnly && rows.length > 0 && columns.length > 0 && presentation.palette.length > 0 && (
+            <TableMenu label="Format">
+              <BackgroundChoices
+                options={presentation}
+                label="Cell background"
+                apply={(key) =>
+                  setAppearance(
+                    setBackground(
+                      appearance,
+                      [selected && rows.some((row) => row.id === selected.row) ? selected.row : rows[0].id],
+                      [selected?.column ?? ('name' in columns[0] ? columns[0].name : '')],
+                      key,
+                    ),
+                  )
+                }
+              />
+              <BackgroundChoices
+                options={presentation}
+                label="Row background"
+                apply={(key) =>
+                  setAppearance(
+                    setBackground(
+                      appearance,
+                      [selected && rows.some((row) => row.id === selected.row) ? selected.row : rows[0].id],
+                      undefined,
+                      key,
+                    ),
+                  )
+                }
+              />
+            </TableMenu>
+          )}
           <TableMenu label="View">
             <button type="button" onClick={() => setWidths({})}>
               Reset column widths
             </button>
+            {presentation.stickyRows.enabled && (
+              <button
+                type="button"
+                disabled={isReadOnly || (!frozen.top && !frozen.bottom)}
+                onClick={() => setAppearance({ ...appearance, stickyRows: { top: 0, bottom: 0 } })}
+              >
+                Unfreeze rows
+              </button>
+            )}
           </TableMenu>
           <span>{rows.length} rows · Structured records</span>
         </div>
         {/* The fieldset enforces parent read-only even when a column explicitly sets admin.readOnly=false. */}
         <fieldset disabled={isReadOnly} className="advanced-table__fieldset">
           <legend className="advanced-table__sr">Table records</legend>
-          <div className="advanced-table__scroll">
+          <div className="advanced-table__scroll" style={{ maxHeight }}>
             <table
               aria-label="Table records"
               style={{
@@ -166,11 +227,27 @@ export function StructuredTableField({
               <tbody>
                 {rows.map((row, index) => (
                   <tr key={row.id}>
-                    <th scope="row">
+                    <th
+                      scope="row"
+                      style={backgroundStyle(appearance, presentation, row.id)}
+                      data-colored={Boolean(backgroundStyle(appearance, presentation, row.id)) || undefined}
+                    >
                       <div className="advanced-table__row-heading">
                         <span>{index + 1}</span>
                         {!isReadOnly && (
                           <TableMenu compact label={`Row ${index + 1} actions`}>
+                            <BackgroundChoices
+                              options={presentation}
+                              label="Row background"
+                              apply={(key) => setAppearance(setBackground(appearance, [row.id], undefined, key))}
+                            />
+                            <FreezeChoices
+                              index={index}
+                              count={rows.length}
+                              appearance={appearance}
+                              options={presentation}
+                              apply={setAppearance}
+                            />
                             {field.admin?.isSortable !== false && (
                               <>
                                 <button
@@ -214,7 +291,22 @@ export function StructuredTableField({
                       <td colSpan={columns.length}>Loading row…</td>
                     ) : (
                       columns.map((column) => (
-                        <td key={'name' in column ? column.name : column.type} className="advanced-table__native-cell">
+                        <td
+                          key={'name' in column ? column.name : column.type}
+                          className="advanced-table__native-cell"
+                          style={backgroundStyle(appearance, presentation, row.id, 'name' in column ? column.name : '')}
+                          data-colored={
+                            Boolean(
+                              backgroundStyle(appearance, presentation, row.id, 'name' in column ? column.name : ''),
+                            ) || undefined
+                          }
+                          onPointerDown={() =>
+                            setSelected({ row: row.id, column: 'name' in column ? column.name : '' })
+                          }
+                          onFocusCapture={() =>
+                            setSelected({ row: row.id, column: 'name' in column ? column.name : '' })
+                          }
+                        >
                           <RenderFields
                             fields={[column]}
                             forceRender

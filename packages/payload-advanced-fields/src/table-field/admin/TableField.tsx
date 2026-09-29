@@ -13,7 +13,8 @@ export function TableField({
   path: incomingPath,
   readOnly,
   options,
-}: (JSONFieldClientProps | TextareaFieldClientProps) & { options: ResolvedTableOptions }) {
+  maxHeight,
+}: (JSONFieldClientProps | TextareaFieldClientProps) & { options: ResolvedTableOptions; maxHeight?: number | string }) {
   const validate = useCallback(
     (value: unknown) =>
       options.storage === 'csv'
@@ -75,6 +76,9 @@ export function TableField({
           key={editorKey}
           value={parsed.table}
           options={options}
+          maxHeight={
+            maxHeight ?? (field.admin && 'maxHeight' in field.admin ? (field.admin.maxHeight as number) : undefined)
+          }
           readOnly={Boolean(readOnly || disabled || field.admin?.readOnly)}
           onChange={(table) => {
             const raw = options.storage === 'csv' ? (table ? tableToCSV(table) : null) : table;
