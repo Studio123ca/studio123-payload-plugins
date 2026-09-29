@@ -1,6 +1,6 @@
 # Link Field
 
-A comprehensive link field supporting internal Payload relationships and external URLs with validation.
+A comprehensive link field supporting internal Payload relationships and absolute or relative URLs with validation.
 
 ## Import
 
@@ -95,7 +95,7 @@ advancedFieldsPlugin({
 ## Link Types
 
 - **internal** - Link to another Payload document
-- **external** - External URL
+- **external** - Absolute or relative URL
 - **email** - Email link (mailto:)
 - **phone** - Phone link (tel:)
 
@@ -138,6 +138,8 @@ export const Menus: CollectionConfig = {
 ```
 
 ### External Link
+
+External links accept complete HTTP(S) URLs and relative references such as `/about`, `../contact`, `?preview=true`, or `#details`.
 
 ```typescript
 {

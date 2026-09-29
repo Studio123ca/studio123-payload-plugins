@@ -25,8 +25,10 @@ const getPrimitiveInternalValue = (value: LinkValue['internal']): string | numbe
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 const isURL = (value: string) => {
+  if (/\s/.test(value)) return false;
+
   try {
-    const url = new URL(value);
+    const url = new URL(value, 'https://relative.invalid');
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
