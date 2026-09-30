@@ -47,7 +47,7 @@ apiResponse: { computeFormulas: true }
 
 `formulas.compute` remains accepted as a compatibility alias for `apiResponse.computeFormulas`, but new configurations should use `apiResponse.computeFormulas`.
 
-Formula arithmetic accepts common formatted numeric strings and preserves compatible formatting in the result. Currency values retain their currency prefix and two decimal places, percentages retain the percent sign, and durations retain their unit. Formatted values with incompatible units or currencies (for example, `2.40ms + 1s` or `$4 + €2`) return `#VALUE!`. Percentages can be multiplied by plain numbers, so `10% * 1,000` evaluates to `100`.
+Formula arithmetic accepts common formatted numeric strings and preserves compatible formatting in the result. Currency values retain their currency prefix and two decimal places, percentages retain the percent sign, durations retain their unit, and ISO dates/times retain their date or time display. Dates and times can be offset by durations, and subtracting two dates returns a duration. Formatted values with incompatible units or currencies (for example, `2.40ms + 1s` or `$4 + €2`) return `#VALUE!`. Percentages can be multiplied by plain numbers, so `10% * 1,000` evaluates to `100`.
 
 Formatting choices are supplied by the field configuration through `formats`. Each format has a stable `key`, a visible `label`, and a background color; an optional `text` color can also be provided. The Format menu and formatting context-menu item are omitted when `formats` is empty or not supplied.
 

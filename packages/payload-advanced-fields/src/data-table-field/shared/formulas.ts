@@ -5,7 +5,9 @@ export type DataTableResult = string | number | boolean | null;
 type NumericFormat =
   | { kind: 'currency'; prefix: string }
   | { kind: 'percent' }
-  | { kind: 'duration'; unit: string };
+  | { kind: 'duration'; unit: string }
+  | { kind: 'date'; dateOnly: boolean }
+  | { kind: 'time'; seconds: boolean };
 
 type NumericValue = { value: number; format?: NumericFormat };
 type EvaluatedValue = DataTableResult | NumericValue;
@@ -28,7 +30,33 @@ function numeric(value: EvaluatedValue): NumericValue {
   if (typeof value === 'boolean') return { value: Number(value) };
   if (typeof value === 'number' && Number.isFinite(value)) return { value };
   if (typeof value === 'string') {
-    const match = /^\s*([+-]?)\s*((?:(?:[$€£¥]|USD|CAD|EUR|GBP)\s*)?)((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(%|ns|us|μs|µs|ms|min|s|h)?\s*$/i.exec(value);
+    const date = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?Z)?)?$/.exec(value.trim());
+    if (date) {
+      const [, year, month, day, hour, minute, second = '0', milliseconds = '0'] = date;
+      const timestamp = Date.UTC(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        Number(hour ?? 0),
+        Number(minute ?? 0),
+        Number(second),
+        Number(milliseconds.padEnd(3, '0')),
+      );
+      if (Number.isFinite(timestamp)) return { value: timestamp, format: { kind: 'date', dateOnly: !hour } };
+    }
+    const time = /^(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(value.trim());
+    if (time) {
+      const [, hour, minute, second = '0', milliseconds = '0'] = time;
+      const hours = Number(hour);
+      const minutes = Number(minute);
+      const seconds = Number(second);
+      if (hours < 24 && minutes < 60 && seconds < 60)
+        return {
+          value: ((hours * 60 + minutes) * 60 + seconds) * 1_000 + Number(milliseconds.padEnd(3, '0')),
+          format: { kind: 'time', seconds: time[3] !== undefined },
+        };
+    }
+    const match = /^\s*([+-]?)\s*((?:(?:[$€£¥]|USD|CAD|EUR|GBP)\s*)?)((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(%|ns|us|μs|µs|ms|min|s|h|d)?\s*$/i.exec(value);
     if (match) {
       const sign = match[1] === '-' ? -1 : 1;
       const prefix = match[2].trim();
@@ -52,7 +80,19 @@ function formatResult(value: EvaluatedValue): DataTableResult {
   if (!value.format) return value.value;
   if (value.format.kind === 'currency') return `${value.format.prefix}${value.value.toFixed(2)}`;
   if (value.format.kind === 'percent') return `${formatNumber(value.value * 100)}%`;
-  return `${formatNumber(value.value)}${value.format.unit}`;
+  if (value.format.kind === 'duration') return `${formatNumber(value.value)}${value.format.unit}`;
+  if (value.format.kind === 'time') {
+    const totalMilliseconds = ((value.value % 86_400_000) + 86_400_000) % 86_400_000;
+    const hours = Math.floor(totalMilliseconds / 3_600_000);
+    const minutes = Math.floor((totalMilliseconds % 3_600_000) / 60_000);
+    const seconds = Math.floor((totalMilliseconds % 60_000) / 1_000);
+    return value.format.seconds
+      ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      : `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+  const date = new Date(value.value);
+  if (value.format.dateOnly) return date.toISOString().slice(0, 10);
+  return date.toISOString().replace(/\.000Z$/, 'Z');
 }
 
 function mergeFormats(left?: NumericFormat, right?: NumericFormat): NumericFormat | undefined {
@@ -68,12 +108,46 @@ function mergeFormats(left?: NumericFormat, right?: NumericFormat): NumericForma
 function addValues(left: EvaluatedValue, right: EvaluatedValue, sign = 1): NumericValue {
   const a = numeric(left);
   const b = numeric(right);
+  if (a.format?.kind === 'date' || a.format?.kind === 'time') {
+    if (b.format?.kind === 'duration') return { value: a.value + sign * durationMilliseconds(b), format: a.format };
+    if (sign < 0 && b.format?.kind === a.format.kind) {
+      const difference = a.value - b.value;
+      const wholeDays = difference % 86_400_000 === 0;
+      return {
+        value: wholeDays ? difference / 86_400_000 : difference,
+        format: { kind: 'duration', unit: wholeDays ? 'd' : 'ms' },
+      };
+    }
+    throw new Error('#VALUE!');
+  }
+  if (b.format?.kind === 'date' || b.format?.kind === 'time') {
+    if (a.format?.kind === 'duration' && sign > 0) return { value: b.value + durationMilliseconds(a), format: b.format };
+    throw new Error('#VALUE!');
+  }
   return { value: a.value + sign * b.value, format: mergeFormats(a.format, b.format) };
+}
+
+function durationMilliseconds(value: NumericValue) {
+  if (value.format?.kind !== 'duration') throw new Error('#VALUE!');
+  const multipliers: Record<string, number> = {
+    ns: 1e-6,
+    us: 1e-3,
+    'μs': 1e-3,
+    'µs': 1e-3,
+    ms: 1,
+    s: 1_000,
+    min: 60_000,
+    h: 3_600_000,
+    d: 86_400_000,
+  };
+  return value.value * (multipliers[value.format.unit] ?? 1);
 }
 
 function multiplyValues(left: EvaluatedValue, right: EvaluatedValue): NumericValue {
   const a = numeric(left);
   const b = numeric(right);
+  if (a.format?.kind === 'date' || a.format?.kind === 'time' || b.format?.kind === 'date' || b.format?.kind === 'time')
+    throw new Error('#VALUE!');
   let format: NumericFormat | undefined;
   if (a.format?.kind === 'percent' && b.format?.kind === 'percent') format = a.format;
   else if (a.format?.kind === 'percent') format = b.format;
@@ -85,6 +159,8 @@ function multiplyValues(left: EvaluatedValue, right: EvaluatedValue): NumericVal
 function divideValues(left: EvaluatedValue, right: EvaluatedValue): NumericValue {
   const a = numeric(left);
   const b = numeric(right);
+  if (a.format?.kind === 'date' || a.format?.kind === 'time' || b.format?.kind === 'date' || b.format?.kind === 'time')
+    throw new Error('#VALUE!');
   if (b.value === 0) throw new Error('#DIV/0!');
   const format = a.format?.kind === 'percent' ? a.format : b.format ? undefined : a.format;
   return { value: a.value / b.value, format };

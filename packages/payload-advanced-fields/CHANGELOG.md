@@ -1,8 +1,9 @@
 # Changelog
 
-## 1.2.1 (Unreleased)
+## 1.2.1
 
 - Added formula parsing that preserves compatible currency, percentage, and duration display values and rejects incompatible formatted operands.
+- Added ISO date/time arithmetic with duration offsets and date-difference results.
 - Expanded Formula Help with formatted-value examples.
 - Matched Edit → Freeze submenu icons with the row context menu.
 - Added spreadsheet-style direct entry for quickly replacing values in the selected cell without opening the editor.

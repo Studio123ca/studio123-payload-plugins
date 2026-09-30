@@ -67,27 +67,48 @@ formattedExample.rows[0].cells = ['Widget', 'Ready', 'Format this row or cell fr
 formattedExample.rows[1].cells = ['Gizmo', 'Review', ''];
 formattedExample.appearance = { rows: { [formattedExample.rows[0].id]: 'highlight' } };
 const valueFormatsOptions = resolveDataTableOptions({
-  columns: { initial: 4 },
+  columns: { initial: 6 },
   rows: { initial: 4 },
   formulas: { enabled: true },
 });
 const valueFormatsExample = createDataTable(valueFormatsOptions);
-['Currency', 'Percent', 'Duration', 'Mixed formats'].forEach((label, index) => {
+['Currency', 'Percent', 'Duration', 'Date', 'Time', 'Mixed formats'].forEach((label, index) => {
   valueFormatsExample.columns[index].label = label;
 });
-valueFormatsExample.rows[0].cells = ['$4.10', '10%', '2.40ms', '1s'];
-valueFormatsExample.rows[1].cells = ['$1.50', '5%', '1.20ms', '2.40ms'];
+valueFormatsExample.rows[0].cells = ['$4.10', '10%', '2.40ms', '2026-09-30', '12:30', '1s'];
+valueFormatsExample.rows[1].cells = ['$1.50', '5%', '1.20ms', '1d', '1h', '2.40ms'];
 valueFormatsExample.rows[2].cells = [
   { formula: '=SUM(A1:A2)' },
   { formula: '=B1+B2' },
   { formula: '=C1+C2' },
   { formula: '=D1+D2' },
+  { formula: '=E1+E2' },
+  { formula: '=F1+F2' },
 ];
 valueFormatsExample.rows[3].cells = [
   'Compatible values retain their display format.',
   'Percent results keep the % sign.',
   'Duration units must match.',
+  'Dates can be offset by durations.',
+  'Times can be offset by durations.',
   'Mixed units return #VALUE!.',
+];
+const dateTimeOptions = resolveDataTableOptions({
+  columns: { initial: 4 },
+  rows: { initial: 3 },
+  formulas: { enabled: true },
+});
+const dateTimeExample = createDataTable(dateTimeOptions);
+['Date', 'Date difference', 'Time', 'Mixed units'].forEach((label, index) => {
+  dateTimeExample.columns[index].label = label;
+});
+dateTimeExample.rows[0].cells = ['2026-09-30', '1d', '12:30', '1s'];
+dateTimeExample.rows[1].cells = ['2026-10-02', '', '1h', '2.40ms'];
+dateTimeExample.rows[2].cells = [
+  { formula: '=A1+B1' },
+  { formula: '=A2-A1' },
+  { formula: '=C1+C2' },
+  { formula: '=D1+D2' },
 ];
 const freezeOptions = resolveDataTableOptions({
   columns: { initial: 3 },
@@ -216,6 +237,13 @@ export const ValueFormats: Story = {
     initialValue: valueFormatsExample,
     formulas: { enabled: true },
     maxHeight: 320,
+  },
+};
+export const DateTimeFormats: Story = {
+  args: {
+    initialValue: dateTimeExample,
+    formulas: { enabled: true },
+    maxHeight: 280,
   },
 };
 export const FreezeRows: Story = {

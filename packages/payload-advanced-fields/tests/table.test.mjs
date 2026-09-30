@@ -98,6 +98,18 @@ test('formulas calculate common formatted numeric values', () => {
   assert.equal(evaluateDataTable(table)[0][6], '20%');
 });
 
+test('formulas preserve dates and times and reject incompatible values', () => {
+  const options = resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 6 }, formulas: true });
+  const table = createDataTable(options);
+  table.rows[0].cells = ['2026-09-30', '1d', { formula: '=A1+B1' }, '12:30', '1h', { formula: '=D1+E1' }];
+  table.rows[1].cells = ['2026-10-02', '', { formula: '=A2-A1' }, '', '', { formula: '=A1+D1' }];
+  const results = evaluateDataTable(table);
+  assert.equal(results[0][2], '2026-10-01');
+  assert.equal(results[0][5], '13:30');
+  assert.equal(results[1][2], '2d');
+  assert.equal(results[1][5], '#VALUE!');
+});
+
 test('supports minimum dimensions and CSV round trips', () => {
   const options = resolveDataTableOptions({ rows: { min: 2, initial: 2 }, columns: { min: 2, initial: 2 } });
   assert.equal(options.columns.min, 2);

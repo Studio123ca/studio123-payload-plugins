@@ -62,6 +62,7 @@ const formulaHelpSections = [
       ['Currency values', '=SUM(A1:A3)', 'With $4.10, $2.40, and $1.50 in A1:A3, the result displays as $8.00.'],
       ['Percent values', '=A1+B1', 'With 10% and 5% in A1:B1, the result displays as 15%.'],
       ['Durations', '=A1+B1', 'With 2.40ms and 1.20ms in A1:B1, the result displays as 3.6ms.'],
+      ['Dates and times', '=A1+B1', 'Add a duration to an ISO date or time to preserve its date or time display.'],
     ],
   },
 ] as const;

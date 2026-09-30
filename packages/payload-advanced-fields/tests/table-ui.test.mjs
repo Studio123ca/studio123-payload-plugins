@@ -254,7 +254,7 @@ test('shows formula help only when formulas are enabled', async () => {
   await selectMenuItem('Help', 'Formula help');
   const dialog = document.querySelector('[role="dialog"]');
   assert.match(dialog?.textContent ?? '', /SUM\(A1:A5\)/);
-  assert.equal(dialog?.querySelectorAll('.data-table__formula-row code').length, 10);
+  assert.equal(dialog?.querySelectorAll('.data-table__formula-row code').length, 11);
   assert.match(dialog?.textContent ?? '', /SUM\(A1,B1,C3\)/);
   await act(async () => document.querySelector('[role="dialog"] button')?.click());
 });
