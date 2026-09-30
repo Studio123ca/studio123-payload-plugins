@@ -9,6 +9,8 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
   const textFormatsEnabled =
     options.textFormats === true || (textFormatOptions !== undefined && textFormatOptions.enabled !== false);
   const apiResponseOptions = options.apiResponse ?? {};
+  const storageOptions = options.storage ?? {};
+  const paginationOptions = typeof storageOptions.pagination === 'object' ? storageOptions.pagination : undefined;
   const computeFormulas = apiResponseOptions.computeFormulas ?? formulaOptions?.compute ?? false;
   const columnOptions = options.columns ?? {};
   const rowOptions = options.rows ?? {};
@@ -30,6 +32,17 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
     apiResponse: {
       includeIds: apiResponseOptions.includeIds ?? false,
       computeFormulas,
+    },
+    storage: {
+      mode: storageOptions.mode ?? 'json',
+      pagination: {
+        enabled:
+          typeof storageOptions.pagination === 'boolean'
+            ? storageOptions.pagination
+            : (paginationOptions?.enabled ?? false),
+        defaultLimit: paginationOptions?.defaultLimit ?? 50,
+        maxLimit: paginationOptions?.maxLimit ?? 250,
+      },
     },
     formats: options.formats ?? [],
     textFormats: {
@@ -66,6 +79,14 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
     resolved.rows.initial > resolved.rows.max
   )
     throw new Error('Initial dimensions must not exceed the configured maximums.');
+  if (!['json', 'rows'].includes(resolved.storage.mode)) throw new Error('Invalid data table storage mode.');
+  if (
+    !Number.isSafeInteger(resolved.storage.pagination.defaultLimit) ||
+    resolved.storage.pagination.defaultLimit < 1 ||
+    !Number.isSafeInteger(resolved.storage.pagination.maxLimit) ||
+    resolved.storage.pagination.maxLimit < resolved.storage.pagination.defaultLimit
+  )
+    throw new Error('Data table pagination limits must be positive integers with maxLimit >= defaultLimit.');
   if (resolved.columns.min > resolved.columns.max || resolved.rows.min > resolved.rows.max)
     throw new Error('Minimum dimensions must not exceed the configured maximums.');
   if (!Array.isArray(resolved.formats) || resolved.formats.length > 32)
@@ -244,9 +265,17 @@ export function validateDataTable(value: unknown, options: ResolvedDataTableOpti
   const table = value as Partial<DataTableValue>;
   if (table.version !== 1 || !Array.isArray(table.columns) || !Array.isArray(table.rows))
     return 'Invalid data table value.';
+  const isExternalManifest =
+    options.storage.mode === 'rows' &&
+    table.storage?.mode === 'rows' &&
+    Number.isSafeInteger(table.storage.rowCount) &&
+    table.storage.rowCount >= 0 &&
+    table.rows.length === 0;
   if (table.columns.length < options.columns.min || table.columns.length > options.columns.max)
     return `Use between ${options.columns.min} and ${options.columns.max} columns.`;
-  if (table.rows.length < options.rows.min || table.rows.length > options.rows.max)
+  if (!isExternalManifest && (table.rows.length < options.rows.min || table.rows.length > options.rows.max))
+    return `Use between ${options.rows.min} and ${options.rows.max} rows.`;
+  if (isExternalManifest && (table.storage!.rowCount < options.rows.min || table.storage!.rowCount > options.rows.max))
     return `Use between ${options.rows.min} and ${options.rows.max} rows.`;
   const appearance = validateAppearance(
     table.appearance,
@@ -270,6 +299,7 @@ export function validateDataTable(value: unknown, options: ResolvedDataTableOpti
     )
       return 'Invalid column metadata.';
   }
+  if (isExternalManifest) return true;
   for (const row of table.rows) {
     if (!row || typeof row !== 'object' || !uniqueID(row.id) || !Array.isArray(row.cells))
       return 'Rows must have unique IDs and cells.';
@@ -320,6 +350,9 @@ export function normalizeDataTableValue(value: unknown): DataTableValue | null {
     ...(typeof table.headerRow === 'boolean' ? { headerRow: table.headerRow } : {}),
     ...(typeof table.caption === 'string' ? { caption: table.caption } : {}),
     ...(table.appearance && typeof table.appearance === 'object' ? { appearance: table.appearance } : {}),
+    ...(table.storage && table.storage.mode === 'rows' && Number.isSafeInteger(table.storage.rowCount)
+      ? { storage: { mode: 'rows' as const, rowCount: table.storage.rowCount } }
+      : {}),
     columns: columns.map((column) => ({
       id: String(column.id ?? column.columnId ?? ''),
       label: String(column.label ?? ''),

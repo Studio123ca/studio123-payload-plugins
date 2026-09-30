@@ -1,5 +1,11 @@
 # Changelog
 
+## Next
+
+- Added opt-in row-backed Data Table storage with a hidden managed row collection, parent access checks, and a paginated row endpoint.
+- Added `storage.mode`, pagination limits, storage manifests, and shared row-page metadata for large tables.
+- Updated the admin field to hydrate row-backed tables through the protected endpoint and updated the Paginated API Storybook story to exercise the row-backed response shape.
+
 ## 1.2.5
 
 - Added Google Sheets-style keyboard shortcuts for selecting, inserting, and deleting rows and columns.

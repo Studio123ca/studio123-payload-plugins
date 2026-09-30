@@ -17,7 +17,7 @@ A collection of enhanced field types for Payload CMS.
 - **Code Editor Field** - Syntax-highlighted code editing with CodeMirror
 - **Link Field** - Internal/external link management with validation
 - **Phone Field** - Canonical phone data with country selector, extension input, validation, and custom formatting
-- **Data Table Field** - A JSON-backed spreadsheet-style table built with TanStack Table, Radix menus, CSV import/export, formulas, sticky rows, reordering, and row virtualization for large tables
+- **Data Table Field** - A spreadsheet-style table built with TanStack Table, Radix menus, CSV import/export, formulas, sticky rows, reordering, row virtualization, and opt-in row-backed storage with paginated API access
 - **Optimized Bundling** - Each field is independently bundled for minimal bloat
 - **Tree-shakeable** - Import only what you need
 - **Full TypeScript Support** - Complete type definitions included
@@ -37,7 +37,7 @@ npm install @studio123/payload-advanced-fields
 | Code       | [Documentation](docs/CODE_FIELD.md)       | `@studio123/payload-advanced-fields/code`       | Syntax-highlighted code editor powered by CodeMirror.                                                 |
 | Link       | [Documentation](docs/LINK_FIELD.md)       | `@studio123/payload-advanced-fields/link`       | Internal/external link field with plugin-level collection config.                                     |
 | Phone      | [Documentation](docs/PHONE_FIELD.md)      | `@studio123/payload-advanced-fields/phone`      | Canonical phone data field with country selector, extension input, validation, and custom formatting. |
-| Data Table | [Documentation](docs/DATA_TABLE_FIELD.md) | `@studio123/payload-advanced-fields/data-table` | JSON-backed text table with sorting, resizing, and row/column editing.                                |
+| Data Table | [Documentation](docs/DATA_TABLE_FIELD.md) | `@studio123/payload-advanced-fields/data-table` | Editable text table with sorting, resizing, row/column editing, and optional row-backed pagination.   |
 
 ---
 
@@ -61,6 +61,8 @@ const fields = [
 ```
 
 See the [Data Table field guide](docs/DATA_TABLE_FIELD.md) for the value contract and configuration. This package currently pins Payload and `@payloadcms/ui` to `4.0.0-canary.37`.
+
+For tables that can outgrow a document response, configure `storage: { mode: 'rows' }` and add `advancedFieldsPlugin()` to register the managed row collection, save hooks, and paginated endpoint. See the [row-backed storage section](docs/DATA_TABLE_FIELD.md#row-backed-storage-and-pagination) for the complete configuration.
 
 Data Table dimensions default to three initial rows and columns with a minimum of one. Maximum rows and columns are unlimited unless `rows.max` or `columns.max` is configured. API response IDs and computed formula values are opt-in through `apiResponse`; stored values remain compact by default.
 

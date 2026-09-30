@@ -44,6 +44,9 @@ export function useConfig() {
 export function useLocale() {
   return { code: useContext(Context).locale };
 }
+export function useDocumentInfo() {
+  return useContext(Context);
+}
 export function RenderFields(props: any) {
   calls.push({ action: 'RenderFields', args: props });
   return (

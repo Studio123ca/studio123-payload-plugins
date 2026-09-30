@@ -9,8 +9,13 @@ import {
   resolveDataTableOptions,
   validateDataTable,
   isSafeDataTableURL,
+  createDataTableStorageManifest,
+  isDataTableStorageManifest,
+  paginateDataTableRows,
 } from '../dist/data-table-field/index.js';
+import { advancedFieldsPlugin } from '../dist/index.js';
 import { pasteDataTableCells } from '../dist/data-table-field/shared/operations.js';
+import { createDataTableRowsEndpoint } from '../dist/data-table-field/server/storage.js';
 
 test('data table factory creates a JSON field with a DataTableField admin component', () => {
   const field = dataTableField({ name: 'pricing', label: 'Pricing', rows: { initial: 2 }, columns: { initial: 4 } });
@@ -23,6 +28,7 @@ test('data table factory creates a JSON field with a DataTableField admin compon
     rows: { initial: 2, min: 1, max: Infinity },
     formulas: { enabled: false, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
+    storage: { mode: 'json', pagination: { enabled: false, defaultLimit: 50, maxLimit: 250 } },
     formats: [],
     textFormats: {
       enabled: false,
@@ -63,6 +69,7 @@ test('data table field forwards spreadsheet options to the client component', ()
     columns: { min: 2 },
     formulas: { enabled: true, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
+    storage: { mode: 'json', pagination: { enabled: false, defaultLimit: 50, maxLimit: 250 } },
     stickyRows: { enabled: true, top: 1 },
     formats: [{ key: 'blue', label: 'Blue', background: 'var(--theme-elevation-100)' }],
   });
@@ -71,6 +78,7 @@ test('data table field forwards spreadsheet options to the client component', ()
     rows: { initial: 3, min: 2, max: Infinity },
     formulas: { enabled: true, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
+    storage: { mode: 'json', pagination: { enabled: false, defaultLimit: 50, maxLimit: 250 } },
     formats: [{ key: 'blue', label: 'Blue', background: 'var(--theme-elevation-100)' }],
     textFormats: {
       enabled: false,
@@ -159,6 +167,85 @@ test('supports minimum dimensions and CSV round trips', () => {
   );
   assert.equal(table.rows[1].cells[1], '24');
   assert.equal(dataTableToCSV(table), 'Name,Value\nWidget,12\nGizmo,24');
+});
+
+test('supports opt-in row-backed manifests and bounded row pages', () => {
+  const options = resolveDataTableOptions({
+    rows: { initial: 4 },
+    columns: { initial: 1 },
+    storage: { mode: 'rows', pagination: { enabled: true, defaultLimit: 2, maxLimit: 3 } },
+  });
+  const table = createDataTable(options);
+  const manifest = createDataTableStorageManifest(table);
+  assert.equal(isDataTableStorageManifest(manifest), true);
+  assert.equal(validateDataTable(manifest, options), true);
+  const page = paginateDataTableRows(table.rows, 2, 2);
+  assert.deepEqual(
+    page.rows.map((row) => row.id),
+    table.rows.slice(2).map((row) => row.id),
+  );
+  assert.deepEqual(
+    { page: page.page, limit: page.limit, totalRows: page.totalRows, totalPages: page.totalPages },
+    { page: 2, limit: 2, totalRows: 4, totalPages: 2 },
+  );
+});
+
+test('registers row storage hooks, collection, and endpoint through the plugin', () => {
+  const field = dataTableField({ name: 'grid', storage: { mode: 'rows' } });
+  const config = advancedFieldsPlugin()({
+    collections: [
+      {
+        slug: 'documents',
+        fields: [{ type: 'group', name: 'details', fields: [field] }],
+        endpoints: [],
+        hooks: {},
+      },
+    ],
+  });
+  const documents = config.collections.find((collection) => collection.slug === 'documents');
+  assert.equal(documents.endpoints[0].path, '/:id/data-table-rows/:field');
+  assert.equal(documents.hooks.beforeChange.length, 1);
+  assert.equal(documents.hooks.afterChange.length, 1);
+  assert.equal(
+    config.collections.some((collection) => collection.slug === 'data-table-rows'),
+    true,
+  );
+});
+
+test('returns bounded row pages with global response IDs from the storage endpoint', async () => {
+  const options = resolveDataTableOptions({
+    rows: { initial: 4 },
+    columns: { initial: 1 },
+    apiResponse: { includeIds: true },
+    storage: { mode: 'rows', pagination: { enabled: true, defaultLimit: 2, maxLimit: 3 } },
+  });
+  const table = createDataTable(options);
+  const manifest = createDataTableStorageManifest(table);
+  const storedRows = table.rows.map((row, position) => ({ rowID: row.id, position, cells: row.cells }));
+  const endpoint = createDataTableRowsEndpoint({
+    collectionSlug: 'documents',
+    fieldName: 'grid',
+    options,
+  });
+  const response = await endpoint.handler({
+    routeParams: { id: 'doc-1', field: 'grid' },
+    url: 'http://localhost/api/documents/doc-1/data-table-rows/grid?page=2&limit=2',
+    payload: {
+      findByID: async () => ({ grid: manifest }),
+      find: async ({ page, limit }) => ({ docs: storedRows.slice((page - 1) * limit, page * limit) }),
+    },
+  });
+  const body = await response.json();
+  assert.deepEqual(body.pagination, {
+    page: 2,
+    limit: 2,
+    totalRows: 4,
+    totalPages: 2,
+    hasPreviousPage: true,
+    hasNextPage: false,
+  });
+  assert.equal(body.rows[0].rowId, table.rows[2].id);
+  assert.equal(body.rows[0].cells[0].cellId, 'A3');
 });
 
 test('validates safe data table link URLs', () => {

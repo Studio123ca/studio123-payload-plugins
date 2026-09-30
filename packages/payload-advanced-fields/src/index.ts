@@ -35,6 +35,7 @@ export {
   csvToDataTable,
   dataTableToCSV,
   evaluateDataTable,
+  paginateDataTableRows,
   resolveDataTableOptions,
   validateDataTable,
 } from './data-table-field/index.js';
@@ -46,7 +47,12 @@ export type {
   DataTableOptions,
   DataTableRow,
   DataTableResponseCell,
+  DataTableStorageOptions,
+  DataTableStorageManifest,
+  DataTableRowPage,
+  DataTableRowRecord,
   DataTableValue,
   ResolvedDataTableDimensionOptions,
   ResolvedDataTableOptions,
+  ResolvedDataTableStorageOptions,
 } from './data-table-field/index.js';

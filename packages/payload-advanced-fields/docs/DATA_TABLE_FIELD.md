@@ -1,75 +1,185 @@
-# Data Table field
+# Data Table Field
 
-`dataTableField` is a JSON-backed, editable table for text content. The admin UI is built on TanStack Table and supports spreadsheet cell selection, deferred cell editing, sortable and resizable columns, editable headers, clipboard actions, undo/redo, context-menu row and column operations, optional format styling, and sticky rows.
+An editable spreadsheet-style field for text values. The admin UI supports cell selection, deferred editing, keyboard navigation, formulas, formatting, CSV import/export, row and column resizing, reordering, and sticky rows.
 
-```ts
+## Import
+
+```typescript
+import { dataTableField } from '@studio123/payload-advanced-fields/data-table';
+```
+
+## Basic Configuration
+
+```typescript
+dataTableField({
+  name: 'pricing',
+  label: 'Pricing',
+});
+```
+
+## Full Configuration
+
+```typescript
+import { CollectionConfig } from 'payload';
 import { dataTableField } from '@studio123/payload-advanced-fields/data-table';
 
-export const Products = {
+export const Products: CollectionConfig = {
   slug: 'products',
   fields: [
     dataTableField({
       name: 'pricing',
-      label: 'Pricing table',
-      rows: { initial: 3, min: 1 },
-      columns: { initial: 3, min: 1 },
+      label: 'Pricing',
+      rows: { initial: 10, min: 1, max: 1_000 },
+      columns: { initial: 4, min: 2, max: 12 },
       formulas: { enabled: true },
-      apiResponse: { computeFormulas: true, includeIds: true },
+      apiResponse: { includeIds: true, computeFormulas: true },
       formats: [
-        { key: 'highlight', label: 'Highlight', background: 'var(--color-bg-warning-tertiary)' },
-        { key: 'success', label: 'Success', background: 'var(--color-bg-success-tertiary)' },
+        {
+          key: 'highlight',
+          label: 'Highlight',
+          background: 'var(--color-bg-warning-tertiary)',
+        },
       ],
+      textFormats: {
+        bold: true,
+        italic: true,
+        alignment: true,
+        wrapping: true,
+        link: true,
+      },
+      stickyRows: { enabled: true, top: 1 },
+      admin: { maxHeight: 520 },
     }),
   ],
 };
 ```
 
-The stored value is intentionally small and explicit:
+## Configuration Options
 
-```ts
+| Option                            | Type                 | Default        | Description                                                                        |
+| --------------------------------- | -------------------- | -------------- | ---------------------------------------------------------------------------------- |
+| `name`                            | string               | `'dataTable'`  | Field name in the document.                                                        |
+| `label`                           | string               | `'Data Table'` | Admin label.                                                                       |
+| `required`                        | boolean              | `false`        | Require a table value.                                                             |
+| `localized`                       | boolean              | `false`        | Enable Payload localization.                                                       |
+| `rows.initial`                    | number               | `3`            | Number of rows created for a new table.                                            |
+| `rows.min`                        | number               | `1`            | Minimum number of rows.                                                            |
+| `rows.max`                        | number               | unlimited      | Maximum number of rows.                                                            |
+| `columns.initial`                 | number               | `3`            | Number of columns created for a new table.                                         |
+| `columns.min`                     | number               | `1`            | Minimum number of columns.                                                         |
+| `columns.max`                     | number               | unlimited      | Maximum number of columns.                                                         |
+| `formulas`                        | boolean or object    | `false`        | Enable spreadsheet formulas with `{ enabled: true }`.                              |
+| `apiResponse.includeIds`          | boolean              | `false`        | Add `columnId`, `rowId`, and spreadsheet-style `cellId` values to API responses.   |
+| `apiResponse.computeFormulas`     | boolean              | `false`        | Return calculated formula values in API responses.                                 |
+| `storage.mode`                    | `'json'` or `'rows'` | `'json'`       | Store the complete value in the document or store rows in the managed collection.  |
+| `storage.pagination`              | boolean or object    | `false`        | Enable bounded pages on the row-storage endpoint.                                  |
+| `storage.pagination.defaultLimit` | number               | `50`           | Page size used when no `limit` is supplied.                                        |
+| `storage.pagination.maxLimit`     | number               | `250`          | Largest page size accepted by the row-storage endpoint.                            |
+| `formats`                         | DataTableFormat[]    | `[]`           | Configure background and text-color choices. The Format menu is hidden when empty. |
+| `textFormats`                     | boolean or object    | `false`        | Enable bold, italic, underline, strikethrough, alignment, wrapping, and links.     |
+| `stickyRows.enabled`              | boolean              | `true`         | Enable sticky-row behavior.                                                        |
+| `stickyRows.top`                  | number               | `0`            | Number of rows frozen at the top.                                                  |
+| `stickyRows.bottom`               | number               | `0`            | Number of rows frozen at the bottom.                                               |
+| `admin.maxHeight`                 | number or string     | `640`          | Maximum editor height, such as `520` or `'60vh'`.                                  |
+
+`textFormats` can be `true` to enable every text-format control, or an object such as `{ bold: true, alignment: true }` to enable selected controls. `formats` entries use `{ key, label, background, text? }`; colors can be CSS values or `{ light, dark }` objects.
+
+## Formulas
+
+Set `formulas.enabled` to `true` to allow formula cells. References use spreadsheet addresses such as `A1`, and ranges use `A1:B10`. Supported operators are `+`, `-`, `*`, `/`, and `^`. Supported functions are `SUM`, `AVERAGE`, `MIN`, `MAX`, and `COUNT`; function arguments can be individual references or ranges separated by commas.
+
+```text
+=A1+B1
+=SUM(B2:B10)
+=AVERAGE(C2,C4:C8)
+```
+
+Currency values, percentages, durations, dates, and times retain their display format when operands are compatible. Mixing formats is not supported: for example, adding `2.40ms` to `1s`, or `$4` to `€2`, returns `#VALUE!`. A formula with no numeric values in an `AVERAGE` range returns `#DIV/0!`.
+
+Set `apiResponse.computeFormulas` to `true` when calculated values should be included in API responses. Formula values are always previewed in the admin editor; this option controls server response enrichment.
+
+## Stored Data
+
+The default value is a compact JSON object:
+
+```typescript
 type DataTableValue = {
   version: 1;
   columns: Array<{ id: string; label: string; width?: number }>;
   rows: Array<{ id: string; cells: Array<string | { formula: string }> }>;
+  appearance?: DataTableAppearance;
 };
 ```
 
-`rows.initial` and `columns.initial` default to `3`; `rows.min` and `columns.min` default to `1`. Maximum dimensions are unlimited unless `rows.max` or `columns.max` is explicitly configured. `admin.maxHeight` accepts a positive pixel number or a CSS length and defaults to `640`.
+`columnId`, `rowId`, and `cellId` are response-only fields. They are not stored unless an application explicitly writes them into another structure.
 
-This is a new field type. Existing `tableField` values and configuration are not migrated or read by `dataTableField`.
+## Row-backed Storage
 
-Formula configuration accepts the boolean shorthand `formulas: true` or an object. The object form controls whether formulas are enabled. API calculation is configured separately:
+Use row-backed storage when a complete table should not be embedded in the parent document. The mode is opt-in and requires the plugin so Payload can register the hidden row collection, save hooks, and endpoint.
 
-```ts
-formulas: { enabled: true },
-apiResponse: { computeFormulas: true }
+```typescript
+import { buildConfig } from 'payload';
+import { advancedFieldsPlugin } from '@studio123/payload-advanced-fields';
+import { dataTableField } from '@studio123/payload-advanced-fields/data-table';
+
+export default buildConfig({
+  plugins: [advancedFieldsPlugin()],
+  collections: [
+    {
+      slug: 'products',
+      fields: [
+        dataTableField({
+          name: 'pricing',
+          storage: {
+            mode: 'rows',
+            pagination: { enabled: true, defaultLimit: 50, maxLimit: 250 },
+          },
+        }),
+      ],
+    },
+  ],
+});
 ```
 
-`formulas.compute` remains accepted as a compatibility alias for `apiResponse.computeFormulas`, but new configurations should use `apiResponse.computeFormulas`.
+The parent document stores a versioned manifest and row count:
 
-Formula arithmetic accepts common formatted numeric strings and preserves compatible formatting in the result. Currency values retain their currency prefix and two decimal places, percentages retain the percent sign, durations retain their unit, and ISO dates/times retain their date or time display. Dates and times can be offset by durations, and subtracting two dates returns a duration. Formatted values with incompatible units or currencies (for example, `2.40ms + 1s` or `$4 + €2`) return `#VALUE!`. Percentages can be multiplied by plain numbers, so `10% * 1,000` evaluates to `100`.
-
-Formatting choices are supplied by the field configuration through `formats`. Each format has a stable `key`, a visible `label`, and a background color; an optional `text` color can also be provided. The Format menu and formatting context-menu item are omitted when `formats` is empty or not supplied.
-
-Configured background choices are available under Format → Background. Choices that define a `text` color are also available under Format → Text color and are stored independently, so changing text color does not replace the selected background.
-
-Cell text formatting is independently opt-in through `textFormats`. Set it to `true` to enable bold, italic, underline, strikethrough, alignment, and wrapping, or pass an object to enable only selected controls. Text formatting is stored in the table appearance and can be applied to a single cell or a multi-cell selection. The keyboard shortcuts are `Mod+B`, `Mod+I`, `Mod+U`, `Mod+Shift+X`, and `Mod+Shift+L/E/R` for left, center, and right alignment.
-
-Set `textFormats.link` to `true` to enable cell hyperlinks. Links are stored as appearance metadata with a URL, and only `http:`, `https:`, and `mailto:` URLs are accepted. Linked cells render as safe external anchors while remaining editable as plain cell values.
-
-API responses keep the compact stored value by default. The `afterRead` transformation is opt-in through `apiResponse`:
-
-```ts
-apiResponse: {
-  includeIds: true,
-  computeFormulas: true,
+```typescript
+{
+  version: 1,
+  columns: [{ id: 'column-id', label: 'Product' }],
+  rows: [],
+  storage: { mode: 'rows', rowCount: 10_000 },
 }
 ```
 
-`includeIds` adds response-only `columnId`, `rowId`, and spreadsheet-style `cellId` values. `computeFormulas` evaluates formulas and returns each cell as an object containing its calculated `value`, plus `formula` when the source cell is a formula. These options are independent, so clients can request IDs without calculation or calculation without the extra IDs. With both disabled, the API returns the stored `columns`, `rows`, and cell values unchanged. This keeps large responses smaller and avoids running the server-side formula evaluator unless requested.
+Rows are stored in the hidden `data-table-rows` collection. With pagination enabled, consumers can request a page from:
 
-The current field hook does not paginate a nested JSON value. For very large tables, a future dedicated table endpoint should return row ranges with explicit pagination metadata rather than silently truncating the normal document response.
+```text
+GET /api/:collection/:id/data-table-rows/:field?page=2&limit=50
+```
 
-The Table menu imports and exports CSV. The first CSV row is used for column labels, and formula cells retain their `=...` text during export. Column widths update while dragging, and an active cell's textarea resize handle keeps the rest of its row aligned. Tables with more than 200 rows use row virtualization in the admin editor so only visible rows and a small overscan buffer are mounted.
+The response includes `page`, `limit`, `totalRows`, `totalPages`, `hasPreviousPage`, and `hasNextPage`. Requested limits are capped by `storage.pagination.maxLimit`. When pagination is disabled, the endpoint returns all rows by default. The admin editor requests `all=true` so editing continues to work with the complete table.
 
-The Storybook examples include Playground, Populated, Formulas, API Response, Paginated API, Formatting, Formula Formats, Freeze Rows, Limited Columns/Rows, Large Data Table, Read Only, and Required Empty. Formatting combines background and cell text formatting examples, while Formula Formats groups currency, percentage, duration, date, time, and incompatible-unit examples in one table. The API Response story displays the live `afterRead` output beside the editor. The Paginated API story uses the 1,000-record customer CSV to demonstrate a page window with explicit pagination metadata. The Large Data Table story loads the same fixture to exercise virtualization and large-table interactions.
+The endpoint checks access to the parent document before reading row records. Direct client access to the managed row collection is disabled. `storage.mode: 'rows'` has no effect until `advancedFieldsPlugin()` is included in the Payload config.
+
+## API Usage
+
+```typescript
+const table = document.pricing;
+
+for (const row of table.rows) {
+  for (const cell of row.cells) {
+    console.log(cell);
+  }
+}
+```
+
+For row-backed tables, read the manifest from the normal document response and use the field endpoint when rows are needed. `apiResponse.includeIds` and `apiResponse.computeFormulas` apply to the normal field hook and to row endpoint responses.
+
+## Notes
+
+- Cells are strings or formula objects; formula objects are available only when formulas are enabled.
+- CSV import uses the first row as column labels. CSV export preserves formula text.
+- Rows and columns can be selected, inserted, deleted, moved, resized, and frozen from the admin menus and context menus.
+- The admin editor virtualizes large row sets to reduce DOM work. Row-backed storage reduces document and API payload size separately from UI virtualization.
+- The Storybook `Paginated API` story uses the 1,000-record customer fixture to show the row-backed manifest and pagination metadata. Persistence, access control, and hooks should be verified in a consuming Payload app.

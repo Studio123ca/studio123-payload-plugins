@@ -6,6 +6,7 @@ import { DataTableField } from '../src/data-table-field/admin/DataTableField.js'
 import { dataTableField } from '../src/data-table-field/server/field.js';
 import { createDataTable, resolveDataTableOptions } from '../src/data-table-field/shared/dataTable.js';
 import { csvToDataTable } from '../src/data-table-field/shared/csv.js';
+import { createDataTableStorageManifest, paginateDataTableRows } from '../src/data-table-field/shared/storage.js';
 import type { DataTableValue, ResolvedDataTableOptions } from '../src/data-table-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
@@ -16,6 +17,10 @@ type Args = FieldControls & {
   maxHeight: number;
   formulas: boolean | { enabled?: boolean; compute?: boolean };
   apiResponse: { includeIds?: boolean; computeFormulas?: boolean };
+  storage?: {
+    mode?: 'json' | 'rows';
+    pagination?: boolean | { enabled?: boolean; defaultLimit?: number; maxLimit?: number };
+  };
   formats: Array<{
     key: string;
     label: string;
@@ -245,55 +250,50 @@ function storyColumnName(index: number) {
 function PaginatedAPIResponsePanel({ value, options }: { value: DataTableValue; options: ResolvedDataTableOptions }) {
   const [page, setPage] = useState(1);
   const pageSize = 50;
-  const totalRows = value.rows.length;
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const rowOffset = (currentPage - 1) * pageSize;
-  const pageValue = {
-    ...value,
-    rows: value.rows.slice(rowOffset, currentPage * pageSize),
-  };
+  const manifest = useMemo(() => createDataTableStorageManifest(value), [value]);
+  const pageResult = useMemo(() => paginateDataTableRows(value.rows, page, pageSize), [page, pageSize, value.rows]);
+  const { rows: _pageRows, ...pagination } = pageResult;
+  const currentPage = pageResult.page;
   const response = useMemo(() => {
     const field = dataTableField({
       apiResponse: { includeIds: true, computeFormulas: options.apiResponse.computeFormulas },
     });
     const afterRead = field.hooks?.afterRead?.[0] as ((args: { value: unknown }) => unknown) | undefined;
-    const pageResponse = afterRead ? afterRead({ value: pageValue }) : pageValue;
+    const pageResponse = afterRead
+      ? afterRead({ value: { ...manifest, rows: pageResult.rows } })
+      : { ...manifest, rows: pageResult.rows };
     const responseRows = (pageResponse as { rows: Array<{ rowId?: string; cells: Array<Record<string, unknown>> }> })
       .rows;
     return {
       ...(pageResponse as Record<string, unknown>),
       rows: responseRows.map((row, pageRowIndex) => ({
         ...row,
-        rowId: value.rows[rowOffset + pageRowIndex]?.id ?? row.rowId,
+        rowId: pageResult.rows[pageRowIndex]?.id ?? row.rowId,
         cells: row.cells.map((cell, columnIndex) => ({
           ...cell,
-          cellId: `${storyColumnName(columnIndex)}${rowOffset + pageRowIndex + 1}`,
+          cellId: `${storyColumnName(columnIndex)}${(currentPage - 1) * pageSize + pageRowIndex + 1}`,
         })),
       })),
-      pagination: {
-        page: currentPage,
-        limit: pageSize,
-        totalRows,
-        totalPages,
-        hasPreviousPage: currentPage > 1,
-        hasNextPage: currentPage < totalPages,
-      },
+      pagination,
     };
-  }, [currentPage, options.apiResponse.computeFormulas, pageValue, rowOffset, totalPages, totalRows, value.rows]);
+  }, [currentPage, manifest, options.apiResponse.computeFormulas, pageResult, pageSize, pagination]);
   return (
     <aside className="story-value" data-testid="paginated-api-response">
       <div className="story-value__heading">
         <strong>Paginated API response</strong>
         <span>
-          Page {currentPage} of {totalPages} · {pageSize} rows per page
+          Page {currentPage} of {pageResult.totalPages} · {pageSize} rows per page
         </span>
       </div>
       <div className="story-value__actions">
         <button type="button" disabled={currentPage === 1} onClick={() => setPage((current) => current - 1)}>
           Previous
         </button>
-        <button type="button" disabled={currentPage === totalPages} onClick={() => setPage((current) => current + 1)}>
+        <button
+          type="button"
+          disabled={currentPage === pageResult.totalPages}
+          onClick={() => setPage((current) => current + 1)}
+        >
           Next
         </button>
       </div>
@@ -347,6 +347,7 @@ const meta = {
     maxHeight: { control: { type: 'number', min: 120, max: 1_000 } },
     formulas: { control: 'object', description: 'Configure formula editing and evaluation.' },
     apiResponse: { control: 'object', description: 'Opt into response IDs and computed formula values.' },
+    storage: { control: 'object', description: 'Opt into row-backed storage and API pagination.' },
     formats: { control: 'object', description: 'Optional format choices. The Format menu is hidden when empty.' },
     textFormats: { control: 'object', description: 'Enable cell text formatting options.' },
     stickyRows: { control: 'object', description: 'Configure sticky top and bottom row counts.' },
@@ -388,6 +389,7 @@ export const APIResponse: Story = {
 export const PaginatedAPI: Story = {
   args: {
     apiResponse: { includeIds: true, computeFormulas: false },
+    storage: { mode: 'rows', pagination: { enabled: true, defaultLimit: 50, maxLimit: 100 } },
     maxHeight: 420,
   },
   render: PaginatedAPIStory,

@@ -21,6 +21,7 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     rows,
     formulas,
     apiResponse,
+    storage,
     formats,
     stickyRows,
     name = 'dataTable',
@@ -34,6 +35,7 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     rows,
     formulas,
     apiResponse,
+    storage,
     formats,
     stickyRows,
   });
@@ -56,9 +58,7 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
         ...(options.apiResponse.computeFormulas || options.apiResponse.includeIds
           ? {
               cells: row.cells.map((cell, columnIndex) => ({
-                ...(options.apiResponse.includeIds
-                  ? { cellId: `${columnName(columnIndex)}${rowIndex + 1}` }
-                  : {}),
+                ...(options.apiResponse.includeIds ? { cellId: `${columnName(columnIndex)}${rowIndex + 1}` } : {}),
                 value: results?.[rowIndex]?.[columnIndex] ?? (typeof cell === 'object' ? cell.formula : cell),
                 ...(typeof cell === 'object' ? { formula: cell.formula } : {}),
               })),
@@ -79,6 +79,13 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     validate: (value, args) => {
       const result = validateDataTable(value, options, Boolean(config.required));
       return result !== true ? result : customValidate ? customValidate(value, args) : true;
+    },
+    custom: {
+      ...config.custom,
+      dataTable: {
+        storage: options.storage,
+        options,
+      },
     },
     admin: {
       ...nativeAdmin,
