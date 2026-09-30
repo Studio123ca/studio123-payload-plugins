@@ -19,8 +19,11 @@ import { DataTableContextMenu, type DataTableContextTarget } from './DataTableCo
 import { createDataTable, MAX_DATA_TABLE_CELL_LENGTH } from '../shared/dataTable.js';
 import {
   dataTableBackgroundStyle,
+  dataTableLink,
   dataTableTextStyle,
   setDataTableBackground,
+  setDataTableLink,
+  setDataTableTextColor,
   setDataTableTextStyle,
   stickyRowCounts,
 } from '../shared/appearance.js';
@@ -42,6 +45,7 @@ import {
 } from '../shared/operations.js';
 import type {
   DataTableCell,
+  DataTableLink,
   DataTableRow,
   DataTableTextStyle,
   DataTableValue,
@@ -103,6 +107,9 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const [virtualScrollTop, setVirtualScrollTop] = useState(0);
   const [stickyLayoutVersion, setStickyLayoutVersion] = useState(0);
   const pendingSelectionRef = useRef<{ rowID: string; columnID: string } | null>(null);
+  const pendingStructureSelectionRef = useRef<
+    { axis: 'row'; rowID: string } | { axis: 'column'; columnID: string } | null
+  >(null);
   const typingCellRef = useRef<{ rowID: string; columnID: string } | null>(null);
   const resizingColumnRef = useRef<string | null>(null);
   const tableRootRef = useRef<HTMLDivElement>(null);
@@ -276,6 +283,68 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       next = insertDataTableColumn(next, next.columns.length, options);
     }
     if (next !== value) commit(next);
+  };
+  const changeSelectedStructure = (action: 'insert' | 'delete') => {
+    if (!value || readOnly) return false;
+    const selections = table.getCellSelectionBounds();
+    if (!selections.length || !value.rows.length || !value.columns.length) return false;
+
+    // A full row/column selection determines which axis the shortcut operates on.
+    // With only a cell selected, insertion follows Sheets' column-first behavior.
+    const fullRows = selections.filter(
+      (selection) => selection.minColumnIndex === 0 && selection.maxColumnIndex === value.columns.length - 1,
+    );
+    const fullColumns = selections.filter(
+      (selection) => selection.minRowIndex === 0 && selection.maxRowIndex === value.rows.length - 1,
+    );
+    const selection = fullRows[0] ?? fullColumns[0];
+    const axis: 'row' | 'column' = fullRows[0] ? 'row' : 'column';
+
+    if (action === 'delete' && !selection) return false;
+    if (action === 'insert') {
+      const bounds = selection ?? selections[0];
+      const count =
+        axis === 'row'
+          ? selection
+            ? bounds.maxRowIndex - bounds.minRowIndex + 1
+            : 1
+          : selection
+            ? bounds.maxColumnIndex - bounds.minColumnIndex + 1
+            : 1;
+      let next = value;
+      const index = axis === 'row' ? bounds.minRowIndex : bounds.minColumnIndex;
+      for (let offset = 0; offset < count; offset += 1) {
+        next =
+          axis === 'row'
+            ? insertDataTableRow(next, index + offset, options)
+            : insertDataTableColumn(next, index + offset, options);
+      }
+      if (next !== value) commit(next);
+      return next !== value;
+    }
+
+    const bounds = selection;
+    const start = axis === 'row' ? bounds.minRowIndex : bounds.minColumnIndex;
+    const end = axis === 'row' ? bounds.maxRowIndex : bounds.maxColumnIndex;
+    let next = value;
+    for (let index = end; index >= start; index -= 1) {
+      next = axis === 'row' ? deleteDataTableRow(next, index, options) : deleteDataTableColumn(next, index, options);
+    }
+    if (next !== value) {
+      const targetIndex = Math.min(
+        Math.max(start - 1, 0),
+        axis === 'row' ? next.rows.length - 1 : next.columns.length - 1,
+      );
+      if (axis === 'row') {
+        const targetRow = next.rows[targetIndex];
+        if (targetRow) pendingStructureSelectionRef.current = { axis: 'row', rowID: targetRow.id };
+      } else {
+        const targetColumn = next.columns[targetIndex];
+        if (targetColumn) pendingStructureSelectionRef.current = { axis: 'column', columnID: targetColumn.id };
+      }
+      commit(next);
+    }
+    return next !== value;
   };
   const sortRows = (direction: 'ascending' | 'descending', columnIndex: number) => {
     if (!value) return;
@@ -547,11 +616,52 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     ];
     commit({ ...value, appearance: setDataTableTextStyle(value.appearance, rows, columns, patch) });
   };
+  const applyTextColor = (key?: string) => {
+    if (!value || !table.getSelectedCellCount()) return;
+    let rows: string[] = [];
+    let columns: string[] | undefined;
+    if (contextTarget?.kind === 'row') {
+      rows = value.rows[contextTarget.row] ? [value.rows[contextTarget.row].id] : [];
+    } else if (contextTarget?.kind === 'column') {
+      rows = value.rows.map((row) => row.id);
+      columns = value.columns[contextTarget.column] ? [value.columns[contextTarget.column].id] : [];
+    } else {
+      const bounds = table.getCellSelectionBounds();
+      bounds.forEach((bound) => {
+        rows.push(...value.rows.slice(bound.minRowIndex, bound.maxRowIndex + 1).map((row) => row.id));
+        const selectedColumns = value.columns
+          .slice(bound.minColumnIndex, bound.maxColumnIndex + 1)
+          .map((column) => column.id);
+        columns = columns ? [...columns, ...selectedColumns] : selectedColumns;
+      });
+    }
+    if (!rows.length || (columns && !columns.length)) return;
+    commit({ ...value, appearance: setDataTableTextColor(value.appearance, rows, columns, key) });
+  };
+  const applyLink = (link: DataTableLink | undefined) => {
+    if (!value || !table.getSelectedCellCount()) return;
+    const bounds = table.getCellSelectionBounds();
+    const rows = [
+      ...new Set(
+        bounds.flatMap((bound) => value.rows.slice(bound.minRowIndex, bound.maxRowIndex + 1).map((row) => row.id)),
+      ),
+    ];
+    const columns = [
+      ...new Set(
+        bounds.flatMap((bound) =>
+          value.columns.slice(bound.minColumnIndex, bound.maxColumnIndex + 1).map((column) => column.id),
+        ),
+      ),
+    ];
+    if (!rows.length || !columns.length) return;
+    commit({ ...value, appearance: setDataTableLink(value.appearance, rows, columns, link) });
+  };
   const toggleTextStyle = (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => {
     const focused = table.getFocusedCell();
     if (!focused || !value) return;
     const current = dataTableTextStyle(value, focused.row.id, focused.column.id);
-    applyTextStyle({ [key]: !current?.[key] });
+    const currentValue = key === 'wrap' ? (current?.wrap ?? true) : (current?.[key] ?? false);
+    applyTextStyle({ [key]: !currentValue });
   };
   const freezeRows = (top: number, bottom: number) => {
     if (!value) return;
@@ -561,6 +671,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const focusedCell = table.getFocusedCell();
   const activeTextStyle =
     value && focusedCell ? dataTableTextStyle(value, focusedCell.row.id, focusedCell.column.id) : undefined;
+  const activeLink = value && focusedCell ? dataTableLink(value, focusedCell.row.id, focusedCell.column.id) : undefined;
   const canFreezeRows = options.stickyRows.enabled && focusedRowIndex !== undefined;
   const freezeThroughFocusedRow = () => {
     if (!value || focusedRowIndex === undefined) return;
@@ -598,6 +709,32 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     pendingSelectionRef.current = null;
     focusActiveCell();
   }, [editingCell, table, value]);
+  useEffect(() => {
+    const pending = pendingStructureSelectionRef.current;
+    if (!pending || !value || !value.rows.length || !value.columns.length) return;
+    const firstRow = value.rows[0];
+    const lastRow = value.rows.at(-1);
+    const firstColumn = value.columns[0];
+    const lastColumn = value.columns.at(-1);
+    if (!firstRow || !lastRow || !firstColumn || !lastColumn) return;
+    if (pending.axis === 'row') {
+      table.selectCellRange({
+        anchorRowId: pending.rowID,
+        anchorColumnId: firstColumn.id,
+        focusRowId: pending.rowID,
+        focusColumnId: lastColumn.id,
+      });
+    } else {
+      table.selectCellRange({
+        anchorRowId: firstRow.id,
+        anchorColumnId: pending.columnID,
+        focusRowId: lastRow.id,
+        focusColumnId: pending.columnID,
+      });
+    }
+    pendingStructureSelectionRef.current = null;
+    focusActiveCell();
+  }, [table, value]);
   const ensureFocusedCell = (target: EventTarget | null) => {
     if (!value || !(target instanceof HTMLElement)) return;
     const focused = table.getFocusedCell();
@@ -702,6 +839,56 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       return;
     }
     const modifier = event.metaKey || event.ctrlKey;
+    if (modifier && !event.altKey && event.key === ' ') {
+      typingCellRef.current = null;
+      event.preventDefault();
+      event.stopPropagation();
+      ensureFocusedCell(event.target);
+      const focused = table.getFocusedCell();
+      if (focused && value) {
+        const columnIndex = value.columns.findIndex((column) => column.id === focused.column.id);
+        if (columnIndex >= 0) selectColumn(columnIndex);
+        focusActiveCell();
+      }
+      return;
+    }
+    if (!modifier && !event.altKey && event.shiftKey && event.key === ' ') {
+      typingCellRef.current = null;
+      event.preventDefault();
+      event.stopPropagation();
+      ensureFocusedCell(event.target);
+      const focused = table.getFocusedCell();
+      if (focused) {
+        const rowIndex = table.getRowModel().rows.findIndex((row) => row.id === focused.row.id);
+        if (rowIndex >= 0) selectRow(rowIndex);
+        focusActiveCell();
+      }
+      return;
+    }
+    const insertStructureShortcut =
+      modifier &&
+      event.altKey &&
+      (event.code === 'Equal' || event.code === 'NumpadAdd' || event.key === '=' || event.key === '+');
+    const deleteStructureShortcut =
+      modifier && event.altKey && (event.code === 'Minus' || event.code === 'NumpadSubtract' || event.key === '-');
+    if (insertStructureShortcut) {
+      ensureFocusedCell(event.target);
+      if (changeSelectedStructure('insert')) {
+        typingCellRef.current = null;
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (deleteStructureShortcut) {
+      ensureFocusedCell(event.target);
+      if (changeSelectedStructure('delete')) {
+        typingCellRef.current = null;
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
     if (modifier && event.key.toLowerCase() === 'a') {
       typingCellRef.current = null;
       event.preventDefault();
@@ -845,9 +1032,13 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
           formats={options.formats}
           textFormats={options.textFormats}
           activeTextStyle={activeTextStyle}
+          activeLink={activeLink}
           hasSelection={table.getSelectedCellCount() > 0}
           formulasEnabled={options.formulas.enabled}
           onApplyBackground={applyBackground}
+          onApplyTextColor={applyTextColor}
+          onApplyLink={applyLink}
+          onClearLink={() => applyLink(undefined)}
           onApplyTextStyle={applyTextStyle}
           onToggleTextStyle={toggleTextStyle}
           selectionLabel={selectionLabel}
@@ -889,6 +1080,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
         onPaste={pasteSelection}
         onCut={cutSelection}
         onApplyBackground={applyBackground}
+        onApplyTextColor={applyTextColor}
         onApplyTextStyle={applyTextStyle}
         onToggleTextStyle={toggleTextStyle}
         onFreezeRows={freezeRows}
@@ -1077,7 +1269,10 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                       const rawCell = value.rows[row.index].cells[index];
                       const selectionEdges = cell.getSelectionEdges();
                       const background = dataTableBackgroundStyle(value, options, row.original.id, cell.column.id);
+                      const hasBackground = Boolean(background && '--data-table-bg-light' in background);
+                      const hasTextColor = Boolean(background && '--data-table-text-light' in background);
                       const textStyle = dataTableTextStyle(value, row.original.id, cell.column.id);
+                      const link = dataTableLink(value, row.original.id, cell.column.id);
                       const isEditing =
                         editingCell?.rowID === row.original.id && editingCell.columnID === cell.column.id;
                       const activateEditing = () => {
@@ -1099,7 +1294,8 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                             textAlign: textStyle?.align,
                             whiteSpace: textStyle?.wrap === false ? 'nowrap' : undefined,
                           }}
-                          data-colored={background ? true : undefined}
+                          data-colored={hasBackground || undefined}
+                          data-text-colored={hasTextColor || undefined}
                           data-context-cell={`${row.getDisplayIndex()}:${index}`}
                           data-selected={cell.getIsSelected() || undefined}
                           data-editing={isEditing || undefined}
@@ -1167,7 +1363,21 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                               }}
                             />
                           ) : (
-                            <span className="data-table__cell-value">{String(results[row.index]?.[index] ?? '')}</span>
+                            <span
+                              className="data-table__cell-value"
+                              style={{
+                                whiteSpace: textStyle?.wrap === false ? 'nowrap' : undefined,
+                                textOverflow: textStyle?.wrap === false ? 'ellipsis' : undefined,
+                              }}
+                            >
+                              {link ? (
+                                <a href={link.url} target="_blank" rel="noopener noreferrer">
+                                  {String(results[row.index]?.[index] ?? '')}
+                                </a>
+                              ) : (
+                                String(results[row.index]?.[index] ?? '')
+                              )}
+                            </span>
                           )}
                         </td>
                       );

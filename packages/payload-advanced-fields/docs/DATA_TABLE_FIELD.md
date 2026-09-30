@@ -51,7 +51,11 @@ Formula arithmetic accepts common formatted numeric strings and preserves compat
 
 Formatting choices are supplied by the field configuration through `formats`. Each format has a stable `key`, a visible `label`, and a background color; an optional `text` color can also be provided. The Format menu and formatting context-menu item are omitted when `formats` is empty or not supplied.
 
+Configured background choices are available under Format → Background. Choices that define a `text` color are also available under Format → Text color and are stored independently, so changing text color does not replace the selected background.
+
 Cell text formatting is independently opt-in through `textFormats`. Set it to `true` to enable bold, italic, underline, strikethrough, alignment, and wrapping, or pass an object to enable only selected controls. Text formatting is stored in the table appearance and can be applied to a single cell or a multi-cell selection. The keyboard shortcuts are `Mod+B`, `Mod+I`, `Mod+U`, `Mod+Shift+X`, and `Mod+Shift+L/E/R` for left, center, and right alignment.
+
+Set `textFormats.link` to `true` to enable cell hyperlinks. Links are stored as appearance metadata with a URL, and only `http:`, `https:`, and `mailto:` URLs are accepted. Linked cells render as safe external anchors while remaining editable as plain cell values.
 
 API responses keep the compact stored value by default. The `afterRead` transformation is opt-in through `apiResponse`:
 
@@ -68,4 +72,4 @@ The current field hook does not paginate a nested JSON value. For very large tab
 
 The Table menu imports and exports CSV. The first CSV row is used for column labels, and formula cells retain their `=...` text during export. Column widths update while dragging, and an active cell's textarea resize handle keeps the rest of its row aligned. Tables with more than 200 rows use row virtualization in the admin editor so only visible rows and a small overscan buffer are mounted.
 
-The Storybook examples include Playground, Populated, Formulas, API Response, Formatting, Formula Formats, Freeze Rows, Limited Columns/Rows, Large Data Table, Read Only, and Required Empty. Formatting combines background and cell text formatting examples, while Formula Formats groups currency, percentage, duration, date, time, and incompatible-unit examples in one table. The API Response story displays the live `afterRead` output beside the editor. The Large Data Table story loads a 1,000-record customer CSV to exercise virtualization and large-table interactions.
+The Storybook examples include Playground, Populated, Formulas, API Response, Paginated API, Formatting, Formula Formats, Freeze Rows, Limited Columns/Rows, Large Data Table, Read Only, and Required Empty. Formatting combines background and cell text formatting examples, while Formula Formats groups currency, percentage, duration, date, time, and incompatible-unit examples in one table. The API Response story displays the live `afterRead` output beside the editor. The Paginated API story uses the 1,000-record customer CSV to demonstrate a page window with explicit pagination metadata. The Large Data Table story loads the same fixture to exercise virtualization and large-table interactions.

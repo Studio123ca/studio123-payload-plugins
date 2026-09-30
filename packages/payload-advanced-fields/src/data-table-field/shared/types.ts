@@ -29,8 +29,17 @@ export type DataTablePaletteEntry = DataTableFormat;
 export type DataTableAppearance = {
   rows?: Record<string, string>;
   cells?: Record<string, Record<string, string>>;
+  textColors?: {
+    rows?: Record<string, string>;
+    cells?: Record<string, Record<string, string>>;
+  };
+  links?: Record<string, Record<string, DataTableLink>>;
   text?: Record<string, Record<string, DataTableTextStyle>>;
   stickyRows?: { top: number; bottom: number };
+};
+
+export type DataTableLink = {
+  url: string;
 };
 
 export type DataTableTextStyle = {
@@ -50,6 +59,7 @@ export type DataTableTextFormats = {
   strikethrough?: boolean;
   alignment?: boolean;
   wrapping?: boolean;
+  link?: boolean;
 };
 
 export type ResolvedDataTableTextFormats = {
@@ -60,6 +70,7 @@ export type ResolvedDataTableTextFormats = {
   strikethrough: boolean;
   alignment: boolean;
   wrapping: boolean;
+  link: boolean;
 };
 
 export type DataTableRow = {

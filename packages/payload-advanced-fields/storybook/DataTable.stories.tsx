@@ -32,6 +32,7 @@ type Args = FieldControls & {
         strikethrough?: boolean;
         alignment?: boolean;
         wrapping?: boolean;
+        link?: boolean;
       };
   stickyRows: { enabled?: boolean; top?: number; bottom?: number };
 };
@@ -67,6 +68,7 @@ const formatOptions = resolveDataTableOptions({
 const formattingExample = createDataTable(
   resolveDataTableOptions({
     ...formatOptions,
+    rows: { initial: 4 },
     textFormats: true,
   }),
 );
@@ -75,12 +77,30 @@ formattingExample.columns[1].label = 'Status';
 formattingExample.columns[2].label = 'Notes';
 formattingExample.rows[0].cells = ['Widget', 'Ready', 'Background and text formatting'];
 formattingExample.rows[1].cells = ['Gizmo', 'Review', 'Select cells, then use Format'];
+formattingExample.rows[2].cells = [
+  'Wrapping test',
+  'Wrapped',
+  'This deliberately long cell value should wrap across multiple lines when wrapping is enabled.',
+];
+formattingExample.rows[3].cells = [
+  'No wrapping',
+  'Toggle me',
+  'This deliberately long cell value starts without wrapping so the toolbar can toggle it back on.',
+];
 formattingExample.appearance = {
   rows: { [formattingExample.rows[0].id]: 'highlight' },
   text: {
     [formattingExample.rows[0].id]: {
       [formattingExample.columns[0].id]: { bold: true },
       [formattingExample.columns[1].id]: { italic: true, align: 'center' },
+    },
+    [formattingExample.rows[3].id]: {
+      [formattingExample.columns[2].id]: { wrap: false },
+    },
+  },
+  links: {
+    [formattingExample.rows[0].id]: {
+      [formattingExample.columns[0].id]: { url: 'https://payloadcms.com' },
     },
   },
 };
@@ -214,6 +234,97 @@ function APIResponsePanel({ options }: { options: ResolvedDataTableOptions }) {
   );
 }
 
+function storyColumnName(index: number) {
+  let name = '';
+  for (let value = index + 1; value > 0; value = Math.floor((value - 1) / 26)) {
+    name = String.fromCharCode(65 + ((value - 1) % 26)) + name;
+  }
+  return name;
+}
+
+function PaginatedAPIResponsePanel({ value, options }: { value: DataTableValue; options: ResolvedDataTableOptions }) {
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+  const totalRows = value.rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const rowOffset = (currentPage - 1) * pageSize;
+  const pageValue = {
+    ...value,
+    rows: value.rows.slice(rowOffset, currentPage * pageSize),
+  };
+  const response = useMemo(() => {
+    const field = dataTableField({
+      apiResponse: { includeIds: true, computeFormulas: options.apiResponse.computeFormulas },
+    });
+    const afterRead = field.hooks?.afterRead?.[0] as ((args: { value: unknown }) => unknown) | undefined;
+    const pageResponse = afterRead ? afterRead({ value: pageValue }) : pageValue;
+    const responseRows = (pageResponse as { rows: Array<{ rowId?: string; cells: Array<Record<string, unknown>> }> })
+      .rows;
+    return {
+      ...(pageResponse as Record<string, unknown>),
+      rows: responseRows.map((row, pageRowIndex) => ({
+        ...row,
+        rowId: value.rows[rowOffset + pageRowIndex]?.id ?? row.rowId,
+        cells: row.cells.map((cell, columnIndex) => ({
+          ...cell,
+          cellId: `${storyColumnName(columnIndex)}${rowOffset + pageRowIndex + 1}`,
+        })),
+      })),
+      pagination: {
+        page: currentPage,
+        limit: pageSize,
+        totalRows,
+        totalPages,
+        hasPreviousPage: currentPage > 1,
+        hasNextPage: currentPage < totalPages,
+      },
+    };
+  }, [currentPage, options.apiResponse.computeFormulas, pageValue, rowOffset, totalPages, totalRows, value.rows]);
+  return (
+    <aside className="story-value" data-testid="paginated-api-response">
+      <div className="story-value__heading">
+        <strong>Paginated API response</strong>
+        <span>
+          Page {currentPage} of {totalPages} · {pageSize} rows per page
+        </span>
+      </div>
+      <div className="story-value__actions">
+        <button type="button" disabled={currentPage === 1} onClick={() => setPage((current) => current - 1)}>
+          Previous
+        </button>
+        <button type="button" disabled={currentPage === totalPages} onClick={() => setPage((current) => current + 1)}>
+          Next
+        </button>
+      </div>
+      <pre>{JSON.stringify(response, null, 2)}</pre>
+    </aside>
+  );
+}
+
+function PaginatedAPIStory(args: Args, { globals }: any) {
+  const [value, setValue] = useState<DataTableValue | null>(null);
+  const options = useMemo(() => resolveDataTableOptions(args), [args]);
+  useEffect(() => {
+    let active = true;
+    fetch('./customers-1000.csv')
+      .then((response) => response.text())
+      .then((csv) => {
+        if (active) setValue(csvToDataTable(csv, options));
+      });
+    return () => {
+      active = false;
+    };
+  }, [options]);
+  if (!value) return <p>Loading paginated data table…</p>;
+  return (
+    <PayloadField args={{ ...args, initialValue: value }} theme={globals.theme} locale={globals.locale}>
+      <DataTableField {...fieldProps(args, 'json')} options={options} maxHeight={args.maxHeight} />
+      <PaginatedAPIResponsePanel value={value} options={options} />
+    </PayloadField>
+  );
+}
+
 const meta = {
   title: 'Fields/Data Table',
   tags: ['autodocs'],
@@ -273,6 +384,13 @@ export const APIResponse: Story = {
       </PayloadField>
     );
   },
+};
+export const PaginatedAPI: Story = {
+  args: {
+    apiResponse: { includeIds: true, computeFormulas: false },
+    maxHeight: 420,
+  },
+  render: PaginatedAPIStory,
 };
 export const Formatting: Story = {
   args: { initialValue: formattingExample, formats: formatOptions.formats, textFormats: true },
