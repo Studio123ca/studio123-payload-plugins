@@ -137,6 +137,20 @@ test('restores grid focus after cancelling cell editing', async () => {
   assert.equal(document.activeElement?.dataset.contextCell, '0:1');
 });
 
+test('keeps keyboard events inside exclusive cell editing mode', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 2 } }));
+  value.rows[0].cells[0] = 'Existing value';
+  await render({ value });
+  const cell = document.querySelector('[data-context-cell="0:0"]');
+  await act(async () => cell.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true })));
+  const input = document.querySelector('textarea');
+  const key = new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+  await act(async () => input.dispatchEvent(key));
+  assert.equal(document.querySelector('textarea'), input);
+  assert.equal(document.activeElement, input);
+  assert.equal(document.querySelector('[data-context-cell="0:1"]')?.dataset.selected, undefined);
+});
+
 test('confirms before clearing the table', async () => {
   const value = createDataTable(options);
   await render({ value });
@@ -317,6 +331,26 @@ test('keeps keyboard navigation inside the grid', async () => {
   await act(async () => document.activeElement.dispatchEvent(selectAll));
   assert.equal(selectAll.defaultPrevented, true);
   assert.equal(document.querySelectorAll('td[data-selected]').length, 4);
+});
+
+test('tabs between column headers without focusing resize handles', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 3 } }));
+  await render({ value });
+  const firstHeader = document.querySelector('[data-context-column="0"]');
+  firstHeader.focus();
+  const tab = new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+  await act(async () => firstHeader.dispatchEvent(tab));
+  assert.equal(tab.defaultPrevented, true);
+  assert.equal(document.activeElement?.dataset.contextColumn, '1');
+  const shiftTab = new dom.window.KeyboardEvent('keydown', {
+    key: 'Tab',
+    shiftKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => document.activeElement.dispatchEvent(shiftTab));
+  assert.equal(shiftTab.defaultPrevented, true);
+  assert.equal(document.activeElement?.dataset.contextColumn, '0');
 });
 
 test('types directly into a selected cell without entering edit mode', async () => {

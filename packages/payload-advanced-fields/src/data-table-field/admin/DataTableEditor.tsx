@@ -800,6 +800,22 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                         }}
                         onDoubleClick={() => activateColumnEditing(column.id)}
                         onKeyDown={(event) => {
+                          if (event.target instanceof HTMLInputElement) return;
+                          if (event.key === 'Tab') {
+                            const nextIndex = index + (event.shiftKey ? -1 : 1);
+                            const nextHeader =
+                              nextIndex >= 0
+                                ? tableRootRef.current?.querySelector<HTMLElement>(
+                                    `[data-context-column="${nextIndex}"]`,
+                                  )
+                                : null;
+                            if (nextHeader) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              nextHeader.focus();
+                            }
+                            return;
+                          }
                           if (event.key === 'Enter' || event.key === 'F2') {
                             event.preventDefault();
                             activateColumnEditing(column.id);
@@ -960,6 +976,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                               onBlur={() => setEditingCell(null)}
                               onChange={(event) => updateCell(row.original.id, index, event.target.value)}
                               onKeyDown={(event) => {
+                                event.stopPropagation();
                                 if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
                                   event.preventDefault();
                                   pendingSelectionRef.current = { rowID: row.original.id, columnID: cell.column.id };

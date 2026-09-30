@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+
+- Fixed exclusive cell editing so keyboard events remain inside the editor instead of switching back to quick entry.
+- Fixed Tab navigation between column headers so resize handles are skipped.
+
 ## 1.2.1
 
 - Added formula parsing that preserves compatible currency, percentage, and duration display values and rejects incompatible formatted operands.
