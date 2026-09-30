@@ -5,6 +5,7 @@
 - Fixed formula copy and paste so formulas remain formula cells when moved through the clipboard.
 - Fixed focused row and column headers using rounded corners instead of hard-edged table styling.
 - Fixed column resizing so dragging the resize handle does not reorder the column.
+- Fixed resized column widths being rejected by Payload validation when a drag exceeded the supported bounds.
 - Constrained the selection indicator so long selections do not push the copy button off-screen.
 - Added one-second checkmark feedback after copying the current selection.
 

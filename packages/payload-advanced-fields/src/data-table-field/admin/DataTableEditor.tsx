@@ -46,6 +46,15 @@ const features = tableFeatures({
   rowSortingFeature,
   sortedRowModel: createSortedRowModel(),
 });
+
+const MIN_COLUMN_WIDTH = 120;
+const MAX_COLUMN_WIDTH = 600;
+
+function persistedColumnWidth(width: unknown, fallback?: number) {
+  const candidate = typeof width === 'number' && Number.isFinite(width) ? width : fallback;
+  if (candidate === undefined || !Number.isFinite(candidate)) return undefined;
+  return Math.round(Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, candidate)) * 100) / 100;
+}
 const emptyRows: DataTableRow[] = [];
 
 function columnName(index: number) {
@@ -144,7 +153,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     columns,
     data: value?.rows ?? emptyRows,
     getRowId: (row) => row.id,
-    defaultColumn: { size: 180, minSize: 120, maxSize: 600 },
+    defaultColumn: { size: 180, minSize: MIN_COLUMN_WIDTH, maxSize: MAX_COLUMN_WIDTH },
     state: { columnSizing, columnResizing },
     columnResizeMode: 'onChange',
     enableCellSelection: !readOnly,
@@ -164,10 +173,10 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       if (value && !readOnly && !next.isResizingColumn && columnResizing.isResizingColumn) {
         commit({
           ...value,
-          columns: value.columns.map((column) => ({
-            ...column,
-            width: columnSizingRef.current[column.id] ?? column.width,
-          })),
+          columns: value.columns.map((column) => {
+            const width = persistedColumnWidth(columnSizingRef.current[column.id], column.width);
+            return width === undefined ? column : { ...column, width };
+          }),
         });
       }
     },
