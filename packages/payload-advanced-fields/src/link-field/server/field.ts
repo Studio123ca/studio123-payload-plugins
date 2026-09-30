@@ -31,10 +31,6 @@ const filterCollections = (collectionSlugs?: string[], getLinkCollectionsFn?: ty
   return globalCollections.filter((collection) => collectionSlugs.includes(collection.slug));
 };
 
-const toClientCollection = (collection: LinkCollectionOption): { slug: string } => ({
-  slug: collection.slug,
-});
-
 export type LinkFieldConfig = Partial<Omit<LinkField, 'type'>> & {
   collectionSlugs?: string[];
   defaultType?: LinkType;
@@ -57,6 +53,7 @@ export const linkField = (
     required = false,
     resolveInternalHref,
     admin,
+    hooks,
     ...rest
   } = config;
 
@@ -71,6 +68,7 @@ export const linkField = (
     label,
     type: 'json',
     localized,
+    required,
     defaultValue: { ...defaultValue, type: normalizedDefaultType },
     validate: (value) => {
       // Get collections at validate time, not at field definition time
@@ -93,7 +91,12 @@ export const linkField = (
     },
     hooks: (() => {
       // Pass the collectionSlugs, not the collections - hooks will resolve at runtime
-      return createLinkFieldHooks(collectionSlugs, resolveInternalHref ?? globalConfig?.resolveInternalHref);
+      const builtIn = createLinkFieldHooks(collectionSlugs, resolveInternalHref ?? globalConfig?.resolveInternalHref);
+      return {
+        ...hooks,
+        beforeChange: [...builtIn.beforeChange, ...(hooks?.beforeChange ?? [])],
+        afterRead: [...builtIn.afterRead, ...(hooks?.afterRead ?? [])],
+      };
     })(),
     ...rest,
   } as LinkField;

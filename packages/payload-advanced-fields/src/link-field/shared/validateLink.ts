@@ -4,7 +4,7 @@ import { getLinkHref } from './getLinkHref.js';
 const trim = (value?: string | null) => (typeof value === 'string' ? value.trim() : '');
 
 const getPrimitiveInternalValue = (value: LinkValue['internal']): string | number | null => {
-  if (!value?.value) return null;
+  if (value?.value == null || value.value === '') return null;
 
   // If it's already a primitive, return it
   if (typeof value.value === 'string' || typeof value.value === 'number') {
@@ -72,6 +72,10 @@ export function validateLink(
     return options.required ? 'A link is required.' : true;
   }
 
+  if (!['internal', 'external', 'email', 'phone'].includes(normalized.type)) {
+    return 'Select a valid link type.';
+  }
+
   if (!normalized.label) {
     return 'Enter a label.';
   }
@@ -83,8 +87,16 @@ export function validateLink(
     }
   }
 
-  if (normalized.type === 'email' && normalized.email && !isEmail(normalized.email)) {
-    return 'Please enter a valid email address.';
+  if (normalized.type === 'email') {
+    if (!normalized.email) return 'Enter an email address.';
+    if (!isEmail(normalized.email)) return 'Please enter a valid email address.';
+  }
+
+  if (normalized.type === 'internal') {
+    if (normalized.internal?.value == null || normalized.internal.value === '') return 'Select a destination.';
+    if (!options.collections.some((collection) => collection.slug === normalized.internal?.relationTo)) {
+      return 'Select a destination from an allowed collection.';
+    }
   }
 
   if (normalized.type === 'phone' && !normalized.phone) {

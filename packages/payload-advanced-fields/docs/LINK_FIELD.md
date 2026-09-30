@@ -25,7 +25,7 @@ import { linkField } from '@studio123/payload-advanced-fields/link';
 linkField({
   name: 'navigationLink',
   label: 'Navigation Link',
-  description: 'Configure where this link points to',
+  admin: { description: 'Configure where this link points to' },
   required: true,
   localized: false,
   collectionSlugs: ['pages', 'posts'],
@@ -82,15 +82,15 @@ advancedFieldsPlugin({
 
 ## Configuration Options
 
-| Option            | Type     | Default     | Description                                       |
-| ----------------- | -------- | ----------- | ------------------------------------------------- |
-| `name`            | string   | `'link'`    | Field name in the database                        |
-| `label`           | string   | `'Link'`    | Display label in admin UI                         |
-| `description`     | string   | `undefined` | Help text for the field                           |
-| `required`        | boolean  | `false`     | Whether the field is required                     |
-| `localized`       | boolean  | `false`     | Enable multi-language support                     |
-| `collectionSlugs` | string[] | `[]`        | Collections available for internal links          |
-| `defaultType`     | LinkType | `undefined` | Default link type (internal/external/email/phone) |
+| Option              | Type     | Default     | Description                                       |
+| ------------------- | -------- | ----------- | ------------------------------------------------- |
+| `name`              | string   | `'link'`    | Field name in the database                        |
+| `label`             | string   | `'Link'`    | Display label in admin UI                         |
+| `admin.description` | string   | `undefined` | Help text for the field                           |
+| `required`          | boolean  | `false`     | Whether the field is required                     |
+| `localized`         | boolean  | `false`     | Enable multi-language support                     |
+| `collectionSlugs`   | string[] | `[]`        | Collections available for internal links          |
+| `defaultType`       | LinkType | `undefined` | Default link type (internal/external/email/phone) |
 
 ## Link Types
 
@@ -125,81 +125,60 @@ export const Menus: CollectionConfig = {
 
 ## Stored Data Structure
 
-### Internal Link
+The JSON value is `null` when cleared. A configured link includes `type`, `label`, `newTab`, `enableAnchor`, and the destination properties below. Inactive destination properties can be `null`.
 
 ```typescript
+// Internal link
 {
   type: 'internal',
-  value: {
-    relationTo: 'pages',
-    value: '123456' // Document ID
-  }
+  label: 'About us',
+  internal: { relationTo: 'pages', value: '123456', title: 'About' },
+  enableAnchor: true,
+  anchor: 'team',
+  newTab: false,
+  url: '/about#team',
+}
+
+// External link
+{ type: 'external', label: 'About', external: '/about', url: '/about' }
+
+// Email link
+{ type: 'email', label: 'Contact', email: 'user@example.com', url: 'mailto:user@example.com' }
+
+// Phone link
+{ type: 'phone', label: 'Call', phone: '+1 555 0123', url: 'tel:+15550123' }
+```
+
+External links accept HTTP(S) URLs and relative references such as `/about`, `../contact`, `?preview=true`, and `#details`. Unsupported schemes and URLs containing whitespace are rejected in both the drawer and server validation.
+
+Internal destinations must belong to the field's allowed collections and have a document ID; numeric ID `0` is supported. Email destinations require an address. All configured links require a label.
+
+## Hydration and Access Control
+
+The field's `beforeChange` hook normalizes the value. Its `afterRead` hook resolves internal URLs using `resolveInternalHref`, or the collection's `generateURL`. Internal `url` values are computed on read and are not a permanent stored URL. Destination titles use the target collection's `admin.useAsTitle` (falling back to `title`). The drawer's title prefill uses the configured API route and current locale.
+
+Internal document lookups respect access control and preserve the request's user, locale, and transaction context. Missing, inaccessible, or disallowed destinations return `url: null` and `internal.title: null`, while retaining the saved link label and destination ID. URL resolvers are only called for readable documents. Frontends should handle a missing URL rather than constructing one from the ID.
+
+Custom `hooks.beforeChange` and `hooks.afterRead` run after the built-in hooks. Other hook arrays are preserved. An explicit custom `validate` still overrides the default validator, following standard field configuration behavior.
+
+## API / Frontend Usage
+
+```tsx
+import type { LinkValue } from '@studio123/payload-advanced-fields/link';
+
+function NavigationLink({ link }: { link: LinkValue | null }) {
+  if (!link?.url) return null;
+
+  return (
+    <a
+      href={link.url}
+      target={link.newTab ? '_blank' : undefined}
+      rel={link.newTab ? 'noopener noreferrer' : undefined}
+    >
+      {link.label}
+    </a>
+  );
 }
 ```
 
-### External Link
-
-External links accept complete HTTP(S) URLs and relative references such as `/about`, `../contact`, `?preview=true`, or `#details`.
-
-```typescript
-{
-  type: 'external',
-  value: 'https://example.com'
-}
-```
-
-### Email Link
-
-```typescript
-{
-  type: 'email',
-  value: 'user@example.com'
-}
-```
-
-### Phone Link
-
-```typescript
-{
-  type: 'phone',
-  value: '+1-555-0123'
-}
-```
-
-## API Usage
-
-```typescript
-// In your API/Frontend
-const link = doc.navigationLink;
-
-// Check link type
-if (link.type === 'internal') {
-  // Access the related document
-  const relatedDoc = link.value.value; // Document ID
-  const collection = link.value.relationTo; // Collection slug
-} else if (link.type === 'external') {
-  const url = link.value; // Full URL
-} else if (link.type === 'email') {
-  const email = link.value; // Email address
-} else if (link.type === 'phone') {
-  const phone = link.value; // Phone number
-}
-```
-
-## Frontend Helper Example
-
-```typescript
-function getLinkHref(linkField: LinkValue): string {
-  if (linkField.type === 'internal') {
-    // You would need to resolve the document to get its URL
-    return `/docs/${linkField.value.value}`;
-  } else if (linkField.type === 'external') {
-    return linkField.value;
-  } else if (linkField.type === 'email') {
-    return `mailto:${linkField.value}`;
-  } else if (linkField.type === 'phone') {
-    return `tel:${linkField.value}`;
-  }
-  return '#';
-}
-```
+To inspect a destination directly, use `link.internal?.value` and `link.internal?.relationTo`, `link.external`, `link.email`, or `link.phone` according to `link.type`.

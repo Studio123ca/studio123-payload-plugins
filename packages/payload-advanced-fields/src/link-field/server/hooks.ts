@@ -22,7 +22,7 @@ const fetchInternalDoc = async (req: PayloadRequest | undefined, relationTo: str
       id,
       depth: 0,
       req: nestedReq as PayloadRequest,
-      overrideAccess: true,
+      overrideAccess: false,
     });
   } catch {
     return null;
@@ -39,7 +39,7 @@ const appendAnchor = (url: string | null, anchor?: string | null) => {
 };
 
 const getPrimitiveInternalValue = (value: LinkValue['internal']): string | number | null => {
-  if (!value?.value) return null;
+  if (value?.value == null || value.value === '') return null;
 
   // If it's already a primitive, return it
   if (typeof value.value === 'string' || typeof value.value === 'number') {
@@ -63,17 +63,21 @@ const populateInternalLink = async (
   req: PayloadRequest | undefined,
 ) => {
   const current = value as LinkValue | null | undefined;
-  if (!current?.internal?.relationTo || !current.internal.value) return { hydrated: current ?? null, doc: null };
+  if (current?.type !== 'internal' || !current.internal?.relationTo) return { hydrated: current ?? null, doc: null };
+  if (!collections.some((collection) => collection.slug === current.internal?.relationTo)) {
+    return { hydrated: current, doc: null };
+  }
 
   const selectedID = getPrimitiveInternalValue(current.internal);
 
   if (selectedID === null || selectedID === undefined || selectedID === '') return { hydrated: current, doc: null };
 
   const doc = await fetchInternalDoc(req, current.internal.relationTo, selectedID);
-  const title =
-    doc && typeof (doc as Record<string, unknown>).title === 'string'
-      ? ((doc as Record<string, unknown>).title as string)
-      : (current.internal.title ?? null);
+  const titleField =
+    req?.payload.config.collections.find((collection) => collection.slug === current.internal?.relationTo)?.admin
+      ?.useAsTitle ?? 'title';
+  const titleValue = doc ? (doc as Record<string, unknown>)[titleField] : null;
+  const title = typeof titleValue === 'string' || typeof titleValue === 'number' ? String(titleValue) : null;
   const hydrated = {
     ...current,
     internal: {
@@ -95,7 +99,8 @@ const resolveStoredHref = async (
 ) => {
   if (!value) return null;
 
-  if (value.type === 'internal' && value.internal) {
+  if (value.type === 'internal') {
+    if (!value.internal || !doc) return null;
     const collection = collections.find((item) => item.slug === value.internal?.relationTo);
     if (collection) {
       // Try custom resolver first
@@ -123,9 +128,8 @@ const resolveStoredHref = async (
         });
         return appendAnchor(generatedHref, value.anchor);
       }
-    } else {
-      // collection not found
     }
+    return null;
   }
 
   return getLinkHref(value, collections, { req }) || appendAnchor(value.url || null, value.anchor) || null;
@@ -185,6 +189,9 @@ export function createLinkFieldHooks(collectionSlugs?: string[], resolveInternal
     const url = await resolveStoredHref(hydrated, normalizedCollections, req, hrefResolver, result.doc);
     return {
       ...stripInternalDoc(hydrated),
+      ...(hydrated.type === 'internal' && hydrated.internal && !result.doc
+        ? { internal: { ...stripInternalDoc(hydrated).internal!, title: null } }
+        : {}),
       url,
     };
   };

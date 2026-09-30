@@ -2,6 +2,8 @@
 
 import { Button } from '@payloadcms/ui/elements/Button';
 import { Drawer } from '@payloadcms/ui/elements/Drawer';
+import { useConfig } from '@payloadcms/ui/providers/Config';
+import { useLocale } from '@payloadcms/ui/providers/Locale';
 import { useModal } from '@payloadcms/ui/elements/Modal';
 import { CheckboxInput } from '@payloadcms/ui/fields/Checkbox';
 import { FieldError } from '@payloadcms/ui/fields/FieldError';
@@ -10,7 +12,7 @@ import { SelectInput } from '@payloadcms/ui/fields/Select';
 import { TextInput } from '@payloadcms/ui/fields/Text';
 import type { ValueWithRelation } from 'payload';
 import type { ChangeEvent } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LINK_TYPES } from '../shared/constants.js';
 import { normalizeLinkValue, validateLink } from '../shared/validateLink.js';
 import type { LinkValue } from '../shared/types.js';
@@ -25,7 +27,7 @@ type Props = {
   value: LinkValue | null;
 };
 
-type DrawerErrors = Partial<Record<'email' | 'external' | 'internal' | 'label' | 'phone', string>>;
+type DrawerErrors = Partial<Record<'email' | 'external' | 'internal' | 'label' | 'phone' | 'type', string>>;
 
 const emptyDraft = (defaultType: LinkValue['type']): LinkValue => ({
   type: defaultType,
@@ -52,6 +54,8 @@ const getInternalValueId = (value: unknown): string | number | null => {
 
 function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug, onCancel, onSave, value }: Props) {
   const { closeModal } = useModal();
+  const { config } = useConfig();
+  const locale = useLocale()?.code;
   const [draft, setDraft] = useState<LinkValue>(value ?? emptyDraft(defaultType));
   const [extensionDraft, setExtensionDraft] = useState<unknown>(extension?.value ?? null);
   const [errors, setErrors] = useState<DrawerErrors>({});
@@ -88,16 +92,22 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
     const relation = draft.internal?.relationTo;
     const currentLabel = draft.label?.trim() ?? '';
 
-    if (!selectedID || !relation) return;
+    if (selectedID == null || selectedID === '' || !relation || !relationTo.includes(relation)) return;
 
     let cancelled = false;
     const loadTitle = async () => {
       try {
-        const response = await fetch(`/api/${relation}/${selectedID}?depth=0`);
+        const query = new URLSearchParams({ depth: '0', ...(locale ? { locale } : {}) });
+        const response = await fetch(
+          `${config.serverURL ?? ''}${config.routes.api}/${encodeURIComponent(relation)}/${encodeURIComponent(selectedID)}?${query}`,
+        );
         if (!response.ok) return;
 
-        const data = (await response.json()) as { title?: unknown };
-        const title = typeof data.title === 'string' ? data.title : '';
+        const data = (await response.json()) as Record<string, unknown>;
+        const titleField =
+          config.collections.find((collection) => collection.slug === relation)?.admin?.useAsTitle ?? 'title';
+        const titleValue = data[titleField];
+        const title = typeof titleValue === 'string' || typeof titleValue === 'number' ? String(titleValue) : '';
         if (!title || cancelled) return;
 
         // Update label if current label is empty OR matches the previous doc's title (wasn't manually edited)
@@ -106,11 +116,12 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
 
         setDraft((prev) => {
           if (prev.type !== 'internal') return prev;
-          if (getInternalValueId(prev.internal) !== selectedID) return prev;
+          if (getInternalValueId(prev.internal) !== selectedID || prev.internal?.relationTo !== relation) return prev;
           const prevLabel = prev.label?.trim() ?? '';
           if (prevLabel !== '' && prevLabel !== lastDocTitleRef.current) return prev;
 
           lastDocTitleRef.current = title;
+          if (prev.label === title) return prev;
           return {
             ...prev,
             label: title,
@@ -126,32 +137,16 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
     return () => {
       cancelled = true;
     };
-  }, [draft.internal, draft.label, draft.type]);
+  }, [draft.internal, draft.label, draft.type, config, locale, collectionSlugs]);
 
   const handleSave = () => {
     const nextErrors: DrawerErrors = {};
 
-    if (!draft.label?.trim()) {
-      nextErrors.label = 'Enter a label.';
-    }
-
-    if (draft.type === 'external' && !draft.external) {
-      nextErrors.external = 'Enter a URL.';
-    }
-
-    if (draft.type === 'email') {
-      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email || '');
-      if (!isEmail) {
-        nextErrors.email = draft.email?.trim() ? 'Please enter a valid email address.' : 'Enter an email address.';
-      }
-    }
-
-    if (draft.type === 'phone' && !draft.phone) {
-      nextErrors.phone = 'Enter a phone number.';
-    }
-
-    if (draft.type === 'internal' && !draft.internal?.value) {
-      nextErrors.internal = 'Select a destination.';
+    const collections = relationTo.map((slug) => ({ slug }));
+    const validation = validateLink(draft, { collections, required: true });
+    if (validation !== true) {
+      const key = !draft.label?.trim() ? 'label' : draft.type;
+      nextErrors[key] = validation;
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -160,12 +155,13 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
     }
 
     setErrors({});
-    onSave(draft);
+    onSave(normalizeLinkValue(draft, collections));
     extension?.onSave?.(extensionDraft ?? null);
     closeModal(modalSlug);
   };
 
   const setType = (type: LinkValue['type']) => {
+    setErrors({});
     setDraft((prev) => ({
       ...emptyDraft(type),
       label: prev.label,
@@ -194,6 +190,7 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
         />
 
         <SelectInput
+          Error={<FieldError message={errors.type} path={`${modalSlug}.type`} showError={Boolean(errors.type)} />}
           label="Type"
           name={`${modalSlug}.type`}
           path={`${modalSlug}.type`}

@@ -51,17 +51,18 @@ const resolveLocalizedLabel = (value: unknown, fallback: string) => {
 };
 
 export function LinkField(props: Props) {
-  const { collectionSlugs, defaultType = 'external', extension, field, label, path } = props;
+  const { collectionSlugs, defaultType = 'external', extension, field, label, path, readOnly } = props;
   const { disabled, showError, value, setValue } = useField<LinkValue | null>({ potentiallyStalePath: path });
   const { openModal } = useModal();
 
+  const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
   const currentValue = (value as LinkValue | null) ?? null;
   const fieldLabel = resolveLocalizedLabel(label || field.label, field.name);
   const description = resolveLocalizedLabel(field.admin?.description, '');
   const modalSlug = `link-field-${path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const isRequired = Boolean(field.required);
   const isLocalized = Boolean(field.localized);
-  const className = [fieldBaseClass, 'link', showError && 'error', disabled && 'read-only'].filter(Boolean).join(' ');
+  const className = [fieldBaseClass, 'link', showError && 'error', isReadOnly && 'read-only'].filter(Boolean).join(' ');
 
   return (
     <div className={className} data-size="large" id={`field-${path.replace(/\./g, '__')}`}>
@@ -71,24 +72,30 @@ export function LinkField(props: Props) {
         <LinkFieldPreview
           collectionSlugs={collectionSlugs}
           renderLabel={extension?.renderPreviewLabel}
-          onClear={() => {
-            setValue(null);
-            extension?.onSave?.(null);
-          }}
-          onEdit={disabled ? undefined : () => openModal(modalSlug)}
+          onClear={
+            isReadOnly
+              ? undefined
+              : () => {
+                  setValue(null);
+                  extension?.onSave?.(null);
+                }
+          }
+          onEdit={isReadOnly ? undefined : () => openModal(modalSlug)}
           value={currentValue}
         />
         <FieldDescription description={description} path={path} />
       </div>
-      <LinkFieldModal
-        collectionSlugs={collectionSlugs}
-        defaultType={defaultType}
-        extension={extension}
-        modalSlug={modalSlug}
-        onCancel={() => void 0}
-        onSave={(nextValue) => setValue(nextValue)}
-        value={currentValue}
-      />
+      {!isReadOnly && (
+        <LinkFieldModal
+          collectionSlugs={collectionSlugs}
+          defaultType={defaultType}
+          extension={extension}
+          modalSlug={modalSlug}
+          onCancel={() => void 0}
+          onSave={(nextValue) => setValue(nextValue)}
+          value={currentValue}
+        />
+      )}
     </div>
   );
 }

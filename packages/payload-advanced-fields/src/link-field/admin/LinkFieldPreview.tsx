@@ -22,7 +22,8 @@ export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, renderLabel
   const hasExternalSelected = value?.type === 'external' && value?.external?.trim();
   const hasEmailSelected = value?.type === 'email' && value?.email?.trim();
   const hasPhoneSelected = value?.type === 'phone' && value?.phone?.trim();
-  const hasInternalSelected = value?.type === 'internal' && value?.internal?.value;
+  const hasInternalSelected =
+    value?.type === 'internal' && value.internal?.value != null && value.internal.value !== '';
   const hasDestinationValue = Boolean(
     hasInternalSelected || hasExternalSelected || hasEmailSelected || hasPhoneSelected,
   );
