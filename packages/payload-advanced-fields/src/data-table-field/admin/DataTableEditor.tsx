@@ -292,8 +292,8 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       return start === end ? start : `${start}:${end}`;
     })
     .join(', ');
-  const copySelectionLabel = () => {
-    if (selectionLabel && navigator.clipboard?.writeText) void navigator.clipboard.writeText(selectionLabel);
+  const copySelectionLabel = async () => {
+    if (selectionLabel && navigator.clipboard?.writeText) await navigator.clipboard.writeText(selectionLabel);
   };
   const insertFormula = (functionName: string) => {
     if (!value || !options.formulas.enabled) return;

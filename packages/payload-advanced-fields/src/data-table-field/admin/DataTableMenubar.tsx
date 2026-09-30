@@ -19,6 +19,7 @@ import {
   FiCornerUpRight,
   FiArrowDown,
   FiArrowUp,
+  FiCheck,
   FiDelete,
   FiDownload,
   FiHelpCircle,
@@ -29,7 +30,7 @@ import {
   FiUpload,
 } from 'react-icons/fi';
 import { TbFreezeRow } from 'react-icons/tb';
-import { useId, useState, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import type { DataTableFormat } from '../shared/types.js';
 
 const shortcuts = [
@@ -109,7 +110,7 @@ type Props = {
   formulasEnabled: boolean;
   onApplyBackground: (key?: string) => void;
   selectionLabel?: string;
-  onCopySelection?: () => void;
+  onCopySelection?: () => void | Promise<void>;
   onInsertFormula: (functionName: (typeof formulaInsertOptions)[number][0]) => void;
 };
 
@@ -160,8 +161,26 @@ export function DataTableMenubar({
   const [bulkCount, setBulkCount] = useState('1');
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [bulkKind, setBulkKind] = useState<'rows' | 'columns'>('rows');
+  const [selectionCopied, setSelectionCopied] = useState(false);
+  const selectionCopyTimer = useRef<number | null>(null);
   const bulkLimit = bulkKind === 'rows' ? maxRowsToAdd : maxColumnsToAdd;
   const bulkDialogSlug = bulkKind === 'rows' ? addRowsDialogSlug : addColumnsDialogSlug;
+  useEffect(() => {
+    return () => {
+      if (selectionCopyTimer.current !== null) window.clearTimeout(selectionCopyTimer.current);
+    };
+  }, []);
+  const copyCurrentSelection = async () => {
+    if (!onCopySelection) return;
+    try {
+      await onCopySelection();
+      setSelectionCopied(true);
+      if (selectionCopyTimer.current !== null) window.clearTimeout(selectionCopyTimer.current);
+      selectionCopyTimer.current = window.setTimeout(() => setSelectionCopied(false), 1_000);
+    } catch {
+      setSelectionCopied(false);
+    }
+  };
   const openBulkInsert = (kind: 'rows' | 'columns') => {
     setBulkKind(kind);
     setBulkCount('1');
@@ -444,11 +463,11 @@ export function DataTableMenubar({
             <button
               type="button"
               className="data-table__selection-copy"
-              aria-label="Copy current selection"
-              title="Copy current selection"
-              onClick={onCopySelection}
+              aria-label={selectionCopied ? 'Selection copied' : 'Copy current selection'}
+              title={selectionCopied ? 'Selection copied' : 'Copy current selection'}
+              onClick={copyCurrentSelection}
             >
-              <FiCopy aria-hidden />
+              {selectionCopied ? <FiCheck aria-hidden /> : <FiCopy aria-hidden />}
             </button>
           </div>
         )}

@@ -6,6 +6,7 @@
 - Fixed focused row and column headers using rounded corners instead of hard-edged table styling.
 - Fixed column resizing so dragging the resize handle does not reorder the column.
 - Constrained the selection indicator so long selections do not push the copy button off-screen.
+- Added one-second checkmark feedback after copying the current selection.
 
 ## 1.2.2
 
