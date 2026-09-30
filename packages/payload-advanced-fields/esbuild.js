@@ -1,5 +1,5 @@
 import esbuild from 'esbuild';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, rm } from 'node:fs/promises';
 
 const browserEntryPoints = {
   'dist/color-field/admin/ColorField.client': 'src/color-field/admin/ColorField.client.tsx',
@@ -17,8 +17,9 @@ const nodeExternalPackages = ['payload'];
 
 async function build() {
   try {
-    await mkdir('dist/table-field/admin', { recursive: true });
-    await copyFile('src/table-field/admin/styles.css', 'dist/table-field/admin/styles.css');
+    await rm('dist/table-field', { recursive: true, force: true });
+    await mkdir('dist/data-table-field/admin', { recursive: true });
+    await copyFile('src/data-table-field/admin/styles.css', 'dist/data-table-field/admin/styles.css');
     await esbuild.build({
       entryPoints: browserEntryPoints,
       outdir: '.',

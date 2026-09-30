@@ -29,25 +29,12 @@ export { phoneField } from './phone-field/server/field.js';
 export type { PhoneField, PhoneFieldConfig } from './phone-field/server/field.js';
 export type { PhoneFieldValue } from './phone-field/shared/types.js';
 
-export { tableField, evaluateTable, csvToTable, tableToCSV } from './table-field/index.js';
+export { dataTableField, createDataTable, resolveDataTableOptions, validateDataTable } from './data-table-field/index.js';
 export type {
-  CSVTableFieldConfig,
-  JSONTableFieldConfig,
-  StructuredTableFieldConfig,
-  TableCell,
-  TableColumn,
-  TableField,
-  TableFieldConfig,
-  TableOptions,
-  TableValue,
-  TableResult,
-} from './table-field/index.js';
-
-export type {
-  TablePaletteEntry,
-  TableThemeColor,
-  TablePresentationConfig,
-  TableFieldPluginConfig,
-  TableAppearance,
-  ResolvedTablePresentation,
-} from './table-field/shared/types.js';
+  DataTableColumn,
+  DataTableFieldConfig,
+  DataTableOptions,
+  DataTableRow,
+  DataTableValue,
+  ResolvedDataTableOptions,
+} from './data-table-field/index.js';

@@ -52,13 +52,13 @@
       "types": "./dist/phone-field/client.d.ts",
       "default": "./dist/phone-field/client.js"
     },
-    "./table": {
-      "types": "./dist/table-field/index.d.ts",
-      "default": "./dist/table-field/index.js"
+    "./data-table": {
+      "types": "./dist/data-table-field/index.d.ts",
+      "default": "./dist/data-table-field/index.js"
     },
-    "./table/client": {
-      "types": "./dist/table-field/client.d.ts",
-      "default": "./dist/table-field/client.js"
+    "./data-table/client": {
+      "types": "./dist/data-table-field/client.d.ts",
+      "default": "./dist/data-table-field/client.js"
     },
     "./package.json": "./package.json"
   },
@@ -93,6 +93,7 @@
   "dependencies": {
     "@codemirror/lang-html": "^6.4.11",
     "@headlessui/react": "^2.2.10",
+    "@tanstack/react-table": "^9.2.4",
     "@uiw/react-codemirror": "^4.25.10",
     "@uiw/react-color": "^2.10.3",
     "libphonenumber-js": "^1.13.8",
