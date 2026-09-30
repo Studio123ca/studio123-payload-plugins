@@ -48,6 +48,15 @@
   justify-content: space-between;
   gap: 12px;
 }
+.story-value__actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.story-value button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .story-value pre {
   max-height: 320px;
   overflow: auto;

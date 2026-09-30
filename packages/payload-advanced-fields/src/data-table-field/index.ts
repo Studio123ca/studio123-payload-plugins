@@ -4,6 +4,7 @@ export {
   normalizeDataTableValue,
   resolveDataTableOptions,
   validateDataTable,
+  isSafeDataTableURL,
 } from './shared/dataTable.js';
 export { evaluateDataTable } from './shared/formulas.js';
 export { csvToDataTable, dataTableToCSV } from './shared/csv.js';
@@ -31,6 +32,7 @@ export type {
   DataTableTextFormats,
   ResolvedDataTableTextFormats,
   DataTableFieldConfig,
+  DataTableLink,
   DataTableFormat,
   DataTableOptions,
   DataTablePaletteEntry,

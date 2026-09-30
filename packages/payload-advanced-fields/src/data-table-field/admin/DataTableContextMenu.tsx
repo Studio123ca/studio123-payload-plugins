@@ -47,6 +47,7 @@ type Props = {
   onPaste: () => void;
   onCut: () => void;
   onApplyBackground: (key?: string) => void;
+  onApplyTextColor: (key?: string) => void;
   onApplyTextStyle: (patch: DataTableTextStyle | undefined) => void;
   onToggleTextStyle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
   onFreezeRows: (top: number, bottom: number) => void;
@@ -148,11 +149,13 @@ function TextFormatChoices({
 function FormatChoices({
   options,
   onApply,
+  onApplyTextColor,
   onApplyTextStyle,
   onToggleTextStyle,
 }: {
   options: ResolvedDataTableOptions;
   onApply: (key?: string) => void;
+  onApplyTextColor: (key?: string) => void;
   onApplyTextStyle: (patch: DataTableTextStyle | undefined) => void;
   onToggleTextStyle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
 }) {
@@ -167,29 +170,61 @@ function FormatChoices({
         </>
       )}
       {options.formats.length > 0 && (
-        <ContextMenu.Label className="data-table__context-label">Background</ContextMenu.Label>
+        <Submenu label="Background" icon={<FiDroplet />}>
+          {options.formats.map((entry) => (
+            <ContextMenu.Item key={entry.key} className="data-table__context-item" onSelect={() => onApply(entry.key)}>
+              <span
+                className="data-table__format-swatch"
+                aria-hidden
+                style={
+                  {
+                    '--data-table-swatch-light':
+                      typeof entry.background === 'string' ? entry.background : entry.background.light,
+                    '--data-table-swatch-dark':
+                      typeof entry.background === 'string' ? entry.background : entry.background.dark,
+                  } as CSSProperties
+                }
+              />
+              {entry.label}
+            </ContextMenu.Item>
+          ))}
+          <Separator />
+          <ContextMenu.Item className="data-table__context-item" onSelect={() => onApply()}>
+            Clear background
+          </ContextMenu.Item>
+        </Submenu>
       )}
-      {options.formats.map((entry) => (
-        <ContextMenu.Item key={entry.key} className="data-table__context-item" onSelect={() => onApply(entry.key)}>
-          <span
-            className="data-table__format-swatch"
-            aria-hidden
-            style={
-              {
-                '--data-table-swatch-light':
-                  typeof entry.background === 'string' ? entry.background : entry.background.light,
-                '--data-table-swatch-dark':
-                  typeof entry.background === 'string' ? entry.background : entry.background.dark,
-              } as CSSProperties
-            }
-          />
-          {entry.label}
-        </ContextMenu.Item>
-      ))}
-      {options.formats.length > 0 && (
-        <ContextMenu.Item className="data-table__context-item" onSelect={() => onApply()}>
-          Clear background
-        </ContextMenu.Item>
+      {options.formats.some((entry) => entry.text) && (
+        <>
+          <Separator />
+          <Submenu label="Text color" icon={<FiType />}>
+            {options.formats
+              .filter((entry) => entry.text)
+              .map((entry) => (
+                <ContextMenu.Item
+                  key={entry.key}
+                  className="data-table__context-item"
+                  onSelect={() => onApplyTextColor(entry.key)}
+                >
+                  <span
+                    className="data-table__format-swatch"
+                    aria-hidden
+                    style={
+                      {
+                        '--data-table-swatch-light': typeof entry.text === 'string' ? entry.text : entry.text!.light,
+                        '--data-table-swatch-dark': typeof entry.text === 'string' ? entry.text : entry.text!.dark,
+                      } as CSSProperties
+                    }
+                  />
+                  {entry.label}
+                </ContextMenu.Item>
+              ))}
+            <Separator />
+            <ContextMenu.Item className="data-table__context-item" onSelect={() => onApplyTextColor()}>
+              Clear text color
+            </ContextMenu.Item>
+          </Submenu>
+        </>
       )}
     </>
   );
@@ -244,6 +279,7 @@ export function DataTableContextMenu({
   onPaste,
   onCut,
   onApplyBackground,
+  onApplyTextColor,
   onApplyTextStyle,
   onToggleTextStyle,
   onFreezeRows,
@@ -290,6 +326,7 @@ export function DataTableContextMenu({
                   <FormatChoices
                     options={options}
                     onApply={onApplyBackground}
+                    onApplyTextColor={onApplyTextColor}
                     onApplyTextStyle={onApplyTextStyle}
                     onToggleTextStyle={onToggleTextStyle}
                   />
@@ -380,6 +417,7 @@ export function DataTableContextMenu({
                   <FormatChoices
                     options={options}
                     onApply={onApplyBackground}
+                    onApplyTextColor={onApplyTextColor}
                     onApplyTextStyle={onApplyTextStyle}
                     onToggleTextStyle={onToggleTextStyle}
                   />
@@ -455,6 +493,7 @@ export function DataTableContextMenu({
                   <FormatChoices
                     options={options}
                     onApply={onApplyBackground}
+                    onApplyTextColor={onApplyTextColor}
                     onApplyTextStyle={onApplyTextStyle}
                     onToggleTextStyle={onToggleTextStyle}
                   />

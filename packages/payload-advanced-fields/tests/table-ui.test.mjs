@@ -79,6 +79,13 @@ async function selectMenuItem(menu, item) {
   });
   await act(async () => menuItem(item).click());
 }
+async function selectNestedMenuItem(menu, submenu, item) {
+  await act(async () => {
+    button(menu).dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  });
+  await act(async () => menuItem(submenu).click());
+  await act(async () => menuItem(item).click());
+}
 after(async () => {
   if (root) await act(async () => root.unmount());
   dom.window.close();
@@ -96,8 +103,8 @@ test('creates and edits a Data Table value', async () => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   assert.equal(stored().rows[0].cells[0], 'Widget');
-  await selectMenuItem('Insert', 'Add column');
-  await selectMenuItem('Insert', 'Add row');
+  await selectNestedMenuItem('Insert', 'Columns', 'Add column');
+  await selectNestedMenuItem('Insert', 'Rows', 'Add row');
   assert.equal(stored().columns.length, 2);
   assert.equal(stored().rows.length, 2);
   await selectMenuItem('Edit', 'Undo');
@@ -192,7 +199,7 @@ test('bulk adds rows and columns from the Insert menu', async () => {
     columns: { initial: 1, max: 10 },
   });
   await render({ value: createDataTable(bulkOptions), tableOptions: bulkOptions });
-  await selectMenuItem('Insert', 'Add rows…');
+  await selectNestedMenuItem('Insert', 'Rows', 'Add rows…');
   await act(async () => {
     const input = document.querySelector('[role="dialog"] input[type="number"]');
     Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, '5');
@@ -201,7 +208,7 @@ test('bulk adds rows and columns from the Insert menu', async () => {
       .find((button) => button.textContent === 'Add rows')
       .click();
   });
-  await selectMenuItem('Insert', 'Add columns…');
+  await selectNestedMenuItem('Insert', 'Columns', 'Add columns…');
   await act(async () => {
     const input = document.querySelector('[role="dialog"] input[type="number"]');
     Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, '5');
@@ -335,6 +342,47 @@ test('keeps keyboard navigation inside the grid', async () => {
   await act(async () => document.activeElement.dispatchEvent(selectAll));
   assert.equal(selectAll.defaultPrevented, true);
   assert.equal(document.querySelectorAll('td[data-selected]').length, 4);
+});
+
+test('uses Google Sheets shortcuts for selecting and changing columns', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 2 } }));
+  await render({ value });
+  const firstCell = document.querySelector('[data-context-cell="0:0"]');
+  firstCell.focus();
+  const selectColumn = new dom.window.KeyboardEvent('keydown', {
+    key: ' ',
+    code: 'Space',
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => firstCell.dispatchEvent(selectColumn));
+  assert.equal(selectColumn.defaultPrevented, true);
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 2);
+
+  const insertColumn = new dom.window.KeyboardEvent('keydown', {
+    key: '=',
+    code: 'Equal',
+    ctrlKey: true,
+    altKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => document.activeElement.dispatchEvent(insertColumn));
+  assert.equal(insertColumn.defaultPrevented, true);
+  assert.equal(stored().columns.length, 3);
+
+  const deleteColumn = new dom.window.KeyboardEvent('keydown', {
+    key: '-',
+    code: 'Minus',
+    ctrlKey: true,
+    altKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => document.activeElement.dispatchEvent(deleteColumn));
+  assert.equal(deleteColumn.defaultPrevented, true);
+  assert.equal(stored().columns.length, 2);
 });
 
 test('tabs between column headers without focusing resize handles', async () => {

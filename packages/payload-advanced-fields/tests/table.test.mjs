@@ -8,6 +8,7 @@ import {
   evaluateDataTable,
   resolveDataTableOptions,
   validateDataTable,
+  isSafeDataTableURL,
 } from '../dist/data-table-field/index.js';
 import { pasteDataTableCells } from '../dist/data-table-field/shared/operations.js';
 
@@ -31,6 +32,7 @@ test('data table factory creates a JSON field with a DataTableField admin compon
       strikethrough: false,
       alignment: false,
       wrapping: false,
+      link: false,
     },
     stickyRows: { enabled: true, top: 0, bottom: 0 },
   });
@@ -78,6 +80,7 @@ test('data table field forwards spreadsheet options to the client component', ()
       strikethrough: false,
       alignment: false,
       wrapping: false,
+      link: false,
     },
     stickyRows: { enabled: true, top: 1, bottom: 0 },
   });
@@ -156,6 +159,20 @@ test('supports minimum dimensions and CSV round trips', () => {
   );
   assert.equal(table.rows[1].cells[1], '24');
   assert.equal(dataTableToCSV(table), 'Name,Value\nWidget,12\nGizmo,24');
+});
+
+test('validates safe data table link URLs', () => {
+  assert.equal(isSafeDataTableURL('https://payloadcms.com'), true);
+  assert.equal(isSafeDataTableURL('mailto:hello@example.com'), true);
+  assert.equal(isSafeDataTableURL('javascript:alert(1)'), false);
+  const options = resolveDataTableOptions({
+    rows: { initial: 1 },
+    columns: { initial: 1 },
+    textFormats: { link: true },
+  });
+  const table = createDataTable(options);
+  table.appearance = { links: { [table.rows[0].id]: { [table.columns[0].id]: { url: 'javascript:alert(1)' } } } };
+  assert.equal(validateDataTable(table, options), 'Invalid data table link appearance.');
 });
 
 test('data table validation rejects malformed and oversized values', () => {

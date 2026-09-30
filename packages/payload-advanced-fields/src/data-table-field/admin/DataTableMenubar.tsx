@@ -14,7 +14,6 @@ import {
 } from '@payloadcms/ui';
 import {
   FiAlignCenter,
-  FiAlignJustify,
   FiAlignLeft,
   FiAlignRight,
   FiBold,
@@ -26,10 +25,12 @@ import {
   FiArrowUp,
   FiCheck,
   FiDelete,
+  FiDroplet,
   FiDownload,
   FiHelpCircle,
   FiHash,
   FiItalic,
+  FiLink,
   FiPlus,
   FiScissors,
   FiTrash2,
@@ -37,15 +38,27 @@ import {
   FiUnderline,
   FiUpload,
 } from 'react-icons/fi';
-import { MdStrikethroughS } from 'react-icons/md';
-import { TbColumnInsertRight, TbFreezeRow, TbRowInsertBottom } from 'react-icons/tb';
+import { MdStrikethroughS, MdWrapText } from 'react-icons/md';
+import { TbClearFormatting, TbColumnInsertRight, TbFreezeRow, TbLinkOff, TbRowInsertBottom } from 'react-icons/tb';
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import type { DataTableFormat, DataTableTextStyle, ResolvedDataTableTextFormats } from '../shared/types.js';
+import type {
+  DataTableFormat,
+  DataTableLink,
+  DataTableTextStyle,
+  ResolvedDataTableTextFormats,
+} from '../shared/types.js';
+import { isSafeDataTableURL } from '../shared/dataTable.js';
 
 const shortcuts = [
   ['Copy selected cells', '⌘ C / Ctrl C'],
   ['Paste into the active cell', '⌘ V / Ctrl V'],
   ['Cut selected cells', '⌘ X / Ctrl X'],
+  ['Select the current column', '⌘ Space / Ctrl Space'],
+  ['Select the current row', '⇧ Space'],
+  ['Insert selected columns', '⌘ ⌥ = / Ctrl Alt ='],
+  ['Delete selected columns', '⌘ ⌥ - / Ctrl Alt -'],
+  ['Insert selected rows', '⌘ ⌥ = / Ctrl Alt ='],
+  ['Delete selected rows', '⌘ ⌥ - / Ctrl Alt -'],
   ['Undo', '⌘ Z / Ctrl Z'],
   ['Redo', '⇧ ⌘ Z / Ctrl ⇧ Z'],
   ['Clear selected cells', 'Delete / Backspace'],
@@ -87,10 +100,16 @@ const formulaInsertOptions = [
 
 function TextFormatChoices({
   formats,
+  activeLink,
+  onOpenLink,
+  onClearLink,
   onApply,
   onToggle,
 }: {
   formats: ResolvedDataTableTextFormats;
+  activeLink?: DataTableLink;
+  onOpenLink: () => void;
+  onClearLink: () => void;
   onApply: (patch: DataTableTextStyle | undefined) => void;
   onToggle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
 }) {
@@ -98,21 +117,33 @@ function TextFormatChoices({
     <>
       {formats.bold && (
         <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('bold')}>
+          <span className="data-table__context-icon" aria-hidden>
+            <FiBold />
+          </span>
           Bold <kbd className="data-table__shortcut">⌘B</kbd>
         </Menubar.Item>
       )}
       {formats.italic && (
         <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('italic')}>
+          <span className="data-table__context-icon" aria-hidden>
+            <FiItalic />
+          </span>
           Italic <kbd className="data-table__shortcut">⌘I</kbd>
         </Menubar.Item>
       )}
       {formats.underline && (
         <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('underline')}>
+          <span className="data-table__context-icon" aria-hidden>
+            <FiUnderline />
+          </span>
           Underline <kbd className="data-table__shortcut">⌘U</kbd>
         </Menubar.Item>
       )}
       {formats.strikethrough && (
         <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('strikethrough')}>
+          <span className="data-table__context-icon" aria-hidden>
+            <MdStrikethroughS />
+          </span>
           Strikethrough <kbd className="data-table__shortcut">⇧⌘X</kbd>
         </Menubar.Item>
       )}
@@ -121,7 +152,7 @@ function TextFormatChoices({
         <Menubar.Sub>
           <Menubar.SubTrigger className="data-table__menu-item">
             <span className="data-table__context-icon" aria-hidden>
-              <FiType />
+              <FiAlignLeft />
             </span>
             Alignment
             <FiChevronRight className="data-table__menu-chevron" aria-hidden />
@@ -129,12 +160,21 @@ function TextFormatChoices({
           <Menubar.Portal>
             <Menubar.SubContent className="data-table__context-content">
               <Menubar.Item className="data-table__menu-item" onSelect={() => onApply({ align: 'left' })}>
+                <span className="data-table__context-icon" aria-hidden>
+                  <FiAlignLeft />
+                </span>
                 Left
               </Menubar.Item>
               <Menubar.Item className="data-table__menu-item" onSelect={() => onApply({ align: 'center' })}>
+                <span className="data-table__context-icon" aria-hidden>
+                  <FiAlignCenter />
+                </span>
                 Center <kbd className="data-table__shortcut">⇧⌘E</kbd>
               </Menubar.Item>
               <Menubar.Item className="data-table__menu-item" onSelect={() => onApply({ align: 'right' })}>
+                <span className="data-table__context-icon" aria-hidden>
+                  <FiAlignRight />
+                </span>
                 Right <kbd className="data-table__shortcut">⇧⌘R</kbd>
               </Menubar.Item>
             </Menubar.SubContent>
@@ -143,8 +183,23 @@ function TextFormatChoices({
       )}
       {formats.wrapping && (
         <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('wrap')}>
+          <span className="data-table__context-icon" aria-hidden>
+            <MdWrapText />
+          </span>
           Toggle wrapping
         </Menubar.Item>
+      )}
+      {formats.link && (
+        <>
+          <Menubar.Separator className="data-table__menu-separator" />
+          <Menubar.Item className="data-table__menu-item" onSelect={activeLink ? onClearLink : onOpenLink}>
+            <span className="data-table__context-icon" aria-hidden>
+              {activeLink ? <TbLinkOff /> : <FiLink />}
+            </span>
+            {activeLink ? 'Remove link' : 'Add link'}
+            <kbd className="data-table__shortcut">⌘K</kbd>
+          </Menubar.Item>
+        </>
       )}
       <Menubar.Item className="data-table__menu-item" onSelect={() => onApply(undefined)}>
         Clear text formatting
@@ -156,11 +211,17 @@ function TextFormatChoices({
 function TextFormattingToolbar({
   formats,
   activeStyle,
+  activeLink,
+  onOpenLink,
+  onClearLink,
   onApply,
   onToggle,
 }: {
   formats: ResolvedDataTableTextFormats;
   activeStyle?: DataTableTextStyle;
+  activeLink?: DataTableLink;
+  onOpenLink: () => void;
+  onClearLink: () => void;
   onApply: (patch: DataTableTextStyle | undefined) => void;
   onToggle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
 }) {
@@ -212,12 +273,18 @@ function TextFormattingToolbar({
     },
     formats.wrapping && {
       label: 'Toggle wrapping',
-      icon: <FiAlignJustify aria-hidden />,
+      icon: <MdWrapText aria-hidden />,
       onClick: () => onToggle('wrap'),
-      active: activeStyle?.wrap,
+      active: activeStyle?.wrap !== false,
     },
     (hasTextStyleOptions || formats.alignment || formats.wrapping) && { divider: true },
-    { label: 'Clear text formatting', icon: <FiType aria-hidden />, onClick: () => onApply(undefined) },
+    formats.link && {
+      label: activeLink ? 'Remove link' : 'Add link',
+      icon: activeLink ? <TbLinkOff aria-hidden /> : <FiLink aria-hidden />,
+      onClick: activeLink ? onClearLink : onOpenLink,
+      active: Boolean(activeLink),
+    },
+    { label: 'Clear text formatting', icon: <TbClearFormatting aria-hidden />, onClick: () => onApply(undefined) },
   ].filter(Boolean) as Array<
     { divider: true } | { label: string; icon: React.ReactNode; onClick: () => void; active?: boolean }
   >;
@@ -278,9 +345,13 @@ type Props = {
   formats: DataTableFormat[];
   textFormats: ResolvedDataTableTextFormats;
   activeTextStyle?: DataTableTextStyle;
+  activeLink?: DataTableLink;
   hasSelection: boolean;
   formulasEnabled: boolean;
   onApplyBackground: (key?: string) => void;
+  onApplyTextColor: (key?: string) => void;
+  onApplyLink: (link: DataTableLink) => void;
+  onClearLink: () => void;
   onApplyTextStyle: (patch: DataTableTextStyle | undefined) => void;
   onToggleTextStyle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
   selectionLabel?: string;
@@ -320,9 +391,13 @@ export function DataTableMenubar({
   formats,
   textFormats,
   activeTextStyle,
+  activeLink,
   hasSelection,
   formulasEnabled,
   onApplyBackground,
+  onApplyTextColor,
+  onApplyLink,
+  onClearLink,
   onApplyTextStyle,
   onToggleTextStyle,
   selectionLabel,
@@ -336,9 +411,12 @@ export function DataTableMenubar({
   const clearTableModalSlug = `data-table-clear-${id}`;
   const addRowsDialogSlug = `data-table-add-rows-${id}`;
   const addColumnsDialogSlug = `data-table-add-columns-${id}`;
+  const linkDialogSlug = `data-table-link-${id}`;
   const [bulkCount, setBulkCount] = useState('1');
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [bulkKind, setBulkKind] = useState<'rows' | 'columns'>('rows');
+  const [linkURL, setLinkURL] = useState('');
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [selectionCopied, setSelectionCopied] = useState(false);
   const selectionCopyTimer = useRef<number | null>(null);
   const bulkLimit = bulkKind === 'rows' ? maxRowsToAdd : maxColumnsToAdd;
@@ -348,6 +426,20 @@ export function DataTableMenubar({
       if (selectionCopyTimer.current !== null) window.clearTimeout(selectionCopyTimer.current);
     };
   }, []);
+  useEffect(() => {
+    if (!textFormats.link || !hasSelection) return;
+    const handleLinkShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('.data-table')) {
+          event.preventDefault();
+          openLinkDialog();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleLinkShortcut);
+    return () => document.removeEventListener('keydown', handleLinkShortcut);
+  }, [hasSelection, textFormats.link, activeLink]);
   const copyCurrentSelection = async () => {
     if (!onCopySelection) return;
     try {
@@ -364,6 +456,20 @@ export function DataTableMenubar({
     setBulkCount('1');
     setBulkError(null);
     openModal(kind === 'rows' ? addRowsDialogSlug : addColumnsDialogSlug);
+  };
+  const openLinkDialog = () => {
+    setLinkURL(activeLink?.url ?? '');
+    setLinkError(null);
+    openModal(linkDialogSlug);
+  };
+  const submitLink = () => {
+    const url = linkURL.trim();
+    if (!isSafeDataTableURL(url)) {
+      setLinkError('Enter a valid http, https, or mailto URL.');
+      return;
+    }
+    onApplyLink({ url });
+    closeModal(linkDialogSlug);
   };
   const submitBulkInsert = () => {
     const count = Number.parseInt(bulkCount, 10);
@@ -518,6 +624,7 @@ export function DataTableMenubar({
                             <TbRowInsertBottom />
                           </span>
                           Add row
+                          <kbd className="data-table__shortcut">⌘⌥=</kbd>
                         </Menubar.Item>
                         <Menubar.Item
                           className="data-table__menu-item"
@@ -547,6 +654,7 @@ export function DataTableMenubar({
                             <TbColumnInsertRight />
                           </span>
                           Add column
+                          <kbd className="data-table__shortcut">⌘⌥=</kbd>
                         </Menubar.Item>
                         <Menubar.Item
                           className="data-table__menu-item"
@@ -617,6 +725,9 @@ export function DataTableMenubar({
                             <Menubar.SubContent className="data-table__context-content">
                               <TextFormatChoices
                                 formats={textFormats}
+                                activeLink={activeLink}
+                                onOpenLink={openLinkDialog}
+                                onClearLink={onClearLink}
                                 onApply={onApplyTextStyle}
                                 onToggle={onToggleTextStyle}
                               />
@@ -628,37 +739,103 @@ export function DataTableMenubar({
                     {formats.length > 0 && (
                       <>
                         {textFormats.enabled && <Menubar.Separator className="data-table__menu-separator" />}
-                        <Menubar.Label className="data-table__menu-label">Background</Menubar.Label>
-                        {formats.map((entry) => (
-                          <Menubar.Item
-                            key={entry.key}
-                            className="data-table__menu-item"
-                            disabled={!hasSelection}
-                            onSelect={() => onApplyBackground(entry.key)}
-                          >
-                            <span
-                              className="data-table__format-swatch"
-                              aria-hidden
-                              style={
-                                {
-                                  '--data-table-swatch-light':
-                                    typeof entry.background === 'string' ? entry.background : entry.background.light,
-                                  '--data-table-swatch-dark':
-                                    typeof entry.background === 'string' ? entry.background : entry.background.dark,
-                                } as CSSProperties
-                              }
-                            />
-                            {entry.label}
-                          </Menubar.Item>
-                        ))}
-                        <Menubar.Separator className="data-table__menu-separator" />
-                        <Menubar.Item
-                          className="data-table__menu-item"
-                          disabled={!hasSelection}
-                          onSelect={() => onApplyBackground()}
-                        >
-                          Clear background
-                        </Menubar.Item>
+                        <Menubar.Sub>
+                          <Menubar.SubTrigger className="data-table__menu-item" disabled={!hasSelection}>
+                            <span className="data-table__context-icon" aria-hidden>
+                              <FiDroplet />
+                            </span>
+                            Background
+                            <FiChevronRight className="data-table__menu-chevron" aria-hidden />
+                          </Menubar.SubTrigger>
+                          <Menubar.Portal>
+                            <Menubar.SubContent className="data-table__context-content">
+                              {formats.map((entry) => (
+                                <Menubar.Item
+                                  key={entry.key}
+                                  className="data-table__menu-item"
+                                  disabled={!hasSelection}
+                                  onSelect={() => onApplyBackground(entry.key)}
+                                >
+                                  <span
+                                    className="data-table__format-swatch"
+                                    aria-hidden
+                                    style={
+                                      {
+                                        '--data-table-swatch-light':
+                                          typeof entry.background === 'string'
+                                            ? entry.background
+                                            : entry.background.light,
+                                        '--data-table-swatch-dark':
+                                          typeof entry.background === 'string'
+                                            ? entry.background
+                                            : entry.background.dark,
+                                      } as CSSProperties
+                                    }
+                                  />
+                                  {entry.label}
+                                </Menubar.Item>
+                              ))}
+                              <Menubar.Separator className="data-table__menu-separator" />
+                              <Menubar.Item
+                                className="data-table__menu-item"
+                                disabled={!hasSelection}
+                                onSelect={() => onApplyBackground()}
+                              >
+                                Clear background
+                              </Menubar.Item>
+                            </Menubar.SubContent>
+                          </Menubar.Portal>
+                        </Menubar.Sub>
+                        {formats.some((entry) => entry.text) && (
+                          <Menubar.Separator className="data-table__menu-separator" />
+                        )}
+                        {formats.some((entry) => entry.text) && (
+                          <Menubar.Sub>
+                            <Menubar.SubTrigger className="data-table__menu-item" disabled={!hasSelection}>
+                              <span className="data-table__context-icon" aria-hidden>
+                                <FiType />
+                              </span>
+                              Text color
+                              <FiChevronRight className="data-table__menu-chevron" aria-hidden />
+                            </Menubar.SubTrigger>
+                            <Menubar.Portal>
+                              <Menubar.SubContent className="data-table__context-content">
+                                {formats
+                                  .filter((entry) => entry.text)
+                                  .map((entry) => (
+                                    <Menubar.Item
+                                      key={entry.key}
+                                      className="data-table__menu-item"
+                                      disabled={!hasSelection}
+                                      onSelect={() => onApplyTextColor(entry.key)}
+                                    >
+                                      <span
+                                        className="data-table__format-swatch"
+                                        aria-hidden
+                                        style={
+                                          {
+                                            '--data-table-swatch-light':
+                                              typeof entry.text === 'string' ? entry.text : entry.text!.light,
+                                            '--data-table-swatch-dark':
+                                              typeof entry.text === 'string' ? entry.text : entry.text!.dark,
+                                          } as CSSProperties
+                                        }
+                                      />
+                                      {entry.label}
+                                    </Menubar.Item>
+                                  ))}
+                                <Menubar.Separator className="data-table__menu-separator" />
+                                <Menubar.Item
+                                  className="data-table__menu-item"
+                                  disabled={!hasSelection}
+                                  onSelect={() => onApplyTextColor()}
+                                >
+                                  Clear text color
+                                </Menubar.Item>
+                              </Menubar.SubContent>
+                            </Menubar.Portal>
+                          </Menubar.Sub>
+                        )}
                       </>
                     )}
                   </Menubar.Content>
@@ -692,6 +869,9 @@ export function DataTableMenubar({
             <TextFormattingToolbar
               formats={textFormats}
               activeStyle={activeTextStyle}
+              activeLink={activeLink}
+              onOpenLink={openLinkDialog}
+              onClearLink={onClearLink}
               onApply={onApplyTextStyle}
               onToggle={onToggleTextStyle}
             />
@@ -823,6 +1003,27 @@ export function DataTableMenubar({
         <DialogFooter>
           <DialogCancel label="Cancel" onClick={() => closeModal(addColumnsDialogSlug)} />
           <DialogConfirm label="Add columns" onClick={submitBulkInsert} />
+        </DialogFooter>
+      </DialogModal>
+      <DialogModal slug={linkDialogSlug} className="data-table__link-dialog" size="small">
+        <DialogHeader title={activeLink ? 'Edit link' : 'Add link'} />
+        <DialogBody>
+          <div className="data-table__link-field">
+            <label htmlFor={`${id}-link-url`}>Enter a URL</label>
+            <input
+              id={`${id}-link-url`}
+              className="data-table__link-input"
+              type="url"
+              value={linkURL}
+              onChange={(event) => setLinkURL(event.target.value)}
+              autoFocus
+            />
+          </div>
+          {linkError && <p className="data-table__bulk-error">{linkError}</p>}
+        </DialogBody>
+        <DialogFooter>
+          <DialogCancel label="Cancel" onClick={() => closeModal(linkDialogSlug)} />
+          <DialogConfirm label={activeLink ? 'Save link' : 'Add link'} onClick={submitLink} />
         </DialogFooter>
       </DialogModal>
     </>

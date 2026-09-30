@@ -76,6 +76,10 @@
   background: transparent;
   color: var(--color-text, inherit);
 }
+.data-table__text-toolbar-button > svg {
+  width: 14px;
+  height: 14px;
+}
 .data-table__text-toolbar-button:hover,
 .data-table__text-toolbar-button:focus-visible,
 .data-table__text-toolbar-button[data-active='true'] {
@@ -222,6 +226,40 @@
   font: inherit;
   font-size: 0.8125rem;
   padding: 6px 8px;
+}
+.data-table__link-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.data-table__link-field label {
+  flex: 0 0 auto;
+  color: var(--color-text, inherit);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.data-table__link-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: min(100%, 280px);
+  height: 32px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border, #d5d5d5);
+  border-radius: 3px;
+  background: var(--theme-elevation-50, #fff);
+  color: var(--color-text, inherit);
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.data-table__link-input:focus {
+  outline: 2px solid var(--color-border-selected, var(--color-bg-brand, #3b82f6));
+  outline-offset: 1px;
+}
+[data-theme='dark'] .data-table__link-input {
+  border-color: var(--color-border, #3b3b3b);
+  background: var(--theme-elevation-100, var(--color-bg-elevated, #242424));
 }
 .data-table__bulk-hint,
 .data-table__bulk-error {
@@ -484,9 +522,17 @@
   background-image: linear-gradient(var(--data-table-bg-light), var(--data-table-bg-light));
   color: var(--data-table-text-light, var(--color-text, inherit));
 }
+.data-table td[data-text-colored],
+.data-table th[data-text-colored] {
+  color: var(--data-table-text-light, var(--color-text, inherit));
+}
 [data-theme='dark'] .data-table td[data-colored],
 [data-theme='dark'] .data-table th[data-colored] {
   background-image: linear-gradient(var(--data-table-bg-dark), var(--data-table-bg-dark));
+  color: var(--data-table-text-dark, var(--color-text, inherit));
+}
+[data-theme='dark'] .data-table td[data-text-colored],
+[data-theme='dark'] .data-table th[data-text-colored] {
   color: var(--data-table-text-dark, var(--color-text, inherit));
 }
 .data-table td[data-selection-edge-top] {
@@ -618,9 +664,16 @@
   display: block;
   min-height: 42px;
   padding: 8px;
+  overflow: hidden;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   cursor: cell;
+}
+.data-table__cell-value a {
+  color: var(--color-text-link, var(--color-bg-brand, #2563eb));
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 .data-table__resize {
   position: absolute;

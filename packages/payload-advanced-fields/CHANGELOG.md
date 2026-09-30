@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.4
+
+- Added nested Format → Background and Format → Text color submenus with independent text-color appearance storage.
+- Added opt-in cell hyperlinks through `textFormats.link`, including a Payload-styled link dialog, toolbar action, `Mod+K` shortcut, safe URL validation, and Storybook coverage.
+- Simplified links to URL-only values, made the link action toggle between Add and Remove, and added the crossed-out chain icon plus icons throughout Format → Text.
+- Added a Paginated API Storybook story using the 1,000-record CSV fixture with page controls and pagination metadata.
+- Fixed the Paginated API story to preserve global row and cell IDs across page boundaries.
+- Refined the Add link dialog with compact Payload-aligned URL field styling.
+- Clarified the link dialog field label to “Enter a URL”.
+- Fixed the wrapping control so its default wrapped state toggles correctly, and updated its toolbar icon.
+- Fixed wrapping styles being overridden by the cell content wrapper.
+- Added long wrapped and unwrapped test rows to the Formatting Storybook story.
+- Prevented unwrapped cell values from overflowing their cell boundaries by clipping them with an ellipsis.
+- Fixed text wrapping toggles so an explicit unwrapped state persists and can be toggled back on.
+- Updated the clear-formatting toolbar action to use the `TbClearFormatting` icon.
+
 ## 1.2.3
 
 - Fixed formula copy and paste so formulas remain formula cells when moved through the clipboard.

@@ -40,6 +40,7 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
       strikethrough: textFormatsEnabled && (textFormatOptions?.strikethrough ?? true),
       alignment: textFormatsEnabled && (textFormatOptions?.alignment ?? true),
       wrapping: textFormatsEnabled && (textFormatOptions?.wrapping ?? true),
+      link: textFormatsEnabled && (textFormatOptions?.link ?? true),
     },
     stickyRows: {
       enabled: options.stickyRows?.enabled ?? true,
@@ -124,7 +125,14 @@ function validateAppearance(
 ): true | string {
   if (value === undefined) return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'Invalid data table appearance.';
-  const appearance = value as { rows?: unknown; cells?: unknown; text?: unknown; stickyRows?: unknown };
+  const appearance = value as {
+    rows?: unknown;
+    cells?: unknown;
+    textColors?: unknown;
+    links?: unknown;
+    text?: unknown;
+    stickyRows?: unknown;
+  };
   const validRows = (rows: unknown) =>
     Boolean(rows && typeof rows === 'object' && !Array.isArray(rows)) &&
     Object.entries(rows as Record<string, unknown>).every(
@@ -143,6 +151,43 @@ function validateAppearance(
         )
       )
         return 'Invalid data table cell appearance.';
+    }
+  }
+  if (appearance.textColors !== undefined) {
+    if (!appearance.textColors || typeof appearance.textColors !== 'object' || Array.isArray(appearance.textColors))
+      return 'Invalid data table text color appearance.';
+    const colors = appearance.textColors as { rows?: unknown; cells?: unknown };
+    if (colors.rows !== undefined && !validRows(colors.rows)) return 'Invalid data table text color appearance.';
+    if (colors.cells !== undefined) {
+      if (!colors.cells || typeof colors.cells !== 'object' || Array.isArray(colors.cells))
+        return 'Invalid data table text color appearance.';
+      for (const [rowID, cells] of Object.entries(colors.cells as Record<string, unknown>)) {
+        if (!rowIDs.includes(rowID) || !cells || typeof cells !== 'object' || Array.isArray(cells))
+          return 'Invalid data table text color appearance.';
+        if (Object.keys(cells as Record<string, unknown>).some((columnID) => !columnIDs.includes(columnID)))
+          return 'Invalid data table text color appearance.';
+        if (Object.values(cells as Record<string, unknown>).some((key) => !formatKeys.has(String(key))))
+          return 'Invalid data table text color appearance.';
+      }
+    }
+  }
+  if (appearance.links !== undefined) {
+    if (!appearance.links || typeof appearance.links !== 'object' || Array.isArray(appearance.links))
+      return 'Invalid data table link appearance.';
+    for (const [rowID, cells] of Object.entries(appearance.links as Record<string, unknown>)) {
+      if (!rowIDs.includes(rowID) || !cells || typeof cells !== 'object' || Array.isArray(cells))
+        return 'Invalid data table link appearance.';
+      for (const [columnID, link] of Object.entries(cells as Record<string, unknown>)) {
+        if (
+          !columnIDs.includes(columnID) ||
+          !link ||
+          typeof link !== 'object' ||
+          Array.isArray(link) ||
+          typeof (link as { url?: unknown }).url !== 'string' ||
+          !isSafeDataTableURL((link as { url: string }).url)
+        )
+          return 'Invalid data table link appearance.';
+      }
     }
   }
   if (appearance.text !== undefined) {
@@ -182,6 +227,15 @@ function validateAppearance(
       return 'Invalid data table sticky row settings.';
   }
   return true;
+}
+
+export function isSafeDataTableURL(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:';
+  } catch {
+    return false;
+  }
 }
 
 export function validateDataTable(value: unknown, options: ResolvedDataTableOptions, required = false): true | string {
