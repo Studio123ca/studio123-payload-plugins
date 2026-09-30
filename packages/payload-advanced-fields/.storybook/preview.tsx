@@ -1,11 +1,22 @@
 import type { Preview } from '@storybook/react-vite';
+import { setupWorker } from 'msw/browser';
 import { mswLoader } from 'msw-storybook-addon/csf3';
 import { handlers } from '../storybook/support/api.js';
 import '@payloadcms/ui/css/app.css';
 import '../storybook/support/styles.css';
 
 const preview: Preview = {
-  loaders: [mswLoader()],
+  loaders: [
+    mswLoader(async () => {
+      const worker = setupWorker();
+      await worker.start({
+        serviceWorker: { url: './mockServiceWorker.js' },
+        onUnhandledFrame: 'bypass',
+        quiet: true,
+      });
+      return worker;
+    }),
+  ],
   parameters: {
     layout: 'padded',
     controls: { expanded: true },

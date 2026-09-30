@@ -123,7 +123,7 @@ function LargeDataTableStory(args: Args, { globals }: any) {
   const options = useMemo(() => resolveDataTableOptions(args), [args]);
   useEffect(() => {
     let active = true;
-    fetch('/customers-1000.csv')
+    fetch('./customers-1000.csv')
       .then((response) => response.text())
       .then((csv) => {
         if (active) setValue(csvToDataTable(csv, options));

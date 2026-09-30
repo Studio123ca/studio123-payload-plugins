@@ -30,12 +30,20 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex: 0 1 min(50%, 360px);
   min-width: 0;
+  max-width: min(50%, 360px);
   overflow: hidden;
   color: var(--theme-elevation-500, var(--color-text-muted, #7a7a7a));
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.75rem;
   line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-table__selection-indicator > span {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -45,6 +53,7 @@
   justify-content: center;
   width: 22px;
   height: 22px;
+  flex: 0 0 22px;
   padding: 2px;
   border: 0;
   border-radius: 3px;

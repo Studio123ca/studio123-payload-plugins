@@ -41,3 +41,9 @@ The static build goes into the ignored `packages/payload-advanced-fields/storybo
 To add a field example, create a `*.stories.tsx` file here, reuse `PayloadField` and common controls, and add explicit fixture API handlers where necessary. Stories and backend fixtures are excluded from the published npm package by its `files` allowlist. After upgrading MSW, run `npx msw init .storybook/public --save` from `packages/payload-advanced-fields` to regenerate its worker.
 
 Data Table also includes formulas, formats, sticky rows, read-only, and required examples. Format and sticky-row controls mirror the field configuration, and `maxHeight` mirrors `admin.maxHeight`. Fields are listed alphabetically.
+
+## GitHub Pages
+
+The repository workflow `.github/workflows/storybook.yml` builds Storybook from this package and deploys `storybook-static/` on pushes to `main`. It can also be started manually from the Actions tab. In repository Settings → Pages, set Source to **GitHub Actions**.
+
+The default site URL is https://studio123ca.github.io/studio123-payload-plugins/. Static fixture and MSW worker URLs are relative so they work under the repository path as well as locally.

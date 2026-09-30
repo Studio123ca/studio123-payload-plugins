@@ -83,6 +83,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const [stickyLayoutVersion, setStickyLayoutVersion] = useState(0);
   const pendingSelectionRef = useRef<{ rowID: string; columnID: string } | null>(null);
   const typingCellRef = useRef<{ rowID: string; columnID: string } | null>(null);
+  const resizingColumnRef = useRef<string | null>(null);
   const tableRootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickyBodyNode = useRef<HTMLTableSectionElement | null>(null);
@@ -92,6 +93,19 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     if (node) setStickyLayoutVersion((version) => version + 1);
   }, []);
   useRowSizing(scrollRef);
+  useEffect(() => {
+    const clearResizingColumn = () => {
+      resizingColumnRef.current = null;
+    };
+    window.addEventListener('mouseup', clearResizingColumn);
+    window.addEventListener('touchend', clearResizingColumn);
+    window.addEventListener('touchcancel', clearResizingColumn);
+    return () => {
+      window.removeEventListener('mouseup', clearResizingColumn);
+      window.removeEventListener('touchend', clearResizingColumn);
+      window.removeEventListener('touchcancel', clearResizingColumn);
+    };
+  }, []);
   const results = useMemo(() => (value ? evaluateDataTable(value) : []), [value]);
   const sticky = useMemo(() => (value ? stickyRowCounts(value, options) : { top: 0, bottom: 0 }), [value, options]);
   const columns = useMemo<ColumnDef<typeof features, DataTableRow>[]>(
@@ -317,7 +331,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     });
   };
   const startDragging = (kind: 'row' | 'column', index: number, event: React.DragEvent<HTMLElement>) => {
-    if (readOnly || (event.target as HTMLElement).closest('input, [role="separator"]')) {
+    if (readOnly || resizingColumnRef.current || (event.target as HTMLElement).closest('input, [role="separator"]')) {
       event.preventDefault();
       return;
     }
@@ -899,10 +913,12 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                               className="data-table__resize"
                               onMouseDown={(event) => {
                                 event.stopPropagation();
+                                resizingColumnRef.current = column.id;
                                 header.getResizeHandler()(event);
                               }}
                               onTouchStart={(event) => {
                                 event.stopPropagation();
+                                resizingColumnRef.current = column.id;
                                 header.getResizeHandler()(event);
                               }}
                               onDragStart={(event) => {
