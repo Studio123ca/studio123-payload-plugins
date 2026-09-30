@@ -64,4 +64,4 @@ The current field hook does not paginate a nested JSON value. For very large tab
 
 The Table menu imports and exports CSV. The first CSV row is used for column labels, and formula cells retain their `=...` text during export. Column widths update while dragging, and an active cell's textarea resize handle keeps the rest of its row aligned. Tables with more than 200 rows use row virtualization in the admin editor so only visible rows and a small overscan buffer are mounted.
 
-The Storybook examples include Playground, Populated, Formulas, Formatted, Freeze Rows, Limited Columns/Rows, Large Data Table, Read Only, and Required Empty. The Large Data Table story loads a 1,000-record customer CSV to exercise virtualization and large-table interactions.
+The Storybook examples include Playground, Populated, Formulas, API Response, Formatted, Freeze Rows, Limited Columns/Rows, Large Data Table, Read Only, and Required Empty. The API Response story displays the live `afterRead` output beside the editor. The Large Data Table story loads a 1,000-record customer CSV to exercise virtualization and large-table interactions.

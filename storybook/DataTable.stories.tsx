@@ -1,12 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useAllFormFields } from '@payloadcms/ui';
+import { reduceFieldsToValues } from 'payload/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { DataTableField } from '../packages/payload-advanced-fields/src/data-table-field/admin/DataTableField.js';
+import { dataTableField } from '../packages/payload-advanced-fields/src/data-table-field/server/field.js';
 import {
   createDataTable,
   resolveDataTableOptions,
 } from '../packages/payload-advanced-fields/src/data-table-field/shared/dataTable.js';
 import { csvToDataTable } from '../packages/payload-advanced-fields/src/data-table-field/shared/csv.js';
-import type { DataTableValue } from '../packages/payload-advanced-fields/src/data-table-field/shared/types.js';
+import type { DataTableValue, ResolvedDataTableOptions } from '../packages/payload-advanced-fields/src/data-table-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 
@@ -96,6 +99,31 @@ function LargeDataTableStory(args: Args, { globals }: any) {
   );
 }
 
+function APIResponsePanel({ options }: { options: ResolvedDataTableOptions }) {
+  const [fields] = useAllFormFields();
+  const value = reduceFieldsToValues(fields, true).example ?? null;
+  const response = useMemo(() => {
+    const field = dataTableField({
+      formulas: { enabled: options.formulas.enabled },
+      apiResponse: options.apiResponse,
+    });
+    const afterRead = field.hooks?.afterRead?.[0] as ((args: { value: unknown }) => unknown) | undefined;
+    return afterRead ? afterRead({ value }) : value;
+  }, [options, value]);
+  return (
+    <aside className="story-value" data-testid="api-response">
+      <div className="story-value__heading">
+        <strong>API response</strong>
+        <span>
+          IDs: {options.apiResponse.includeIds ? 'on' : 'off'} · Formulas:{' '}
+          {options.apiResponse.computeFormulas ? 'computed' : 'raw'}
+        </span>
+      </div>
+      <pre>{JSON.stringify(response, null, 2)}</pre>
+    </aside>
+  );
+}
+
 const meta = {
   title: 'Fields/Data Table',
   tags: ['autodocs'],
@@ -137,6 +165,22 @@ export const Playground: Story = {};
 export const Populated: Story = { args: { initialValue: example } };
 export const Formulas: Story = {
   args: { initialValue: formulaExample, formulas: { enabled: true }, apiResponse: { computeFormulas: true } },
+};
+export const APIResponse: Story = {
+  args: {
+    initialValue: formulaExample,
+    formulas: { enabled: true },
+    apiResponse: { includeIds: true, computeFormulas: true },
+  },
+  render: (args, { globals }) => {
+    const resolved = resolveDataTableOptions(args);
+    return (
+      <PayloadField args={args} theme={globals.theme} locale={globals.locale}>
+        <DataTableField {...fieldProps(args, 'json')} options={resolved} maxHeight={args.maxHeight} />
+        <APIResponsePanel options={resolved} />
+      </PayloadField>
+    );
+  },
 };
 export const Formatted: Story = {
   args: { initialValue: formattedExample, formats: formatOptions.formats },

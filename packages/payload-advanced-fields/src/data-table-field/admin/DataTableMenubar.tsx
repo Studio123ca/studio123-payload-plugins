@@ -158,14 +158,6 @@ export function DataTableMenubar({
           <Menubar.Trigger className="data-table__menu-trigger">Table</Menubar.Trigger>
           <Menubar.Portal>
             <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
-              <Menubar.Item
-                className="data-table__menu-item data-table__menu-item--danger"
-                onSelect={() => openModal(clearTableModalSlug)}
-              >
-                <span className="data-table__context-icon" aria-hidden><FiTrash2 /></span>
-                Clear table
-              </Menubar.Item>
-              <Menubar.Separator className="data-table__menu-separator" />
               <Menubar.Item className="data-table__menu-item" onSelect={onImportCSV}>
                 <span className="data-table__context-icon" aria-hidden><FiUpload /></span>
                 Import CSV
@@ -173,6 +165,14 @@ export function DataTableMenubar({
               <Menubar.Item className="data-table__menu-item" onSelect={onExportCSV}>
                 <span className="data-table__context-icon" aria-hidden><FiDownload /></span>
                 Export CSV
+              </Menubar.Item>
+              <Menubar.Separator className="data-table__menu-separator" />
+              <Menubar.Item
+                className="data-table__menu-item data-table__menu-item--danger"
+                onSelect={() => openModal(clearTableModalSlug)}
+              >
+                <span className="data-table__context-icon" aria-hidden><FiTrash2 /></span>
+                Clear table
               </Menubar.Item>
             </Menubar.Content>
           </Menubar.Portal>

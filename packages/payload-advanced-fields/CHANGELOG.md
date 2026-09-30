@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Rebuilt the Data Table field around TanStack Table with spreadsheet-style selection, deferred cell editing, keyboard navigation, row and column reordering, resizing, sticky rows, CSV import/export, formulas, and Payload-styled Radix menus and dialogs.
+- Added bulk row and column insertion with user-entered counts, configurable unlimited dimensions, optional row and column limits, and a large-table row virtualization path.
+- Made API response enrichment opt-in through `apiResponse.includeIds` and `apiResponse.computeFormulas`; compact stored values are now returned by default. `formulas.compute` remains supported as a compatibility alias.
+- Added API response, formula, freeze-row, limited-dimensions, and large-data Storybook coverage, including live API response inspection and a 1,000-record customer fixture.
+- Added dark-mode menu styling, Payload-aligned controls, confirmation for destructive table clearing, context-menu shortcuts, formula help, and expanded keyboard interaction coverage.
+
 ## 1.1.0
 
 - Added a configurable Table field with JSON, CSV, structured, and spreadsheet modes, including editing tools, import/export, formulas, validation, and undo/redo.
