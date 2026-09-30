@@ -17,6 +17,9 @@ import {
   FiCopy,
   FiCornerUpLeft,
   FiCornerUpRight,
+  FiArrowDown,
+  FiArrowUp,
+  FiDelete,
   FiDownload,
   FiHelpCircle,
   FiHash,
@@ -40,14 +43,27 @@ const shortcuts = [
   ['Extend a selection', 'Shift + Arrow keys'],
 ] as const;
 
-const formulaHelp = [
-  ['Cell references', '=A1+B1', 'Adds values from two cells.'],
-  ['Arithmetic', '=(A1+B1)*2', 'Use +, -, *, /, ^, and parentheses.'],
-  ['Multiple cells', '=SUM(A1,B1,C3)', 'Separate individual cells with commas.'],
-  ['SUM', '=SUM(A1:A5)', 'Adds every numeric value in a range.'],
-  ['AVERAGE', '=AVERAGE(B2:B6)', 'Returns the average of numeric values.'],
-  ['MIN / MAX', '=MIN(C1:C5) / =MAX(C1:C5)', 'Returns the smallest or largest value.'],
-  ['COUNT', '=COUNT(D1:D10)', 'Counts numeric values in a range.'],
+const formulaHelpSections = [
+  {
+    title: 'Formula syntax',
+    entries: [
+      ['Cell references', '=A1+B1', 'Adds values from two cells.'],
+      ['Arithmetic', '=(A1+B1)*2', 'Use +, -, *, /, ^, and parentheses.'],
+      ['Multiple cells', '=SUM(A1,B1,C3)', 'Separate individual cells with commas.'],
+      ['SUM', '=SUM(A1:A5)', 'Adds every numeric value in a range.'],
+      ['AVERAGE', '=AVERAGE(B2:B6)', 'Returns the average of numeric values.'],
+      ['MIN / MAX', '=MIN(C1:C5) / =MAX(C1:C5)', 'Returns the smallest or largest value.'],
+      ['COUNT', '=COUNT(D1:D10)', 'Counts numeric values in a range.'],
+    ],
+  },
+  {
+    title: 'Formatted values',
+    entries: [
+      ['Currency values', '=SUM(A1:A3)', 'With $4.10, $2.40, and $1.50 in A1:A3, the result displays as $8.00.'],
+      ['Percent values', '=A1+B1', 'With 10% and 5% in A1:B1, the result displays as 15%.'],
+      ['Durations', '=A1+B1', 'With 2.40ms and 1.20ms in A1:B1, the result displays as 3.6ms.'],
+    ],
+  },
 ] as const;
 
 type Props = {
@@ -226,15 +242,15 @@ export function DataTableMenubar({
                 <Menubar.Portal>
                   <Menubar.SubContent className="data-table__context-content">
                     <Menubar.Item className="data-table__menu-item" onSelect={onFreezeThroughCurrentRow}>
-                      <span className="data-table__context-icon" aria-hidden><TbFreezeRow /></span>
+                      <span className="data-table__context-icon" aria-hidden><FiArrowDown /></span>
                       Freeze through current row
                     </Menubar.Item>
                     <Menubar.Item className="data-table__menu-item" onSelect={onFreezeFromCurrentRow}>
-                      <span className="data-table__context-icon" aria-hidden><TbFreezeRow /></span>
+                      <span className="data-table__context-icon" aria-hidden><FiArrowUp /></span>
                       Freeze from current row
                     </Menubar.Item>
                     <Menubar.Item className="data-table__menu-item" onSelect={onUnfreezeRows}>
-                      <span className="data-table__context-icon" aria-hidden><TbFreezeRow /></span>
+                      <span className="data-table__context-icon" aria-hidden><FiDelete /></span>
                       Unfreeze rows
                     </Menubar.Item>
                   </Menubar.SubContent>
@@ -351,22 +367,40 @@ export function DataTableMenubar({
           </dl>
         </div>
       </Drawer>
-      <Drawer slug={formulaHelpDrawerSlug} title="Formula help" className="data-table__help-drawer">
+      <Drawer
+        slug={formulaHelpDrawerSlug}
+        title="Formula help"
+        className="data-table__help-drawer data-table__formula-help-drawer"
+      >
         <div className="data-table__help-content">
           <p className="data-table__help-intro">
             Enter a formula in a cell. References use spreadsheet addresses such as A1; the examples below show the
             supported calculations.
           </p>
-          <dl className="data-table__shortcut-list">
-            {formulaHelp.map(([label, example, description]) => (
-              <div className="data-table__shortcut-row" key={label}>
-                <dt>{label}</dt>
-                <dd>
-                  <code>{example}</code> {description}
-                </dd>
-              </div>
+          <div className="data-table__formula-sections">
+            {formulaHelpSections.map((section) => (
+              <section className="data-table__formula-section" key={section.title}>
+                <h3 className="data-table__help-section-title">{section.title}</h3>
+                {section.title === 'Formatted values' && (
+                  <p className="data-table__formula-section-note">
+                    Formatted operands must use compatible formats. Mixing duration units or currencies is not
+                    supported and returns <code>#VALUE!</code>.
+                  </p>
+                )}
+                <dl className="data-table__formula-list">
+                  {section.entries.map(([label, example, description]) => (
+                    <div className="data-table__formula-row" key={label}>
+                      <dt>{label}</dt>
+                      <dd>
+                        <code>{example}</code>
+                        <span>{description}</span>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
             ))}
-          </dl>
+          </div>
         </div>
       </Drawer>
       <ConfirmationModal

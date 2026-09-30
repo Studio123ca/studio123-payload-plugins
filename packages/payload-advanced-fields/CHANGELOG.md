@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.1 (Unreleased)
+
+- Added formula parsing that preserves compatible currency, percentage, and duration display values and rejects incompatible formatted operands.
+- Expanded Formula Help with formatted-value examples.
+- Matched Edit → Freeze submenu icons with the row context menu.
+- Added spreadsheet-style direct entry for quickly replacing values in the selected cell without opening the editor.
+
 ## 1.2.0
 
 - Rebuilt the Data Table field around TanStack Table with spreadsheet-style selection, deferred cell editing, keyboard navigation, row and column reordering, resizing, sticky rows, CSV import/export, formulas, and Payload-styled Radix menus and dialogs.

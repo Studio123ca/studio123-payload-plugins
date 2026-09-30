@@ -106,6 +106,37 @@ test('creates and edits a Data Table value', async () => {
   assert.equal(stored().columns.length, 1);
 });
 
+test('places the caret at the end when entering cell edit mode', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 1 } }));
+  value.rows[0].cells[0] = 'Existing value';
+  await render({ value });
+  const cell = document.querySelector('[data-context-cell="0:0"]');
+  await act(async () => cell.focus());
+  await act(async () =>
+    cell.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })),
+  );
+  const input = document.querySelector('textarea');
+  assert.equal(input?.selectionStart, 'Existing value'.length);
+  assert.equal(input?.selectionEnd, 'Existing value'.length);
+});
+
+test('restores grid focus after cancelling cell editing', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 2 } }));
+  value.rows[0].cells[0] = 'Existing value';
+  await render({ value });
+  const cell = document.querySelector('[data-context-cell="0:0"]');
+  await act(async () => cell.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true })));
+  const input = document.querySelector('textarea');
+  await act(async () =>
+    input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })),
+  );
+  assert.equal(document.querySelector('textarea'), null);
+  assert.equal(document.activeElement?.dataset.contextCell, '0:0');
+  const right = new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+  await act(async () => document.activeElement.dispatchEvent(right));
+  assert.equal(document.activeElement?.dataset.contextCell, '0:1');
+});
+
 test('confirms before clearing the table', async () => {
   const value = createDataTable(options);
   await render({ value });
@@ -223,7 +254,7 @@ test('shows formula help only when formulas are enabled', async () => {
   await selectMenuItem('Help', 'Formula help');
   const dialog = document.querySelector('[role="dialog"]');
   assert.match(dialog?.textContent ?? '', /SUM\(A1:A5\)/);
-  assert.equal(dialog?.querySelectorAll('code').length, 7);
+  assert.equal(dialog?.querySelectorAll('.data-table__formula-row code').length, 10);
   assert.match(dialog?.textContent ?? '', /SUM\(A1,B1,C3\)/);
   await act(async () => document.querySelector('[role="dialog"] button')?.click());
 });
@@ -286,6 +317,26 @@ test('keeps keyboard navigation inside the grid', async () => {
   await act(async () => document.activeElement.dispatchEvent(selectAll));
   assert.equal(selectAll.defaultPrevented, true);
   assert.equal(document.querySelectorAll('td[data-selected]').length, 4);
+});
+
+test('types directly into a selected cell without entering edit mode', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 2 } }));
+  await render({ value });
+  const cell = document.querySelector('[data-context-cell="0:0"]');
+  cell.focus();
+  const key = new dom.window.KeyboardEvent('keydown', { key: 'A', bubbles: true, cancelable: true });
+  await act(async () => cell.dispatchEvent(key));
+  assert.equal(key.defaultPrevented, true);
+  assert.equal(document.querySelector('textarea'), null);
+  assert.equal(stored().rows[0].cells[0], 'A');
+  assert.equal(document.querySelector('[data-context-cell="0:0"]').dataset.selected, 'true');
+  const nextKey = new dom.window.KeyboardEvent('keydown', { key: 'B', bubbles: true, cancelable: true });
+  await act(async () => document.activeElement.dispatchEvent(nextKey));
+  assert.equal(stored().rows[0].cells[0], 'AB');
+  const right = new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+  await act(async () => document.querySelector('[data-context-cell="0:0"]').dispatchEvent(right));
+  assert.equal(right.defaultPrevented, true);
+  assert.equal(document.activeElement?.dataset.contextCell, '0:1');
 });
 
 test('clears the cell selection when the grid loses focus', async () => {

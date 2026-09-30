@@ -2,6 +2,14 @@ import type { DataTableCell, DataTableValue } from './types.js';
 
 export type DataTableResult = string | number | boolean | null;
 
+type NumericFormat =
+  | { kind: 'currency'; prefix: string }
+  | { kind: 'percent' }
+  | { kind: 'duration'; unit: string };
+
+type NumericValue = { value: number; format?: NumericFormat };
+type EvaluatedValue = DataTableResult | NumericValue;
+
 const MAX_EVALUATION_STEPS = 100_000;
 const MAX_FORMULA_LENGTH = 1_024;
 
@@ -14,17 +22,78 @@ function address(reference: string, table: DataTableValue): [number, number] {
   return [row, column];
 }
 
-function numeric(value: DataTableResult): number {
-  if (value === null || value === '') return 0;
-  if (typeof value === 'boolean') return Number(value);
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
+function numeric(value: EvaluatedValue): NumericValue {
+  if (typeof value === 'object' && value !== null && 'value' in value) return value;
+  if (value === null || value === '') return { value: 0 };
+  if (typeof value === 'boolean') return { value: Number(value) };
+  if (typeof value === 'number' && Number.isFinite(value)) return { value };
+  if (typeof value === 'string') {
+    const match = /^\s*([+-]?)\s*((?:(?:[$€£¥]|USD|CAD|EUR|GBP)\s*)?)((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(%|ns|us|μs|µs|ms|min|s|h)?\s*$/i.exec(value);
+    if (match) {
+      const sign = match[1] === '-' ? -1 : 1;
+      const prefix = match[2].trim();
+      const unit = match[4]?.toLowerCase();
+      const amount = Number(match[3].replaceAll(',', '')) * sign;
+      if (prefix) return { value: amount, format: { kind: 'currency', prefix } };
+      if (unit === '%') return { value: amount / 100, format: { kind: 'percent' } };
+      if (unit) return { value: amount, format: { kind: 'duration', unit } };
+      return { value: amount };
+    }
+  }
   throw new Error('#VALUE!');
+}
+
+function formatNumber(value: number, decimals = 6) {
+  return Number(value.toFixed(decimals)).toString();
+}
+
+function formatResult(value: EvaluatedValue): DataTableResult {
+  if (typeof value !== 'object' || value === null || !('value' in value)) return value;
+  if (!value.format) return value.value;
+  if (value.format.kind === 'currency') return `${value.format.prefix}${value.value.toFixed(2)}`;
+  if (value.format.kind === 'percent') return `${formatNumber(value.value * 100)}%`;
+  return `${formatNumber(value.value)}${value.format.unit}`;
+}
+
+function mergeFormats(left?: NumericFormat, right?: NumericFormat): NumericFormat | undefined {
+  if (!left) return right;
+  if (!right) return left;
+  if (left.kind !== right.kind) throw new Error('#VALUE!');
+  if (left.kind === 'currency' && right.kind === 'currency' && left.prefix !== right.prefix)
+    throw new Error('#VALUE!');
+  if (left.kind === 'duration' && right.kind === 'duration' && left.unit !== right.unit) throw new Error('#VALUE!');
+  return left;
+}
+
+function addValues(left: EvaluatedValue, right: EvaluatedValue, sign = 1): NumericValue {
+  const a = numeric(left);
+  const b = numeric(right);
+  return { value: a.value + sign * b.value, format: mergeFormats(a.format, b.format) };
+}
+
+function multiplyValues(left: EvaluatedValue, right: EvaluatedValue): NumericValue {
+  const a = numeric(left);
+  const b = numeric(right);
+  let format: NumericFormat | undefined;
+  if (a.format?.kind === 'percent' && b.format?.kind === 'percent') format = a.format;
+  else if (a.format?.kind === 'percent') format = b.format;
+  else if (b.format?.kind === 'percent') format = a.format;
+  else format = mergeFormats(a.format, b.format);
+  return { value: a.value * b.value, format };
+}
+
+function divideValues(left: EvaluatedValue, right: EvaluatedValue): NumericValue {
+  const a = numeric(left);
+  const b = numeric(right);
+  if (b.value === 0) throw new Error('#DIV/0!');
+  const format = a.format?.kind === 'percent' ? a.format : b.format ? undefined : a.format;
+  return { value: a.value / b.value, format };
 }
 
 function evaluateFormula(
   source: string,
-  read: (reference: string) => DataTableResult,
-  range: (from: string, to: string) => DataTableResult[],
+  read: (reference: string) => EvaluatedValue,
+  range: (from: string, to: string) => EvaluatedValue[],
 ) {
   if (!source.startsWith('=') || source.length > MAX_FORMULA_LENGTH) throw new Error('#ERROR!');
   const expression = source.slice(1).toUpperCase();
@@ -32,7 +101,7 @@ function evaluateFormula(
   let index = 0;
   const peek = () => tokens[index];
   const take = () => tokens[index++];
-  const primary = (): DataTableResult => {
+  const primary = (): EvaluatedValue => {
     const token = take();
     if (!token) throw new Error('#ERROR!');
     if (/^\d/.test(token)) return Number(token);
@@ -44,12 +113,12 @@ function evaluateFormula(
     if (/^[A-Z]+\d+$/.test(token)) {
       if (peek() === ':') {
         take();
-        return range(token, take()).reduce<number>((sum, value) => sum + numeric(value), 0);
+        return range(token, take()).reduce<NumericValue>((sum, value) => addValues(sum, value), { value: 0 });
       }
       return read(token);
     }
     if (!/^[A-Z]+$/.test(token) || take() !== '(') throw new Error('#NAME?');
-    const values: DataTableResult[] = [];
+    const values: EvaluatedValue[] = [];
     while (peek() !== ')') {
       const first = take();
       if (!first || !/^[A-Z]+\d+$/.test(first)) throw new Error('#ERROR!');
@@ -63,42 +132,49 @@ function evaluateFormula(
       else break;
     }
     if (take() !== ')') throw new Error('#ERROR!');
-    const numbers = values.filter((value): value is number => typeof value === 'number');
+    const numbers = values.flatMap((value) => {
+      try {
+        return [numeric(value)];
+      } catch {
+        return [];
+      }
+    });
     if (token === 'COUNT') return numbers.length;
-    if (token === 'SUM') return numbers.reduce((sum, value) => sum + value, 0);
+    if (token === 'SUM') return numbers.reduce<NumericValue>((sum, value) => addValues(sum, value), { value: 0 });
     if (!numbers.length && token === 'AVERAGE') throw new Error('#DIV/0!');
     if (!numbers.length) return 0;
-    if (token === 'AVERAGE') return numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
-    return token === 'MIN' ? Math.min(...numbers) : Math.max(...numbers);
+    const format = numbers.reduce<NumericFormat | undefined>((current, value) => mergeFormats(current, value.format), undefined);
+    if (token === 'AVERAGE') return { value: numbers.reduce((sum, value) => sum + value.value, 0) / numbers.length, format };
+    return { value: token === 'MIN' ? Math.min(...numbers.map((value) => value.value)) : Math.max(...numbers.map((value) => value.value)), format };
   };
-  const unary = (): DataTableResult => {
+  const unary = (): EvaluatedValue => {
     if (peek() === '+' || peek() === '-') {
       const sign = take() === '-' ? -1 : 1;
-      return sign * numeric(unary());
+      const value = numeric(unary());
+      return { ...value, value: sign * value.value };
     }
     const value = primary();
     if (peek() === '^') {
       take();
-      return numeric(value) ** numeric(unary());
+      return { value: numeric(value).value ** numeric(unary()).value };
     }
     return value;
   };
-  const multiply = (): DataTableResult => {
+  const multiply = (): EvaluatedValue => {
     let value = unary();
     while (peek() === '*' || peek() === '/') {
       const operator = take();
-      const right = numeric(unary());
-      if (operator === '/' && right === 0) throw new Error('#DIV/0!');
-      value = operator === '*' ? numeric(value) * right : numeric(value) / right;
+      const right = unary();
+      value = operator === '*' ? multiplyValues(value, right) : divideValues(value, right);
     }
     return value;
   };
-  function add(): DataTableResult {
+  function add(): EvaluatedValue {
     let value = multiply();
     while (peek() === '+' || peek() === '-') {
       const operator = take();
-      const right = numeric(multiply());
-      value = operator === '+' ? numeric(value) + right : numeric(value) - right;
+      const right = multiply();
+      value = operator === '+' ? addValues(value, right) : addValues(value, right, -1);
     }
     return value;
   }
@@ -108,19 +184,16 @@ function evaluateFormula(
 }
 
 export function evaluateDataTable(table: DataTableValue): DataTableResult[][] {
-  const cache = new Map<string, DataTableResult>();
+  const cache = new Map<string, EvaluatedValue>();
   const visiting = new Set<string>();
   let steps = MAX_EVALUATION_STEPS;
-  const read = (row: number, column: number): DataTableResult => {
+  const read = (row: number, column: number): EvaluatedValue => {
     const key = `${row}:${column}`;
     if (cache.has(key)) return cache.get(key)!;
     if (visiting.has(key)) return '#CYCLE!';
     if (--steps < 0) return '#LIMIT!';
     const cell: DataTableCell = table.rows[row].cells[column];
-    if (typeof cell === 'string') {
-      const numericValue = Number(cell);
-      return cell.trim() !== '' && Number.isFinite(numericValue) ? numericValue : cell;
-    }
+    if (typeof cell === 'string') return numericOrText(cell);
     visiting.add(key);
     try {
       const result = evaluateFormula(
@@ -132,7 +205,7 @@ export function evaluateDataTable(table: DataTableValue): DataTableResult[][] {
         (from, to) => {
           const [rowA, columnA] = address(from, table);
           const [rowB, columnB] = address(to, table);
-          const values: DataTableResult[] = [];
+          const values: EvaluatedValue[] = [];
           for (let row = Math.min(rowA, rowB); row <= Math.max(rowA, rowB); row += 1) {
             for (let column = Math.min(columnA, columnB); column <= Math.max(columnA, columnB); column += 1) {
               values.push(read(row, column));
@@ -144,12 +217,21 @@ export function evaluateDataTable(table: DataTableValue): DataTableResult[][] {
       cache.set(key, result);
       return result;
     } catch (error) {
-      const result = error instanceof Error ? error.message : '#ERROR!';
+      const result: DataTableResult = error instanceof Error ? error.message : '#ERROR!';
       cache.set(key, result);
       return result;
     } finally {
       visiting.delete(key);
     }
   };
-  return table.rows.map((row, rowIndex) => row.cells.map((_, columnIndex) => read(rowIndex, columnIndex)));
+  return table.rows.map((row, rowIndex) => row.cells.map((_, columnIndex) => formatResult(read(rowIndex, columnIndex))));
+}
+
+function numericOrText(value: string): EvaluatedValue {
+  if (value.trim() === '') return value;
+  try {
+    return numeric(value);
+  } catch {
+    return value;
+  }
 }

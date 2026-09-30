@@ -80,6 +80,8 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const [csvError, setCSVError] = useState<string | null>(null);
   const [virtualScrollTop, setVirtualScrollTop] = useState(0);
   const [stickyLayoutVersion, setStickyLayoutVersion] = useState(0);
+  const pendingSelectionRef = useRef<{ rowID: string; columnID: string } | null>(null);
+  const typingCellRef = useRef<{ rowID: string; columnID: string } | null>(null);
   const tableRootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickyBodyNode = useRef<HTMLTableSectionElement | null>(null);
@@ -132,6 +134,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     columnResizeMode: 'onChange',
     enableCellSelection: !readOnly,
     enableCellSelectionDrag: !readOnly,
+    autoResetCellSelection: false,
     enableColumnResizing: !readOnly,
     enableSorting: true,
     onColumnSizingChange: (update) => {
@@ -484,6 +487,22 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       .querySelector<HTMLElement>(`[data-context-cell="${focused.row.getDisplayIndex()}:${columnIndex}"]`)
       ?.focus({ preventScroll: true });
   };
+  useEffect(() => {
+    const pending = pendingSelectionRef.current;
+    if (!pending || !value) return;
+    if (!value.rows.some((row) => row.id === pending.rowID) || !value.columns.some((column) => column.id === pending.columnID)) {
+      pendingSelectionRef.current = null;
+      return;
+    }
+    table.selectCellRange({
+      anchorRowId: pending.rowID,
+      anchorColumnId: pending.columnID,
+      focusRowId: pending.rowID,
+      focusColumnId: pending.columnID,
+    });
+    pendingSelectionRef.current = null;
+    focusActiveCell();
+  }, [editingCell, table, value]);
   const ensureFocusedCell = (target: EventTarget | null) => {
     if (!value || !(target instanceof HTMLElement)) return;
     const focused = table.getFocusedCell();
@@ -509,6 +528,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     } as const;
     const selectedDirection = direction[event.key as keyof typeof direction];
     if (selectedDirection) {
+      typingCellRef.current = null;
       event.preventDefault();
       event.stopPropagation();
       ensureFocusedCell(event.target);
@@ -518,6 +538,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       return;
     }
     if (event.key === 'Tab') {
+      typingCellRef.current = null;
       event.preventDefault();
       event.stopPropagation();
       ensureFocusedCell(event.target);
@@ -544,6 +565,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       return;
     }
     if (event.key === 'Home' || event.key === 'End') {
+      typingCellRef.current = null;
       event.preventDefault();
       event.stopPropagation();
       ensureFocusedCell(event.target);
@@ -571,6 +593,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       return;
     }
     if (event.key === 'PageUp' || event.key === 'PageDown') {
+      typingCellRef.current = null;
       event.preventDefault();
       event.stopPropagation();
       ensureFocusedCell(event.target);
@@ -585,6 +608,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     }
     const modifier = event.metaKey || event.ctrlKey;
     if (modifier && event.key.toLowerCase() === 'a') {
+      typingCellRef.current = null;
       event.preventDefault();
       event.stopPropagation();
       table.selectAllCells();
@@ -592,6 +616,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       return;
     }
     if (!modifier && (event.key === 'Backspace' || event.key === 'Delete') && table.getSelectedCellCount()) {
+      typingCellRef.current = null;
       event.preventDefault();
       event.stopPropagation();
       clearSelection();
@@ -870,7 +895,8 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                       const isEditing =
                         editingCell?.rowID === row.original.id && editingCell.columnID === cell.column.id;
                       const activateEditing = () => {
-                        if (!readOnly) setEditingCell({ rowID: row.original.id, columnID: cell.column.id });
+                        if (readOnly) return;
+                        setEditingCell({ rowID: row.original.id, columnID: cell.column.id });
                       };
                       return (
                         <td
@@ -889,10 +915,31 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                           data-selection-edge-left={selectionEdges.left || undefined}
                           tabIndex={cell.getTabIndex()}
                           aria-label={`${value.columns[index].label}, row ${row.getDisplayIndex() + 1}`}
-                          onMouseDown={cell.getSelectionStartHandler()}
+                          onMouseDown={(event) => {
+                            typingCellRef.current = null;
+                            cell.getSelectionStartHandler()(event);
+                          }}
                           onMouseEnter={cell.getSelectionExtendHandler()}
-                          onDoubleClick={activateEditing}
+                          onDoubleClick={() => activateEditing()}
                           onKeyDown={(event) => {
+                            if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.length === 1) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              pendingSelectionRef.current = { rowID: row.original.id, columnID: cell.column.id };
+                              table.selectCellRange({
+                                anchorRowId: row.original.id,
+                                anchorColumnId: cell.column.id,
+                                focusRowId: row.original.id,
+                                focusColumnId: cell.column.id,
+                              });
+                              const isContinuing =
+                                typingCellRef.current?.rowID === row.original.id &&
+                                typingCellRef.current.columnID === cell.column.id;
+                              const currentValue = typeof rawCell === 'object' ? rawCell.formula : rawCell;
+                              typingCellRef.current = { rowID: row.original.id, columnID: cell.column.id };
+                              updateCell(row.original.id, index, isContinuing ? `${currentValue}${event.key}` : event.key);
+                              return;
+                            }
                             if (event.key === 'Enter' || event.key === 'F2') {
                               event.preventDefault();
                               activateEditing();
@@ -906,11 +953,16 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                               value={typeof rawCell === 'object' ? rawCell.formula : rawCell}
                               maxLength={MAX_DATA_TABLE_CELL_LENGTH}
                               rows={1}
+                              onFocus={(event) => {
+                                const end = event.currentTarget.value.length;
+                                event.currentTarget.setSelectionRange(end, end);
+                              }}
                               onBlur={() => setEditingCell(null)}
                               onChange={(event) => updateCell(row.original.id, index, event.target.value)}
                               onKeyDown={(event) => {
                                 if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
                                   event.preventDefault();
+                                  pendingSelectionRef.current = { rowID: row.original.id, columnID: cell.column.id };
                                   setEditingCell(null);
                                 }
                               }}

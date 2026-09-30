@@ -240,8 +240,74 @@
   padding: var(--gutter-h, 1.5rem);
 }
 .data-table__help-intro {
-  margin: 0 0 1rem;
+  margin: 0 0 1.5rem;
   color: var(--theme-elevation-500, var(--color-text-muted, #7a7a7a));
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.data-table__formula-section + .data-table__formula-section {
+  margin-top: 2.25rem;
+}
+.data-table__help-section-title {
+  margin: 0 0 0.75rem;
+  color: var(--color-text, inherit);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.data-table__formula-section-note {
+  margin: -0.125rem 0 0.75rem;
+  color: var(--theme-elevation-500, var(--color-text-muted, #7a7a7a));
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+.data-table__formula-section-note code {
+  color: var(--color-text, inherit);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+.data-table__formula-list {
+  margin: 0;
+  border-top: 1px solid var(--color-border, #d5d5d5);
+}
+.data-table__formula-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.38fr) minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-border, #d5d5d5);
+}
+.data-table__formula-row dt {
+  color: var(--color-text, inherit);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.data-table__formula-row dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin: 0;
+  color: var(--theme-elevation-500, var(--color-text-muted, #7a7a7a));
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.data-table__formula-row code {
+  color: var(--color-text, inherit);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8125rem;
+}
+.data-table__formula-help-drawer .data-table__help-intro {
+  font-size: 0.8125rem;
+}
+.data-table__formula-help-drawer .data-table__help-section-title {
+  font-size: 0.8125rem;
+}
+.data-table__formula-help-drawer .data-table__formula-row dt {
+  font-size: 0.8125rem;
+}
+.data-table__formula-help-drawer .data-table__formula-row dd,
+.data-table__formula-help-drawer .data-table__formula-row code {
+  font-size: 0.75rem;
 }
 .data-table__shortcut-list {
   display: grid;
@@ -334,8 +400,13 @@
 .data-table td[data-selection-edge-left] {
   --data-table-selection-left: inset 2px 0 0 var(--color-border-selected, var(--color-bg-brand, #3b82f6));
 }
+.data-table td:focus,
+.data-table td:focus-visible,
 .data-table td:focus-within {
   outline: none;
+}
+.data-table td[data-selected] {
+  border-radius: 0;
 }
 .data-table td[data-editing] {
   outline: none;

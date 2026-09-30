@@ -9,7 +9,10 @@ import {
   resolveDataTableOptions,
 } from '../packages/payload-advanced-fields/src/data-table-field/shared/dataTable.js';
 import { csvToDataTable } from '../packages/payload-advanced-fields/src/data-table-field/shared/csv.js';
-import type { DataTableValue, ResolvedDataTableOptions } from '../packages/payload-advanced-fields/src/data-table-field/shared/types.js';
+import type {
+  DataTableValue,
+  ResolvedDataTableOptions,
+} from '../packages/payload-advanced-fields/src/data-table-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 
@@ -63,6 +66,29 @@ formattedExample.columns[2].label = 'Notes';
 formattedExample.rows[0].cells = ['Widget', 'Ready', 'Format this row or cell from the menu'];
 formattedExample.rows[1].cells = ['Gizmo', 'Review', ''];
 formattedExample.appearance = { rows: { [formattedExample.rows[0].id]: 'highlight' } };
+const valueFormatsOptions = resolveDataTableOptions({
+  columns: { initial: 4 },
+  rows: { initial: 4 },
+  formulas: { enabled: true },
+});
+const valueFormatsExample = createDataTable(valueFormatsOptions);
+['Currency', 'Percent', 'Duration', 'Mixed formats'].forEach((label, index) => {
+  valueFormatsExample.columns[index].label = label;
+});
+valueFormatsExample.rows[0].cells = ['$4.10', '10%', '2.40ms', '1s'];
+valueFormatsExample.rows[1].cells = ['$1.50', '5%', '1.20ms', '2.40ms'];
+valueFormatsExample.rows[2].cells = [
+  { formula: '=SUM(A1:A2)' },
+  { formula: '=B1+B2' },
+  { formula: '=C1+C2' },
+  { formula: '=D1+D2' },
+];
+valueFormatsExample.rows[3].cells = [
+  'Compatible values retain their display format.',
+  'Percent results keep the % sign.',
+  'Duration units must match.',
+  'Mixed units return #VALUE!.',
+];
 const freezeOptions = resolveDataTableOptions({
   columns: { initial: 3 },
   rows: { initial: 8 },
@@ -184,6 +210,13 @@ export const APIResponse: Story = {
 };
 export const Formatted: Story = {
   args: { initialValue: formattedExample, formats: formatOptions.formats },
+};
+export const ValueFormats: Story = {
+  args: {
+    initialValue: valueFormatsExample,
+    formulas: { enabled: true },
+    maxHeight: 320,
+  },
 };
 export const FreezeRows: Story = {
   args: {

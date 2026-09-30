@@ -83,6 +83,21 @@ test('formula-enabled API reads expose stable response IDs and computed values',
   assert.deepEqual(response.rows[0].cells[2], { cellId: 'C1', value: 5, formula: '=A1+B1' });
 });
 
+test('formulas calculate common formatted numeric values', () => {
+  const options = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 7 }, formulas: true });
+  const table = createDataTable(options);
+  table.rows[0].cells = ['$4.10', '$2.40', '2.40ms', '1s', '10%', '1,000', { formula: '=A1+B1' }];
+  assert.equal(evaluateDataTable(table)[0][6], '$6.50');
+  table.rows[0].cells[6] = { formula: '=C1+D1' };
+  assert.equal(evaluateDataTable(table)[0][6], '#VALUE!');
+  table.rows[0].cells[3] = '1.20ms';
+  assert.equal(evaluateDataTable(table)[0][6], '3.6ms');
+  table.rows[0].cells[6] = { formula: '=E1*F1' };
+  assert.equal(evaluateDataTable(table)[0][6], 100);
+  table.rows[0].cells[6] = { formula: '=E1+E1' };
+  assert.equal(evaluateDataTable(table)[0][6], '20%');
+});
+
 test('supports minimum dimensions and CSV round trips', () => {
   const options = resolveDataTableOptions({ rows: { min: 2, initial: 2 }, columns: { min: 2, initial: 2 } });
   assert.equal(options.columns.min, 2);
