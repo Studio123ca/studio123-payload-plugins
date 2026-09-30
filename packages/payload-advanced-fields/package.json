@@ -81,8 +81,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node esbuild.js",
     "prepublishOnly": "npm run build",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test tests/*.test.mjs"
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run storybook:typecheck",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "storybook": "storybook dev -p 6006 --host 127.0.0.1 --no-open --disable-telemetry",
+    "storybook:build": "storybook build --disable-telemetry",
+    "storybook:typecheck": "tsc -p .storybook/tsconfig.json"
   },
   "peerDependencies": {
     "@payloadcms/ui": "4.0.0-canary.37",
@@ -102,14 +105,27 @@
     "validator": "^13.15.35"
   },
   "devDependencies": {
+    "@payloadcms/translations": "4.0.0-canary.37",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-docs": "10.6.0",
+    "@storybook/react-vite": "10.6.0",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@types/validator": "^13.15.10",
     "esbuild": "^0.28.1",
     "jsdom": "26.1.0",
-    "typescript": "6.0.3"
+    "msw": "3.0.0",
+    "msw-storybook-addon": "3.0.3",
+    "storybook": "10.6.0",
+    "typescript": "6.0.3",
+    "vite": "8.3.1"
   },
   "engines": {
     "node": "^18.20.2 || >=20.9.0"
+  },
+  "msw": {
+    "workerDirectory": [
+      ".storybook/public"
+    ]
   }
 }

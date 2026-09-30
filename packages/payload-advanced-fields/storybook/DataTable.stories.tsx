@@ -2,17 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useAllFormFields } from '@payloadcms/ui';
 import { reduceFieldsToValues } from 'payload/shared';
 import { useEffect, useMemo, useState } from 'react';
-import { DataTableField } from '../packages/payload-advanced-fields/src/data-table-field/admin/DataTableField.js';
-import { dataTableField } from '../packages/payload-advanced-fields/src/data-table-field/server/field.js';
-import {
-  createDataTable,
-  resolveDataTableOptions,
-} from '../packages/payload-advanced-fields/src/data-table-field/shared/dataTable.js';
-import { csvToDataTable } from '../packages/payload-advanced-fields/src/data-table-field/shared/csv.js';
-import type {
-  DataTableValue,
-  ResolvedDataTableOptions,
-} from '../packages/payload-advanced-fields/src/data-table-field/shared/types.js';
+import { DataTableField } from '../src/data-table-field/admin/DataTableField.js';
+import { dataTableField } from '../src/data-table-field/server/field.js';
+import { createDataTable, resolveDataTableOptions } from '../src/data-table-field/shared/dataTable.js';
+import { csvToDataTable } from '../src/data-table-field/shared/csv.js';
+import type { DataTableValue, ResolvedDataTableOptions } from '../src/data-table-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 

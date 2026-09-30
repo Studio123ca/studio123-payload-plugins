@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import CodeField from '../packages/payload-advanced-fields/src/code-field/admin/CodeField.client.js';
+import CodeField from '../src/code-field/admin/CodeField.client.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 type Args = FieldControls & { language: 'html' | 'text'; height: number };

@@ -21,4 +21,11 @@ Prettier is configured at the workspace root for consistent TypeScript, JavaScri
 
 ## Field previews
 
-Use Node.js 22.12+ and run `npm run storybook` to preview all advanced fields with editable props, light/dark themes, and live values. See the [Storybook guide](storybook/README.md) for examples, fixtures, and build commands.
+Use Node.js 22.12+ and run Storybook from the fields package to preview all advanced fields with editable props, light/dark themes, and live values:
+
+```sh
+cd packages/payload-advanced-fields
+npm run storybook
+```
+
+See the [Storybook guide](packages/payload-advanced-fields/storybook/README.md) for examples, fixtures, and build commands.

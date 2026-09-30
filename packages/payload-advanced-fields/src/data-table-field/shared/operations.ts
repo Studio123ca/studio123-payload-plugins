@@ -164,7 +164,8 @@ export function pasteDataTableCells(
       ...row,
       cells: columns.map((_, columnIndex) => {
         const pasted = matrix[rowIndex - startRow]?.[columnIndex - startColumn];
-        return pasted === undefined ? (row.cells[columnIndex] ?? '') : pasted;
+        if (pasted === undefined) return row.cells[columnIndex] ?? '';
+        return options.formulas.enabled && pasted.startsWith('=') ? { formula: pasted } : pasted;
       }),
     })),
   };

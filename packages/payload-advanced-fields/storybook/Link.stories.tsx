@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import LinkField from '../packages/payload-advanced-fields/src/link-field/admin/LinkField.client.js';
-import type { LinkType } from '../packages/payload-advanced-fields/src/link-field/shared/types.js';
+import LinkField from '../src/link-field/admin/LinkField.client.js';
+import type { LinkType } from '../src/link-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 type Args = FieldControls & { defaultType: LinkType };

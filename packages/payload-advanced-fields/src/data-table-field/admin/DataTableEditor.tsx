@@ -31,6 +31,7 @@ import {
   insertDataTableRow,
   moveDataTableColumn,
   moveDataTableRow,
+  copyDataTableSelection,
   pasteDataTableCells,
 } from '../shared/operations.js';
 import type { DataTableCell, DataTableRow, DataTableValue, ResolvedDataTableOptions } from '../shared/types.js';
@@ -415,7 +416,15 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   };
   const copySelection = () => {
     if (!navigator.clipboard?.writeText) return;
-    const ranges = table.getSelectedCellRangesData() as string[][][];
+    if (!value) return;
+    const ranges = table.getCellSelectionBounds().map((bounds) =>
+      copyDataTableSelection(value, {
+        startRow: bounds.minRowIndex,
+        endRow: bounds.maxRowIndex,
+        startColumn: bounds.minColumnIndex,
+        endColumn: bounds.maxColumnIndex,
+      }),
+    );
     const rows = ranges.flatMap((range, index) => (index ? [[''], ...range.map((row) => row.map(String))] : range));
     if (rows.length) void navigator.clipboard.writeText(stringifyDelimited(rows));
   };
@@ -888,8 +897,18 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                               tabIndex={0}
                               aria-label={`Resize ${column.label}`}
                               className="data-table__resize"
-                              onMouseDown={header.getResizeHandler()}
-                              onTouchStart={header.getResizeHandler()}
+                              onMouseDown={(event) => {
+                                event.stopPropagation();
+                                header.getResizeHandler()(event);
+                              }}
+                              onTouchStart={(event) => {
+                                event.stopPropagation();
+                                header.getResizeHandler()(event);
+                              }}
+                              onDragStart={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                              }}
                             />
                           )}
                         </div>

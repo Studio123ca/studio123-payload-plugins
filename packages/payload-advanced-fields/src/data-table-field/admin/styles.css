@@ -455,10 +455,12 @@
 }
 .data-table th {
   background: var(--theme-elevation-50, var(--color-bg-secondary, #f8f8f8));
+  border-radius: 0 !important;
 }
 .data-table th:focus,
 .data-table th:focus-visible {
   outline: none;
+  border-radius: 0 !important;
 }
 .data-table th[data-selected] {
   background: var(--theme-elevation-150, var(--color-bg-selected, #edf5ff));

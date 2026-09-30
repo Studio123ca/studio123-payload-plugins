@@ -1,9 +1,10 @@
 # Field Storybook
 
-Use Node.js 22.12+ (Node 24 recommended), then run from the repository root:
+Use Node.js 22.12+ (Node 24 recommended), install dependencies from the repository root, then start Storybook from the fields package:
 
 ```sh
 npm install
+cd packages/payload-advanced-fields
 npm run storybook
 ```
 
@@ -25,15 +26,18 @@ These stories preview UI and client interactions. Database persistence, access e
 
 ## Verification and builds
 
+Run these commands from `packages/payload-advanced-fields`:
+
 ```sh
 npm run typecheck
 npm test
 npm run storybook:build
-npm run format:check
 ```
 
-The static build goes into the ignored `storybook-static/` directory. Serve it over HTTP to allow the MSW worker to run. `storybook:build` compiles stories; it does not execute their interaction checks. Open Spreadsheet, Structured, and Menus in the browser to run those checks. No automated browser test runner is installed.
+Storybook configuration, stories, fixtures, and development dependencies belong to `packages/payload-advanced-fields`. Run its scripts directly from that package directory. Repository-wide formatting is checked separately with `npm run format:check` from the repository root.
 
-To add a field example, create a `*.stories.tsx` file here, reuse `PayloadField` and common controls, and add explicit fixture API handlers where necessary. Keep stories and backend fixtures outside published packages. After upgrading MSW, regenerate its worker with `npx msw init .storybook/public --save`.
+The static build goes into the ignored `packages/payload-advanced-fields/storybook-static/` directory. Serve it over HTTP to allow the MSW worker to run. `storybook:build` compiles stories; it does not execute their interaction checks. Open Spreadsheet, Structured, and Menus in the browser to run those checks. No automated browser test runner is installed.
+
+To add a field example, create a `*.stories.tsx` file here, reuse `PayloadField` and common controls, and add explicit fixture API handlers where necessary. Stories and backend fixtures are excluded from the published npm package by its `files` allowlist. After upgrading MSW, run `npx msw init .storybook/public --save` from `packages/payload-advanced-fields` to regenerate its worker.
 
 Data Table also includes formulas, formats, sticky rows, read-only, and required examples. Format and sticky-row controls mirror the field configuration, and `maxHeight` mirrors `admin.maxHeight`. Fields are listed alphabetically.

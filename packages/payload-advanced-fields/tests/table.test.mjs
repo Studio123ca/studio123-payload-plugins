@@ -9,6 +9,7 @@ import {
   resolveDataTableOptions,
   validateDataTable,
 } from '../dist/data-table-field/index.js';
+import { pasteDataTableCells } from '../dist/data-table-field/shared/operations.js';
 
 test('data table factory creates a JSON field with a DataTableField admin component', () => {
   const field = dataTableField({ name: 'pricing', label: 'Pricing', rows: { initial: 2 }, columns: { initial: 4 } });
@@ -96,6 +97,23 @@ test('formulas calculate common formatted numeric values', () => {
   assert.equal(evaluateDataTable(table)[0][6], 100);
   table.rows[0].cells[6] = { formula: '=E1+E1' };
   assert.equal(evaluateDataTable(table)[0][6], '20%');
+});
+
+test('pasting formulas preserves formula cells when formulas are enabled', () => {
+  const options = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 2 }, formulas: true });
+  const table = createDataTable(options);
+  const pasted = pasteDataTableCells(
+    table,
+    [
+      ['2', '3'],
+      ['=A1+B1', ''],
+    ],
+    0,
+    0,
+    options,
+  );
+  assert.equal(pasted.rows[1].cells[0].formula, '=A1+B1');
+  assert.equal(pasted.rows[0].cells[0], '2');
 });
 
 test('formulas preserve dates and times and reject incompatible values', () => {

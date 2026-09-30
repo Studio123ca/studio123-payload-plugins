@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import ColorField from '../packages/payload-advanced-fields/src/color-field/admin/ColorField.client.js';
-import type { ColorPickerType } from '../packages/payload-advanced-fields/src/color-field/shared/types.js';
+import ColorField from '../src/color-field/admin/ColorField.client.js';
+import type { ColorPickerType } from '../src/color-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 type Args = FieldControls & { pickerType: ColorPickerType; disableAlpha: boolean; showPresets: boolean };

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import PhoneField from '../packages/payload-advanced-fields/src/phone-field/admin/PhoneField.client.js';
+import PhoneField from '../src/phone-field/admin/PhoneField.client.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 type Args = FieldControls & {
