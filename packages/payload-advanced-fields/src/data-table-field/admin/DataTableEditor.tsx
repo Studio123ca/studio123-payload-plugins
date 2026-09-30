@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '@payloadcms/ui';
 import {
   columnResizingFeature,
@@ -10,6 +10,8 @@ import {
   rowSortingFeature,
   tableFeatures,
   useTable,
+  type ColumnSizingState,
+  type columnResizingState,
   type ColumnDef,
 } from '@tanstack/react-table';
 import { DataTableMenubar } from './DataTableMenubar.js';
@@ -18,6 +20,7 @@ import { createDataTable, MAX_DATA_TABLE_CELL_LENGTH } from '../shared/dataTable
 import { dataTableBackgroundStyle, setDataTableBackground, stickyRowCounts } from '../shared/appearance.js';
 import { evaluateDataTable } from '../shared/formulas.js';
 import { parseDelimited, stringifyDelimited } from '../shared/clipboard.js';
+import { csvToDataTable, dataTableToCSV } from '../shared/csv.js';
 import {
   clearDataTableSelections,
   deleteDataTableColumn,
@@ -32,6 +35,7 @@ import {
 } from '../shared/operations.js';
 import type { DataTableCell, DataTableRow, DataTableValue, ResolvedDataTableOptions } from '../shared/types.js';
 import { useDataTableController } from './useDataTableController.js';
+import { useRowSizing } from './useRowSizing.js';
 import './styles.css';
 
 const features = tableFeatures({
@@ -70,7 +74,20 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   });
   const [contextTarget, setContextTarget] = useState<DataTableContextTarget | null>(null);
   const [editingCell, setEditingCell] = useState<{ rowID: string; columnID: string } | null>(null);
+  const [editingColumn, setEditingColumn] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<{ kind: 'row' | 'column'; index: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ kind: 'row' | 'column'; index: number } | null>(null);
+  const [csvError, setCSVError] = useState<string | null>(null);
+  const [stickyLayoutVersion, setStickyLayoutVersion] = useState(0);
+  const tableRootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickyBodyNode = useRef<HTMLTableSectionElement | null>(null);
+  const stickyBodyRef = useCallback((node: HTMLTableSectionElement | null) => {
+    if (node === stickyBodyNode.current) return;
+    stickyBodyNode.current = node;
+    if (node) setStickyLayoutVersion((version) => version + 1);
+  }, []);
+  useRowSizing(scrollRef);
   const results = useMemo(() => (value ? evaluateDataTable(value) : []), [value]);
   const sticky = useMemo(() => (value ? stickyRowCounts(value, options) : { top: 0, bottom: 0 }), [value, options]);
   const columns = useMemo<ColumnDef<typeof features, DataTableRow>[]>(
@@ -85,67 +102,98 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       })) ?? [],
     [value?.columns],
   );
-  const columnSizing = useMemo(
+  const initialColumnSizing = useMemo<ColumnSizingState>(
     () =>
       Object.fromEntries(value?.columns.flatMap((column) => (column.width ? [[column.id, column.width]] : [])) ?? []),
     [value?.columns],
   );
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(initialColumnSizing);
+  const [columnResizing, setColumnResizing] = useState<columnResizingState>({
+    columnSizingStart: [],
+    deltaOffset: null,
+    deltaPercentage: null,
+    isResizingColumn: false,
+    startOffset: null,
+    startSize: null,
+  });
+  const columnSizingRef = useRef(columnSizing);
+  useEffect(() => {
+    setColumnSizing(initialColumnSizing);
+    columnSizingRef.current = initialColumnSizing;
+  }, [initialColumnSizing]);
   const table = useTable({
     features,
     columns,
     data: value?.rows ?? emptyRows,
     getRowId: (row) => row.id,
     defaultColumn: { size: 180, minSize: 120, maxSize: 600 },
-    state: { columnSizing },
-    columnResizeMode: 'onEnd',
+    state: { columnSizing, columnResizing },
+    columnResizeMode: 'onChange',
     enableCellSelection: !readOnly,
     enableCellSelectionDrag: !readOnly,
     enableColumnResizing: !readOnly,
     enableSorting: true,
     onColumnSizingChange: (update) => {
       if (!value || readOnly) return;
-      const next = typeof update === 'function' ? update(columnSizing) : update;
-      commit({
-        ...value,
-        columns: value.columns.map((column) => ({ ...column, width: next[column.id] ?? column.width })),
-      });
+      const next = typeof update === 'function' ? update(columnSizingRef.current) : update;
+      columnSizingRef.current = next;
+      setColumnSizing(next);
+    },
+    onColumnResizingChange: (update) => {
+      const next = typeof update === 'function' ? update(columnResizing) : update;
+      setColumnResizing(next);
+      if (value && !readOnly && !next.isResizingColumn && columnResizing.isResizingColumn) {
+        commit({
+          ...value,
+          columns: value.columns.map((column) => ({
+            ...column,
+            width: columnSizingRef.current[column.id] ?? column.width,
+          })),
+        });
+      }
     },
   });
-  useLayoutEffect(() => {
-    const container = scrollRef.current;
-    if (!container || (!sticky.top && !sticky.bottom)) return;
-    const rows = Array.from(container.querySelectorAll<HTMLTableRowElement>('tbody > tr'));
-    const header = container.querySelector('thead');
-    const position = () => {
-      let topOffset = header?.getBoundingClientRect().height ?? 0;
-      rows.forEach((row, index) => {
-        row.removeAttribute('data-sticky');
+  useEffect(() => {
+    const container =
+      scrollRef.current ?? tableRootRef.current?.querySelector<HTMLDivElement>('.data-table__scroll') ?? null;
+    if (!container) return;
+    const root = container;
+    let resizeObserver: ResizeObserver | null = null;
+    function position() {
+      const rows = Array.from(root.querySelectorAll<HTMLTableRowElement>('tbody > tr'));
+      const header = root.querySelector('thead');
+      rows.forEach((row) => {
         row.style.removeProperty('--data-table-sticky-offset');
-        if (index < sticky.top) {
-          row.dataset.sticky = 'top';
-          row.style.setProperty('--data-table-sticky-offset', `${topOffset}px`);
-          topOffset += row.getBoundingClientRect().height;
-        }
+      });
+      if (!sticky.top && !sticky.bottom) return;
+      const topRows = rows.filter((row) => row.dataset.sticky === 'top');
+      const bottomRows = rows.filter((row) => row.dataset.sticky === 'bottom');
+      let topOffset = header?.getBoundingClientRect().height ?? 0;
+      topRows.forEach((row) => {
+        row.style.setProperty('--data-table-sticky-offset', `${topOffset}px`);
+        topOffset += row.getBoundingClientRect().height;
       });
       let bottomOffset = 0;
-      for (let index = rows.length - 1; index >= rows.length - sticky.bottom; index -= 1) {
-        const row = rows[index];
-        if (!row) continue;
-        row.dataset.sticky = 'bottom';
+      bottomRows.reverse().forEach((row) => {
         row.style.setProperty('--data-table-sticky-offset', `${bottomOffset}px`);
         bottomOffset += row.getBoundingClientRect().height;
-      }
-    };
+      });
+      resizeObserver?.disconnect();
+      rows.forEach((row) => resizeObserver?.observe(row));
+      if (header) resizeObserver?.observe(header);
+    }
+    resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(position);
     position();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(position);
-    rows.forEach((row) => observer.observe(row));
-    if (header) observer.observe(header);
-    return () => observer.disconnect();
-  }, [sticky.bottom, sticky.top, value?.rows.length, editingCell]);
+    const mutationObserver = new MutationObserver(position);
+    mutationObserver.observe(root, { childList: true, subtree: true });
+    return () => {
+      mutationObserver.disconnect();
+      resizeObserver?.disconnect();
+    };
+  }, [editingCell, sticky.bottom, sticky.top, stickyLayoutVersion, value?.rows.map((row) => row.id).join(':')]);
   const updateCell = (rowID: string, columnIndex: number, cell: string) => {
     if (!value) return;
-    const nextCell: DataTableCell = options.formulas && cell.startsWith('=') ? { formula: cell } : cell;
+    const nextCell: DataTableCell = options.formulas.enabled && cell.startsWith('=') ? { formula: cell } : cell;
     commit({
       ...value,
       rows: value.rows.map((row) =>
@@ -161,6 +209,9 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       ...value,
       columns: value.columns.map((column) => (column.id === columnID ? { ...column, label } : column)),
     });
+  };
+  const activateColumnEditing = (columnID: string) => {
+    if (!readOnly) setEditingColumn(columnID);
   };
   const addRow = () => {
     if (!value) return;
@@ -183,6 +234,81 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       return direction === 'ascending' ? comparison : -comparison;
     });
     commit({ ...value, rows });
+  };
+  const isCellSelected = (rowIndex: number, columnIndex: number) =>
+    table
+      .getCellSelectionBounds()
+      .some(
+        (selection) =>
+          rowIndex >= selection.minRowIndex &&
+          rowIndex <= selection.maxRowIndex &&
+          columnIndex >= selection.minColumnIndex &&
+          columnIndex <= selection.maxColumnIndex,
+      );
+  const isRowSelected = (rowIndex: number) =>
+    Boolean(value?.columns.length) && value?.columns.every((_, columnIndex) => isCellSelected(rowIndex, columnIndex));
+  const isColumnSelected = (columnIndex: number) =>
+    Boolean(value?.rows.length) && value?.rows.every((_, rowIndex) => isCellSelected(rowIndex, columnIndex));
+  const selectRow = (rowIndex: number) => {
+    if (!value || readOnly) return;
+    const row = value.rows[rowIndex];
+    const firstColumn = value.columns[0];
+    const lastColumn = value.columns.at(-1);
+    if (!row || !firstColumn || !lastColumn) return;
+    table.selectCellRange({
+      anchorRowId: row.id,
+      anchorColumnId: firstColumn.id,
+      focusRowId: row.id,
+      focusColumnId: lastColumn.id,
+    });
+  };
+  const selectColumn = (columnIndex: number) => {
+    if (!value || readOnly) return;
+    const firstRow = value.rows[0];
+    const lastRow = value.rows.at(-1);
+    const column = value.columns[columnIndex];
+    if (!firstRow || !lastRow || !column) return;
+    table.selectCellRange({
+      anchorRowId: firstRow.id,
+      anchorColumnId: column.id,
+      focusRowId: lastRow.id,
+      focusColumnId: column.id,
+    });
+  };
+  const startDragging = (kind: 'row' | 'column', index: number, event: React.DragEvent<HTMLElement>) => {
+    if (readOnly || (event.target as HTMLElement).closest('input, [role="separator"]')) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', `${kind}:${index}`);
+    setDragging({ kind, index });
+    setDropTarget({ kind, index });
+  };
+  const updateDropTarget = (kind: 'row' | 'column', index: number, event: React.DragEvent<HTMLElement>) => {
+    if (!dragging || dragging.kind !== kind) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDropTarget({ kind, index });
+  };
+  const dropReordered = (kind: 'row' | 'column', index: number, event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (!value || !dragging || dragging.kind !== kind || dragging.index === index) {
+      setDragging(null);
+      setDropTarget(null);
+      return;
+    }
+    commit(
+      kind === 'row'
+        ? moveDataTableRow(value, dragging.index, index)
+        : moveDataTableColumn(value, dragging.index, index),
+    );
+    setDragging(null);
+    setDropTarget(null);
+  };
+  const stopDragging = () => {
+    setDragging(null);
+    setDropTarget(null);
   };
   const handleContextMenu = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
@@ -260,7 +386,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     const columnIndex = focused ? value.columns.findIndex((column) => column.id === focused.column.id) : -1;
     if (rowIndex === undefined || columnIndex < 0) return;
     void navigator.clipboard.readText().then((text) => {
-      const matrix = parseDelimited(text, '\t', options.maxRows, options.maxColumns);
+      const matrix = parseDelimited(text, '\t', options.rows.max, options.columns.max);
       commit(pasteDataTableCells(value, matrix, rowIndex, columnIndex, options));
     });
   };
@@ -268,13 +394,36 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     copySelection();
     clearSelection();
   };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importCSV = () => fileInputRef.current?.click();
+  const handleCSVImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      setCSVError(null);
+      commit(csvToDataTable(await file.text(), options));
+    } catch (error) {
+      setCSVError(error instanceof Error ? error.message : 'Could not import CSV.');
+    }
+  };
+  const exportCSV = () => {
+    if (!value) return;
+    const blob = new Blob([dataTableToCSV(value)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'data-table.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   const applyBackground = (key?: string) => {
-    if (!value || !contextTarget || contextTarget.kind === 'table') return;
+    if (!value) return;
     let rows: string[] = [];
     let columns: string[] | undefined;
-    if (contextTarget.kind === 'row') {
+    if (contextTarget?.kind === 'row') {
       rows = value.rows[contextTarget.row] ? [value.rows[contextTarget.row].id] : [];
-    } else if (contextTarget.kind === 'column') {
+    } else if (contextTarget?.kind === 'column') {
       rows = value.rows.map((row) => row.id);
       columns = value.columns[contextTarget.column] ? [value.columns[contextTarget.column].id] : [];
     } else {
@@ -294,11 +443,125 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     if (!value) return;
     commit({ ...value, appearance: { ...value.appearance, stickyRows: { top, bottom } } });
   };
+  const focusActiveCell = () => {
+    const focused = table.getFocusedCell();
+    if (!focused || !scrollRef.current || !value) return;
+    const columnIndex = value.columns.findIndex((column) => column.id === focused.column.id);
+    if (columnIndex < 0) return;
+    scrollRef.current
+      .querySelector<HTMLElement>(`[data-context-cell="${focused.row.getDisplayIndex()}:${columnIndex}"]`)
+      ?.focus({ preventScroll: true });
+  };
+  const ensureFocusedCell = (target: EventTarget | null) => {
+    if (!value || !(target instanceof HTMLElement)) return;
+    const focused = table.getFocusedCell();
+    if (
+      focused &&
+      table.getRowModel().rows.some((row) => row.id === focused.row.id) &&
+      value.columns.some((column) => column.id === focused.column.id)
+    )
+      return;
+    const cell = target.closest<HTMLElement>('[data-context-cell]');
+    const [rowIndex, columnIndex] = cell?.dataset.contextCell?.split(':').map(Number) ?? [];
+    const row = table.getRowModel().rows.find((candidate) => candidate.getDisplayIndex() === rowIndex);
+    const column = value.columns[columnIndex];
+    if (row && column) table.setFocusedCell(row.id, column.id);
+  };
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return;
+    const direction = {
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+    } as const;
+    const selectedDirection = direction[event.key as keyof typeof direction];
+    if (selectedDirection) {
+      event.preventDefault();
+      event.stopPropagation();
+      ensureFocusedCell(event.target);
+      if (event.shiftKey) table.extendCellSelection(selectedDirection);
+      else table.moveCellSelection(selectedDirection);
+      focusActiveCell();
+      return;
+    }
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      event.stopPropagation();
+      ensureFocusedCell(event.target);
+      const focused = table.getFocusedCell();
+      if (!focused || !value?.columns.length || !value.rows.length) return;
+      const rows = table.getRowModel().rows;
+      const rowIndex = rows.findIndex((row) => row.id === focused.row.id);
+      const columnIndex = value.columns.findIndex((column) => column.id === focused.column.id);
+      if (rowIndex < 0 || columnIndex < 0) return;
+      const step = event.shiftKey ? -1 : 1;
+      let nextRowIndex = rowIndex;
+      let nextColumnIndex = columnIndex + step;
+      if (nextColumnIndex < 0) {
+        nextRowIndex -= 1;
+        nextColumnIndex = value.columns.length - 1;
+      } else if (nextColumnIndex >= value.columns.length) {
+        nextRowIndex += 1;
+        nextColumnIndex = 0;
+      }
+      const nextRow = rows[nextRowIndex];
+      const nextColumn = value.columns[nextColumnIndex];
+      if (nextRow && nextColumn) table.setFocusedCell(nextRow.id, nextColumn.id);
+      focusActiveCell();
+      return;
+    }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      event.stopPropagation();
+      ensureFocusedCell(event.target);
+      const focused = table.getFocusedCell();
+      const rows = table.getRowModel().rows;
+      if (!focused || !rows.length || !value?.columns.length) return;
+      const rowIndex =
+        event.ctrlKey || event.metaKey
+          ? event.key === 'Home'
+            ? 0
+            : rows.length - 1
+          : rows.findIndex((row) => row.id === focused.row.id);
+      const columnIndex =
+        event.ctrlKey || event.metaKey
+          ? event.key === 'Home'
+            ? 0
+            : value.columns.length - 1
+          : event.key === 'Home'
+            ? 0
+            : value.columns.length - 1;
+      const row = rows[rowIndex];
+      const column = value.columns[columnIndex];
+      if (row && column) table.setFocusedCell(row.id, column.id);
+      focusActiveCell();
+      return;
+    }
+    if (event.key === 'PageUp' || event.key === 'PageDown') {
+      event.preventDefault();
+      event.stopPropagation();
+      ensureFocusedCell(event.target);
+      const pageSize = Math.max(1, Math.floor((scrollRef.current?.clientHeight ?? 0) / 43) - 1);
+      const pageDirection = event.key === 'PageUp' ? 'up' : 'down';
+      for (let index = 0; index < pageSize; index += 1) {
+        if (event.shiftKey) table.extendCellSelection(pageDirection);
+        else table.moveCellSelection(pageDirection);
+      }
+      focusActiveCell();
+      return;
+    }
     const modifier = event.metaKey || event.ctrlKey;
+    if (modifier && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      event.stopPropagation();
+      table.selectAllCells();
+      focusActiveCell();
+      return;
+    }
     if (!modifier && (event.key === 'Backspace' || event.key === 'Delete') && table.getSelectedCellCount()) {
       event.preventDefault();
+      event.stopPropagation();
       clearSelection();
       return;
     }
@@ -306,15 +569,19 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     const key = event.key.toLowerCase();
     if (key === 'c' && table.getSelectedCellCount()) {
       event.preventDefault();
+      event.stopPropagation();
       copySelection();
     } else if (key === 'v' && table.getFocusedCell()) {
       event.preventDefault();
+      event.stopPropagation();
       pasteSelection();
     } else if (key === 'x' && table.getSelectedCellCount()) {
       event.preventDefault();
+      event.stopPropagation();
       cutSelection();
     } else if (key === 'z') {
       event.preventDefault();
+      event.stopPropagation();
       event.shiftKey ? redo() : undo();
     }
   };
@@ -324,21 +591,22 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     ) : (
       <Button
         type="button"
+        className="data-table__create-button"
         buttonStyle="primary"
         size="medium"
         margin={false}
         onClick={() => commit(createDataTable(options))}
       >
-        Create data table
+        Create Table
       </Button>
     );
   }
   return (
-    <div className="data-table">
+    <div ref={tableRootRef} className="data-table">
       {!readOnly && (
         <DataTableMenubar
-          canAddRow={value.rows.length < options.maxRows}
-          canAddColumn={value.columns.length < options.maxColumns}
+          canAddRow={value.rows.length < options.rows.max}
+          canAddColumn={value.columns.length < options.columns.max}
           onAddRow={addRow}
           onAddColumn={addColumn}
           onClear={() => commit(null)}
@@ -353,7 +621,24 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
           onPaste={pasteSelection}
           onCut={cutSelection}
           onClearSelection={clearSelection}
+          onImportCSV={importCSV}
+          onExportCSV={exportCSV}
+          formats={options.formats}
+          onApplyBackground={applyBackground}
         />
+      )}
+      <input
+        ref={fileInputRef}
+        className="data-table__file-input"
+        type="file"
+        accept=".csv,text/csv"
+        aria-label="Import CSV"
+        onChange={handleCSVImport}
+      />
+      {csvError && (
+        <p className="data-table__csv-error" role="alert">
+          {csvError}
+        </p>
       )}
       <DataTableContextMenu
         target={contextTarget}
@@ -383,6 +668,8 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
           ref={scrollRef}
           className="data-table__scroll"
           style={{ maxHeight }}
+          tabIndex={0}
+          aria-label="Data table grid"
           onContextMenu={handleContextMenu}
           onKeyDown={handleGridKeyDown}
         >
@@ -394,20 +681,53 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                   {group.headers.map((header, index) => {
                     const column = value.columns[index];
                     return (
-                      <th key={header.id} style={{ width: header.getSize() }} data-context-column={index} tabIndex={0}>
+                      <th
+                        key={header.id}
+                        style={{ width: header.getSize() }}
+                        data-context-column={index}
+                        data-selected={isColumnSelected(index) || undefined}
+                        data-drop-target={
+                          dropTarget?.kind === 'column' && dropTarget.index === index ? true : undefined
+                        }
+                        draggable={!readOnly && editingColumn !== column.id}
+                        tabIndex={0}
+                        onDragStart={(event) => startDragging('column', index, event)}
+                        onDragOver={(event) => updateDropTarget('column', index, event)}
+                        onDrop={(event) => dropReordered('column', index, event)}
+                        onDragEnd={stopDragging}
+                        onClick={(event) => {
+                          if ((event.target as HTMLElement).closest('input, [role="separator"]')) return;
+                          selectColumn(index);
+                        }}
+                        onDoubleClick={() => activateColumnEditing(column.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === 'F2') {
+                            event.preventDefault();
+                            activateColumnEditing(column.id);
+                          }
+                        }}
+                      >
                         <div className="data-table__header">
                           <span className="data-table__column-letter" aria-hidden>
                             {columnName(index)}
                           </span>
-                          {readOnly ? (
+                          {readOnly || editingColumn !== column.id ? (
                             <span>{column.label}</span>
                           ) : (
                             <input
                               aria-label={`Column ${index + 1}`}
                               value={column.label}
                               maxLength={MAX_DATA_TABLE_CELL_LENGTH}
+                              autoFocus
                               onChange={(event) => updateColumn(column.id, event.target.value)}
                               onClick={(event) => event.stopPropagation()}
+                              onBlur={() => setEditingColumn(null)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
+                                  event.preventDefault();
+                                  setEditingColumn(null);
+                                }
+                              }}
                             />
                           )}
                           {!readOnly && header.column.getCanResize() && (
@@ -427,70 +747,103 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                 </tr>
               ))}
             </thead>
-            <tbody>
-              {table.getRowModel().rows.map((row) => (
-                <tr key={row.id}>
-                  <th scope="row" data-context-row={row.getDisplayIndex()} tabIndex={0}>
-                    {row.getDisplayIndex() + 1}
-                  </th>
-                  {row.getAllCells().map((cell, index) => {
-                    const rawCell = value.rows[row.index].cells[index];
-                    const selectionEdges = cell.getSelectionEdges();
-                    const background = dataTableBackgroundStyle(value, options, row.original.id, cell.column.id);
-                    const isEditing = editingCell?.rowID === row.original.id && editingCell.columnID === cell.column.id;
-                    const activateEditing = () => {
-                      if (!readOnly) setEditingCell({ rowID: row.original.id, columnID: cell.column.id });
-                    };
-                    return (
-                      <td
-                        key={cell.id}
-                        style={{
-                          width: cell.column.getSize(),
-                          ...background,
-                        }}
-                        data-colored={background ? true : undefined}
-                        data-context-cell={`${row.getDisplayIndex()}:${index}`}
-                        data-selected={cell.getIsSelected() || undefined}
-                        data-selection-edge-top={selectionEdges.top || undefined}
-                        data-selection-edge-right={selectionEdges.right || undefined}
-                        data-selection-edge-bottom={selectionEdges.bottom || undefined}
-                        data-selection-edge-left={selectionEdges.left || undefined}
-                        tabIndex={cell.getTabIndex()}
-                        aria-label={`${value.columns[index].label}, row ${row.getDisplayIndex() + 1}`}
-                        onMouseDown={cell.getSelectionStartHandler()}
-                        onMouseEnter={cell.getSelectionExtendHandler()}
-                        onDoubleClick={activateEditing}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === 'F2') {
-                            event.preventDefault();
-                            activateEditing();
-                          }
-                        }}
-                      >
-                        {isEditing ? (
-                          <textarea
-                            aria-label={`Edit ${value.columns[index].label}, row ${row.getDisplayIndex() + 1}`}
-                            autoFocus
-                            value={typeof rawCell === 'object' ? rawCell.formula : rawCell}
-                            maxLength={MAX_DATA_TABLE_CELL_LENGTH}
-                            rows={1}
-                            onBlur={() => setEditingCell(null)}
-                            onChange={(event) => updateCell(row.original.id, index, event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
-                                event.preventDefault();
-                                setEditingCell(null);
-                              }
-                            }}
-                          />
-                        ) : (
-                          <span className="data-table__cell-value">{String(results[row.index]?.[index] ?? '')}</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+            <tbody ref={stickyBodyRef}>
+              {table.getRowModel().rows.map((row, rowIndex, renderedRows) => {
+                const displayIndex = row.getDisplayIndex();
+                const stickyPosition =
+                  rowIndex < sticky.top
+                    ? 'top'
+                    : rowIndex >= renderedRows.length - sticky.bottom
+                      ? 'bottom'
+                      : undefined;
+                const stickyOffset =
+                  stickyPosition === 'top'
+                    ? `${41 + rowIndex * 43}px`
+                    : stickyPosition === 'bottom'
+                      ? `${(renderedRows.length - rowIndex - 1) * 43}px`
+                      : undefined;
+                return (
+                  <tr
+                    key={row.id}
+                    data-sticky={stickyPosition}
+                    style={stickyOffset ? ({ '--data-table-sticky-offset': stickyOffset } as CSSProperties) : undefined}
+                  >
+                    <th
+                      scope="row"
+                      data-context-row={row.getDisplayIndex()}
+                      data-selected={isRowSelected(row.index) || undefined}
+                      data-drop-target={dropTarget?.kind === 'row' && dropTarget.index === row.index ? true : undefined}
+                      draggable={!readOnly}
+                      tabIndex={0}
+                      onDragStart={(event) => startDragging('row', row.index, event)}
+                      onDragOver={(event) => updateDropTarget('row', row.index, event)}
+                      onDrop={(event) => dropReordered('row', row.index, event)}
+                      onDragEnd={stopDragging}
+                      onClick={() => selectRow(row.index)}
+                    >
+                      {row.getDisplayIndex() + 1}
+                    </th>
+                    {row.getAllCells().map((cell, index) => {
+                      const rawCell = value.rows[row.index].cells[index];
+                      const selectionEdges = cell.getSelectionEdges();
+                      const background = dataTableBackgroundStyle(value, options, row.original.id, cell.column.id);
+                      const isEditing =
+                        editingCell?.rowID === row.original.id && editingCell.columnID === cell.column.id;
+                      const activateEditing = () => {
+                        if (!readOnly) setEditingCell({ rowID: row.original.id, columnID: cell.column.id });
+                      };
+                      return (
+                        <td
+                          key={cell.id}
+                          style={{
+                            width: cell.column.getSize(),
+                            ...background,
+                          }}
+                          data-colored={background ? true : undefined}
+                          data-context-cell={`${row.getDisplayIndex()}:${index}`}
+                          data-selected={cell.getIsSelected() || undefined}
+                          data-editing={isEditing || undefined}
+                          data-selection-edge-top={selectionEdges.top || undefined}
+                          data-selection-edge-right={selectionEdges.right || undefined}
+                          data-selection-edge-bottom={selectionEdges.bottom || undefined}
+                          data-selection-edge-left={selectionEdges.left || undefined}
+                          tabIndex={cell.getTabIndex()}
+                          aria-label={`${value.columns[index].label}, row ${row.getDisplayIndex() + 1}`}
+                          onMouseDown={cell.getSelectionStartHandler()}
+                          onMouseEnter={cell.getSelectionExtendHandler()}
+                          onDoubleClick={activateEditing}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === 'F2') {
+                              event.preventDefault();
+                              activateEditing();
+                            }
+                          }}
+                        >
+                          {isEditing ? (
+                            <textarea
+                              aria-label={`Edit ${value.columns[index].label}, row ${row.getDisplayIndex() + 1}`}
+                              autoFocus
+                              value={typeof rawCell === 'object' ? rawCell.formula : rawCell}
+                              maxLength={MAX_DATA_TABLE_CELL_LENGTH}
+                              rows={1}
+                              onBlur={() => setEditingCell(null)}
+                              onChange={(event) => updateCell(row.original.id, index, event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
+                                  event.preventDefault();
+                                  setEditingCell(null);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span className="data-table__cell-value">{String(results[row.index]?.[index] ?? '')}</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

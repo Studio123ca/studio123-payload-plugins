@@ -76,14 +76,14 @@ function Separator() {
   return <ContextMenu.Separator className="data-table__context-separator" />;
 }
 
-function PaletteChoices({ options, onApply }: { options: ResolvedDataTableOptions; onApply: (key?: string) => void }) {
+function FormatChoices({ options, onApply }: { options: ResolvedDataTableOptions; onApply: (key?: string) => void }) {
   return (
     <>
       <ContextMenu.Label className="data-table__context-label">Background</ContextMenu.Label>
-      {options.palette.map((entry) => (
+      {options.formats.map((entry) => (
         <ContextMenu.Item key={entry.key} className="data-table__context-item" onSelect={() => onApply(entry.key)}>
           <span
-            className="data-table__palette-swatch"
+            className="data-table__format-swatch"
             aria-hidden
             style={
               {
@@ -155,10 +155,10 @@ export function DataTableContextMenu({
         <ContextMenu.Content className="data-table__context-content" onCloseAutoFocus={close}>
           {target?.kind === 'table' && (
             <>
-              <Item icon={<FiPlus />} disabled={value.rows.length >= options.maxRows} onSelect={onAddRow}>
+              <Item icon={<FiPlus />} disabled={value.rows.length >= options.rows.max} onSelect={onAddRow}>
                 Add row
               </Item>
-              <Item icon={<FiPlus />} disabled={value.columns.length >= options.maxColumns} onSelect={onAddColumn}>
+              <Item icon={<FiPlus />} disabled={value.columns.length >= options.columns.max} onSelect={onAddColumn}>
                 Add column
               </Item>
               <Separator />
@@ -181,34 +181,36 @@ export function DataTableContextMenu({
               <Item icon={<FiDelete />} shortcut="⌫" onSelect={onClearSelection}>
                 Clear cells
               </Item>
-              <Submenu label="Format" icon={<FiDroplet />}>
-                <PaletteChoices options={options} onApply={onApplyBackground} />
-              </Submenu>
+              {options.formats.length > 0 && (
+                <Submenu label="Format" icon={<FiDroplet />}>
+                  <FormatChoices options={options} onApply={onApplyBackground} />
+                </Submenu>
+              )}
               <Submenu label="Insert" icon={<FiPlus />}>
                 <Item
                   icon={<FiArrowUp />}
-                  disabled={value.rows.length >= options.maxRows}
+                  disabled={value.rows.length >= options.rows.max}
                   onSelect={() => onInsertRow(target.row)}
                 >
                   Row before
                 </Item>
                 <Item
                   icon={<FiArrowDown />}
-                  disabled={value.rows.length >= options.maxRows}
+                  disabled={value.rows.length >= options.rows.max}
                   onSelect={() => onInsertRow(target.row + 1)}
                 >
                   Row after
                 </Item>
                 <Item
                   icon={<FiArrowLeft />}
-                  disabled={value.columns.length >= options.maxColumns}
+                  disabled={value.columns.length >= options.columns.max}
                   onSelect={() => onInsertColumn(target.column)}
                 >
                   Column before
                 </Item>
                 <Item
                   icon={<FiArrowRight />}
-                  disabled={value.columns.length >= options.maxColumns}
+                  disabled={value.columns.length >= options.columns.max}
                   onSelect={() => onInsertColumn(target.column + 1)}
                 >
                   Column after
@@ -225,9 +227,11 @@ export function DataTableContextMenu({
           )}
           {target?.kind === 'row' && (
             <>
-              <Submenu label="Format" icon={<FiDroplet />}>
-                <PaletteChoices options={options} onApply={onApplyBackground} />
-              </Submenu>
+              {options.formats.length > 0 && (
+                <Submenu label="Format" icon={<FiDroplet />}>
+                  <FormatChoices options={options} onApply={onApplyBackground} />
+                </Submenu>
+              )}
               {options.stickyRows.enabled && (
                 <Submenu label="Freeze rows" icon={<FiArrowDown />}>
                   <Item icon={<FiArrowDown />} onSelect={() => onFreezeRows(target.row + 1, 0)}>
@@ -244,21 +248,21 @@ export function DataTableContextMenu({
               <Submenu label="Insert" icon={<FiPlus />}>
                 <Item
                   icon={<FiArrowUp />}
-                  disabled={value.rows.length >= options.maxRows}
+                  disabled={value.rows.length >= options.rows.max}
                   onSelect={() => onInsertRow(target.row)}
                 >
                   Row before
                 </Item>
                 <Item
                   icon={<FiArrowDown />}
-                  disabled={value.rows.length >= options.maxRows}
+                  disabled={value.rows.length >= options.rows.max}
                   onSelect={() => onInsertRow(target.row + 1)}
                 >
                   Row after
                 </Item>
                 <Item
                   icon={<FiCopy />}
-                  disabled={value.rows.length >= options.maxRows}
+                  disabled={value.rows.length >= options.rows.max}
                   onSelect={() => onDuplicateRow(target.row)}
                 >
                   Duplicate row
@@ -283,7 +287,7 @@ export function DataTableContextMenu({
               <Separator />
               <Item
                 icon={<FiTrash2 />}
-                disabled={value.rows.length <= options.minRows}
+                disabled={value.rows.length <= options.rows.min}
                 onSelect={() => onDeleteRow(target.row)}
               >
                 Delete row
@@ -292,27 +296,29 @@ export function DataTableContextMenu({
           )}
           {target?.kind === 'column' && (
             <>
-              <Submenu label="Format" icon={<FiDroplet />}>
-                <PaletteChoices options={options} onApply={onApplyBackground} />
-              </Submenu>
+              {options.formats.length > 0 && (
+                <Submenu label="Format" icon={<FiDroplet />}>
+                  <FormatChoices options={options} onApply={onApplyBackground} />
+                </Submenu>
+              )}
               <Submenu label="Insert" icon={<FiPlus />}>
                 <Item
                   icon={<FiArrowLeft />}
-                  disabled={value.columns.length >= options.maxColumns}
+                  disabled={value.columns.length >= options.columns.max}
                   onSelect={() => onInsertColumn(target.column)}
                 >
                   Column before
                 </Item>
                 <Item
                   icon={<FiArrowRight />}
-                  disabled={value.columns.length >= options.maxColumns}
+                  disabled={value.columns.length >= options.columns.max}
                   onSelect={() => onInsertColumn(target.column + 1)}
                 >
                   Column after
                 </Item>
                 <Item
                   icon={<FiCopy />}
-                  disabled={value.columns.length >= options.maxColumns}
+                  disabled={value.columns.length >= options.columns.max}
                   onSelect={() => onDuplicateColumn(target.column)}
                 >
                   Duplicate column
@@ -337,7 +343,7 @@ export function DataTableContextMenu({
               <Separator />
               <Item
                 icon={<FiTrash2 />}
-                disabled={value.columns.length <= options.minColumns}
+                disabled={value.columns.length <= options.columns.min}
                 onSelect={() => onDeleteColumn(target.column)}
               >
                 Delete column

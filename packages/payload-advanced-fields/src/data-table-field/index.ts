@@ -6,6 +6,7 @@ export {
   validateDataTable,
 } from './shared/dataTable.js';
 export { evaluateDataTable } from './shared/formulas.js';
+export { csvToDataTable, dataTableToCSV } from './shared/csv.js';
 export {
   clearDataTableSelection,
   copyDataTableSelection,
@@ -25,11 +26,14 @@ export type {
   DataTableCell,
   DataTableResponseCell,
   DataTableColumn,
+  DataTableDimensionOptions,
   DataTableFieldConfig,
+  DataTableFormat,
   DataTableOptions,
   DataTablePaletteEntry,
   DataTableRow,
   DataTableThemeColor,
   DataTableValue,
+  ResolvedDataTableDimensionOptions,
   ResolvedDataTableOptions,
 } from './shared/types.js';

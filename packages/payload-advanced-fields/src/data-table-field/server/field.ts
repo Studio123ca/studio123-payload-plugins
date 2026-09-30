@@ -17,14 +17,10 @@ const validMaxHeight = (value: unknown): value is number | string =>
 /** Creates a JSON-backed Data Table field with a small, stable data contract. */
 export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
   const {
-    initialColumns,
-    initialRows,
-    minColumns,
-    minRows,
-    maxColumns,
-    maxRows,
+    columns,
+    rows,
     formulas,
-    palette,
+    formats,
     stickyRows,
     name = 'dataTable',
     label = 'Data Table',
@@ -33,14 +29,10 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     ...rest
   } = config;
   const options = resolveDataTableOptions({
-    initialColumns,
-    initialRows,
-    minColumns,
-    minRows,
-    maxColumns,
-    maxRows,
+    columns,
+    rows,
     formulas,
-    palette,
+    formats,
     stickyRows,
   });
   const { maxHeight = 640, ...nativeAdmin } = admin ?? {};
@@ -49,7 +41,7 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
   const afterRead = ({ value }: { value?: unknown }) => {
     if (!value || typeof value !== 'object' || !Array.isArray((value as DataTableValue).rows)) return value;
     const table = value as DataTableValue;
-    const results = options.computeFormulas ? evaluateDataTable(table) : undefined;
+    const results = options.formulas.compute ? evaluateDataTable(table) : undefined;
     return {
       ...table,
       columns: table.columns.map((column) => ({ ...column, columnId: column.id })),

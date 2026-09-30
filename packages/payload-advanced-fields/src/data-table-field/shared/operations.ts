@@ -23,14 +23,14 @@ export function moveItem<T>(items: T[], from: number, to: number): T[] {
 }
 
 export function insertDataTableRow(table: DataTableValue, index: number, options: ResolvedDataTableOptions) {
-  if (table.rows.length >= options.maxRows) return table;
+  if (table.rows.length >= options.rows.max) return table;
   const rows = [...table.rows];
   rows.splice(index, 0, { id: createDataTableID(), cells: table.columns.map(() => '') });
   return { ...table, rows };
 }
 
 export function insertDataTableColumn(table: DataTableValue, index: number, options: ResolvedDataTableOptions) {
-  if (table.columns.length >= options.maxColumns) return table;
+  if (table.columns.length >= options.columns.max) return table;
   const columns = [...table.columns];
   columns.splice(index, 0, { id: createDataTableID(), label: `Column ${index + 1}` });
   return {
@@ -41,7 +41,7 @@ export function insertDataTableColumn(table: DataTableValue, index: number, opti
 }
 
 export function duplicateDataTableRow(table: DataTableValue, index: number, options: ResolvedDataTableOptions) {
-  if (table.rows.length >= options.maxRows) return table;
+  if (table.rows.length >= options.rows.max) return table;
   const row = table.rows[index];
   if (!row) return table;
   const rows = [...table.rows];
@@ -50,7 +50,7 @@ export function duplicateDataTableRow(table: DataTableValue, index: number, opti
 }
 
 export function duplicateDataTableColumn(table: DataTableValue, index: number, options: ResolvedDataTableOptions) {
-  if (table.columns.length >= options.maxColumns) return table;
+  if (table.columns.length >= options.columns.max) return table;
   const column = table.columns[index];
   if (!column) return table;
   const columns = [...table.columns];
@@ -78,12 +78,12 @@ export function moveDataTableColumn(table: DataTableValue, from: number, to: num
 }
 
 export function deleteDataTableRow(table: DataTableValue, index: number, options: ResolvedDataTableOptions) {
-  if (table.rows.length <= options.minRows) return table;
+  if (table.rows.length <= options.rows.min) return table;
   return { ...table, rows: table.rows.filter((_, rowIndex) => rowIndex !== index) };
 }
 
 export function deleteDataTableColumn(table: DataTableValue, index: number, options: ResolvedDataTableOptions) {
-  if (table.columns.length <= options.minColumns) return table;
+  if (table.columns.length <= options.columns.min) return table;
   return {
     ...table,
     columns: table.columns.filter((_, columnIndex) => columnIndex !== index),
@@ -149,9 +149,9 @@ export function pasteDataTableCells(
   const width = Math.max(0, ...matrix.map((row) => row.length));
   const rowCount = Math.max(table.rows.length, startRow + matrix.length);
   const columnCount = Math.max(table.columns.length, startColumn + width);
-  if (rowCount > options.maxRows || columnCount > options.maxColumns)
+  if (rowCount > options.rows.max || columnCount > options.columns.max)
     throw new Error(
-      `Pasted data exceeds the table limits of ${options.maxRows} rows and ${options.maxColumns} columns.`,
+      `Pasted data exceeds the table limits of ${options.rows.max} rows and ${options.columns.max} columns.`,
     );
   const columns = [...table.columns];
   while (columns.length < columnCount) columns.push({ id: createDataTableID(), label: `Column ${columns.length + 1}` });

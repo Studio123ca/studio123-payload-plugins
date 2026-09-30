@@ -44,17 +44,22 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { createRoot } = await import('react-dom/client');
 const { DataTableField, Fixture } = await import(pathToFileURL(entry));
 let root;
-const options = resolveDataTableOptions({ initialRows: 1, initialColumns: 1 });
+const options = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 1 } });
+const formatOptions = resolveDataTableOptions({
+  rows: { initial: 1 },
+  columns: { initial: 1 },
+  formats: [{ key: 'highlight', label: 'Highlight', background: '#fff3c4' }],
+});
 const field = { name: 'dataTable', type: 'json', label: 'Data Table' };
 
-async function render({ value = null, readOnly = false } = {}) {
+async function render({ value = null, readOnly = false, tableOptions = options } = {}) {
   if (!root) root = createRoot(document.querySelector('#root'));
   await act(async () =>
     root.render(
       createElement(
         Fixture,
         { initialValue: value },
-        createElement(DataTableField, { field, path: 'dataTable', options, readOnly }),
+        createElement(DataTableField, { field, path: 'dataTable', options: tableOptions, readOnly }),
       ),
     ),
   );
@@ -77,7 +82,7 @@ after(async () => {
 
 test('creates and edits a Data Table value', async () => {
   await render();
-  await act(async () => button('Create data table').click());
+  await act(async () => button('Create Table').click());
   const cell = document.querySelector('[data-context-cell="0:0"]');
   await act(async () => cell.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true })));
   const input = document.querySelector('textarea');
@@ -99,6 +104,9 @@ test('creates and edits a Data Table value', async () => {
 test('updates headers and respects read-only mode', async () => {
   const value = createDataTable(options);
   await render({ value });
+  const headerCell = document.querySelector('[data-context-column="0"]');
+  assert.equal(document.querySelector('input[aria-label="Column 1"]'), null);
+  await act(async () => headerCell.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true })));
   const header = document.querySelector('input[aria-label="Column 1"]');
   await act(async () => {
     Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(header, 'Product');
@@ -109,6 +117,26 @@ test('updates headers and respects read-only mode', async () => {
   assert.equal(button('Insert'), undefined);
   assert.equal(document.querySelector('textarea'), null);
   assert.equal(document.querySelector('[data-context-cell="0:0"] [class="data-table__cell-value"]').textContent, '');
+});
+
+test('orders menus and opens the keyboard shortcuts drawer', async () => {
+  const value = createDataTable(options);
+  await render({ value });
+  assert.deepEqual(
+    [...document.querySelectorAll('.data-table__menubar > button')].map((element) => element.textContent),
+    ['Table', 'Edit', 'Insert', 'Help'],
+  );
+  await selectMenuItem('Help', 'Keyboard shortcuts');
+  assert.match(document.querySelector('[role="dialog"]')?.textContent ?? '', /Copy selected cells/);
+  await act(async () => document.querySelector('[role="dialog"] button')?.click());
+});
+
+test('shows the Format menu only when formats are configured', async () => {
+  await render({ value: createDataTable(formatOptions), tableOptions: formatOptions });
+  assert.deepEqual(
+    [...document.querySelectorAll('.data-table__menubar > button')].map((element) => element.textContent),
+    ['Table', 'Edit', 'Insert', 'Format', 'Help'],
+  );
 });
 
 test('context menus mutate the active row and column', async () => {
@@ -131,4 +159,69 @@ test('context menus mutate the active row and column', async () => {
   });
   await act(async () => menuItem('Delete column').click());
   assert.equal(stored().columns.length, 1);
+  await act(async () => root.render(null));
+});
+
+test('selects complete rows and columns from their headers', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 2 } }));
+  await render({ value });
+  await act(async () => document.querySelector('[data-context-column="1"]').click());
+  assert.equal(document.querySelector('[data-context-column="1"]').dataset.selected, 'true');
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 2);
+  await act(async () => document.querySelector('[data-context-row="0"]').click());
+  assert.equal(document.querySelector('[data-context-row="0"]').dataset.selected, 'true');
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 2);
+});
+
+test('keeps keyboard navigation inside the grid', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 2 } }));
+  await render({ value });
+  const firstCell = document.querySelector('[data-context-cell="0:0"]');
+  firstCell.focus();
+  const right = new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+  await act(async () => firstCell.dispatchEvent(right));
+  assert.equal(right.defaultPrevented, true);
+  assert.equal(document.activeElement?.dataset.contextCell, '0:1');
+
+  const tab = new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+  await act(async () => document.activeElement.dispatchEvent(tab));
+  assert.equal(tab.defaultPrevented, true);
+  assert.equal(document.activeElement?.dataset.contextCell, '1:0');
+
+  const selectAll = new dom.window.KeyboardEvent('keydown', {
+    key: 'a',
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => document.activeElement.dispatchEvent(selectAll));
+  assert.equal(selectAll.defaultPrevented, true);
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 4);
+});
+
+test('reorders rows and columns with header drag and drop', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 2 } }));
+  value.rows[0].cells = ['first', 'one'];
+  value.rows[1].cells = ['second', 'two'];
+  value.columns[0].label = 'Left';
+  value.columns[1].label = 'Right';
+  await render({ value });
+  const transfer = { effectAllowed: '', dropEffect: '', setData() {} };
+  const dispatchDrag = async (type, target) => {
+    const event = new dom.window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', { value: transfer });
+    await act(async () => target.dispatchEvent(event));
+  };
+  const row0 = document.querySelector('[data-context-row="0"]');
+  const row1 = document.querySelector('[data-context-row="1"]');
+  await dispatchDrag('dragstart', row0);
+  await dispatchDrag('dragover', row1);
+  await dispatchDrag('drop', row1);
+  assert.equal(stored().rows[0].cells[0], 'second');
+  const column0 = document.querySelector('[data-context-column="0"]');
+  const column1 = document.querySelector('[data-context-column="1"]');
+  await dispatchDrag('dragstart', column0);
+  await dispatchDrag('dragover', column1);
+  await dispatchDrag('drop', column1);
+  assert.equal(stored().columns[0].label, 'Right');
 });

@@ -50,7 +50,7 @@ import { dataTableField } from '@studio123/payload-advanced-fields/data-table';
 
 const fields = [
   dataTableField({ name: 'specifications' }),
-  dataTableField({ name: 'priceList', initialRows: 5, initialColumns: 4 }),
+  dataTableField({ name: 'priceList', rows: { initial: 5 }, columns: { initial: 4 } }),
 ];
 ```
 

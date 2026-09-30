@@ -12,7 +12,7 @@ export function dataTableBackgroundStyle(
   columnID?: string,
 ): CSSProperties | undefined {
   const key = (columnID && table.appearance?.cells?.[rowID]?.[columnID]) || table.appearance?.rows?.[rowID];
-  const entry = options.palette.find((item) => item.key === key);
+  const entry = options.formats.find((item) => item.key === key);
   if (!entry) return undefined;
   return {
     '--data-table-bg-light': color(entry.background, 'light'),

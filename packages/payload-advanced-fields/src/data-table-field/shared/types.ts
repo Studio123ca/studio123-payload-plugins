@@ -16,12 +16,15 @@ export type DataTableResponseCell = {
 
 export type DataTableThemeColor = string | { light: string; dark: string };
 
-export type DataTablePaletteEntry = {
+export type DataTableFormat = {
   key: string;
   label: string;
   background: DataTableThemeColor;
   text?: DataTableThemeColor;
 };
+
+/** @deprecated Use DataTableFormat. */
+export type DataTablePaletteEntry = DataTableFormat;
 
 export type DataTableAppearance = {
   rows?: Record<string, string>;
@@ -43,22 +46,31 @@ export type DataTableValue = {
   rows: DataTableRow[];
 };
 
+export type DataTableDimensionOptions = {
+  initial?: number;
+  min?: number;
+  max?: number;
+};
+
+export type ResolvedDataTableDimensionOptions = {
+  initial: number;
+  min: number;
+  max: number;
+};
+
 export type DataTableOptions = {
-  initialColumns?: number;
-  initialRows?: number;
-  maxColumns?: number;
-  maxRows?: number;
-  minColumns?: number;
-  minRows?: number;
+  columns?: DataTableDimensionOptions;
+  rows?: DataTableDimensionOptions;
   formulas?: boolean | { enabled?: boolean; compute?: boolean };
-  palette?: DataTablePaletteEntry[];
+  formats?: DataTableFormat[];
   stickyRows?: { enabled?: boolean; top?: number; bottom?: number };
 };
 
-export type ResolvedDataTableOptions = Omit<Required<DataTableOptions>, 'formulas' | 'stickyRows' | 'palette'> & {
-  formulas: boolean;
-  computeFormulas: boolean;
-  palette: DataTablePaletteEntry[];
+export type ResolvedDataTableOptions = {
+  columns: ResolvedDataTableDimensionOptions;
+  rows: ResolvedDataTableDimensionOptions;
+  formulas: { enabled: boolean; compute: boolean };
+  formats: DataTableFormat[];
   stickyRows: { enabled: boolean; top: number; bottom: number };
 };
 

@@ -32,16 +32,21 @@ export type { PhoneFieldValue } from './phone-field/shared/types.js';
 export {
   dataTableField,
   createDataTable,
+  csvToDataTable,
+  dataTableToCSV,
   evaluateDataTable,
   resolveDataTableOptions,
   validateDataTable,
 } from './data-table-field/index.js';
 export type {
   DataTableColumn,
+  DataTableDimensionOptions,
   DataTableFieldConfig,
+  DataTableFormat,
   DataTableOptions,
   DataTableRow,
   DataTableResponseCell,
   DataTableValue,
+  ResolvedDataTableDimensionOptions,
   ResolvedDataTableOptions,
 } from './data-table-field/index.js';
