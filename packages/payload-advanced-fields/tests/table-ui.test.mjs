@@ -197,14 +197,18 @@ test('bulk adds rows and columns from the Insert menu', async () => {
     const input = document.querySelector('[role="dialog"] input[type="number"]');
     Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, '5');
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    [...document.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent === 'Add rows').click();
+    [...document.querySelectorAll('[role="dialog"] button')]
+      .find((button) => button.textContent === 'Add rows')
+      .click();
   });
   await selectMenuItem('Insert', 'Add columns…');
   await act(async () => {
     const input = document.querySelector('[role="dialog"] input[type="number"]');
     Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, '5');
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    [...document.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent === 'Add columns').click();
+    [...document.querySelectorAll('[role="dialog"] button')]
+      .find((button) => button.textContent === 'Add columns')
+      .click();
   });
   assert.equal(stored().rows.length, 6);
   assert.equal(stored().columns.length, 6);
@@ -351,6 +355,38 @@ test('tabs between column headers without focusing resize handles', async () => 
   await act(async () => document.activeElement.dispatchEvent(shiftTab));
   assert.equal(shiftTab.defaultPrevented, true);
   assert.equal(document.activeElement?.dataset.contextColumn, '0');
+});
+
+test('selects the next row or column when tabbing headers', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 3 } }));
+  await render({ value });
+  const firstColumn = document.querySelector('[data-context-column="0"]');
+  firstColumn.focus();
+  await act(async () =>
+    firstColumn.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })),
+  );
+  assert.equal(document.activeElement?.dataset.contextColumn, '1');
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 2);
+
+  const firstRow = document.querySelector('[data-context-row="0"]');
+  firstRow.focus();
+  await act(async () =>
+    firstRow.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })),
+  );
+  assert.equal(document.activeElement?.dataset.contextRow, '1');
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 3);
+});
+
+test('tabs between editable column header inputs', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 2 } }));
+  await render({ value });
+  const firstColumn = document.querySelector('[data-context-column="0"]');
+  await act(async () => firstColumn.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true })));
+  const firstInput = document.querySelector('input[aria-label="Column 1"]');
+  await act(async () =>
+    firstInput.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })),
+  );
+  assert.equal(document.querySelector('input[aria-label="Column 2"]'), document.activeElement);
 });
 
 test('types directly into a selected cell without entering edit mode', async () => {

@@ -4,6 +4,8 @@
 
 - Fixed exclusive cell editing so keyboard events remain inside the editor instead of switching back to quick entry.
 - Fixed Tab navigation between column headers so resize handles are skipped.
+- Added a selection indicator with copy support and improved row, column, and header navigation.
+- Added an Insert → Formulas submenu that inserts editable formula templates into the active cell.
 
 ## 1.2.1
 

@@ -9,15 +9,52 @@
   color: var(--theme-text, var(--color-text, inherit));
   background: var(--theme-elevation-0, var(--color-bg, transparent));
 }
+.data-table__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
 .data-table__menubar {
   display: flex;
   gap: 2px;
-  margin-bottom: 8px;
   padding: 2px;
   width: fit-content;
   border: 1px solid var(--color-border, #d5d5d5);
   border-radius: 4px;
   background: var(--theme-elevation-50, #fff);
+}
+.data-table__selection-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--theme-elevation-500, var(--color-text-muted, #7a7a7a));
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-table__selection-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--theme-elevation-500, var(--color-text-muted, #7a7a7a));
+}
+.data-table__selection-copy:hover,
+.data-table__selection-copy:focus-visible {
+  background: var(--color-bg-hover, var(--theme-elevation-150, #e8e8e8));
+  color: var(--color-text, inherit);
 }
 [data-theme='dark'] .data-table__menubar {
   border-color: var(--color-border, #3b3b3b);
@@ -418,6 +455,10 @@
 }
 .data-table th {
   background: var(--theme-elevation-50, var(--color-bg-secondary, #f8f8f8));
+}
+.data-table th:focus,
+.data-table th:focus-visible {
+  outline: none;
 }
 .data-table th[data-selected] {
   background: var(--theme-elevation-150, var(--color-bg-selected, #edf5ff));

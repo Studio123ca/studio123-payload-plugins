@@ -269,6 +269,26 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     Boolean(value?.columns.length) && value?.columns.every((_, columnIndex) => isCellSelected(rowIndex, columnIndex));
   const isColumnSelected = (columnIndex: number) =>
     Boolean(value?.rows.length) && value?.rows.every((_, rowIndex) => isCellSelected(rowIndex, columnIndex));
+  const selectionLabel = table
+    .getCellSelectionBounds()
+    .map((bounds) => {
+      const start = `${columnName(bounds.minColumnIndex)}${bounds.minRowIndex + 1}`;
+      const end = `${columnName(bounds.maxColumnIndex)}${bounds.maxRowIndex + 1}`;
+      return start === end ? start : `${start}:${end}`;
+    })
+    .join(', ');
+  const copySelectionLabel = () => {
+    if (selectionLabel && navigator.clipboard?.writeText) void navigator.clipboard.writeText(selectionLabel);
+  };
+  const insertFormula = (functionName: string) => {
+    if (!value || !options.formulas.enabled) return;
+    const focused = table.getFocusedCell();
+    if (!focused) return;
+    const columnIndex = value.columns.findIndex((column) => column.id === focused.column.id);
+    if (columnIndex < 0) return;
+    updateCell(focused.row.id, columnIndex, `=${functionName}()`);
+    setEditingCell({ rowID: focused.row.id, columnID: focused.column.id });
+  };
   const selectRow = (rowIndex: number) => {
     if (!value || readOnly) return;
     const row = value.rows[rowIndex];
@@ -490,7 +510,10 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   useEffect(() => {
     const pending = pendingSelectionRef.current;
     if (!pending || !value) return;
-    if (!value.rows.some((row) => row.id === pending.rowID) || !value.columns.some((column) => column.id === pending.columnID)) {
+    if (
+      !value.rows.some((row) => row.id === pending.rowID) ||
+      !value.columns.some((column) => column.id === pending.columnID)
+    ) {
       pendingSelectionRef.current = null;
       return;
     }
@@ -719,6 +742,9 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
           hasSelection={table.getSelectedCellCount() > 0}
           formulasEnabled={options.formulas.enabled}
           onApplyBackground={applyBackground}
+          selectionLabel={selectionLabel}
+          onCopySelection={copySelectionLabel}
+          onInsertFormula={insertFormula}
         />
       )}
       <input
@@ -812,6 +838,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                             if (nextHeader) {
                               event.preventDefault();
                               event.stopPropagation();
+                              selectColumn(nextIndex);
                               nextHeader.focus();
                             }
                             return;
@@ -838,6 +865,16 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                               onClick={(event) => event.stopPropagation()}
                               onBlur={() => setEditingColumn(null)}
                               onKeyDown={(event) => {
+                                if (event.key === 'Tab') {
+                                  const nextIndex = index + (event.shiftKey ? -1 : 1);
+                                  const nextColumn = value.columns[nextIndex];
+                                  if (nextColumn) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    setEditingColumn(nextColumn.id);
+                                  }
+                                  return;
+                                }
                                 if (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
                                   event.preventDefault();
                                   setEditingColumn(null);
@@ -872,11 +909,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                 const rowIndex = allRows.indexOf(row);
                 const displayIndex = row.getDisplayIndex();
                 const stickyPosition =
-                  rowIndex < sticky.top
-                    ? 'top'
-                    : rowIndex >= allRows.length - sticky.bottom
-                      ? 'bottom'
-                      : undefined;
+                  rowIndex < sticky.top ? 'top' : rowIndex >= allRows.length - sticky.bottom ? 'bottom' : undefined;
                 const stickyOffset =
                   stickyPosition === 'top'
                     ? `${41 + rowIndex * 43}px`
@@ -901,6 +934,20 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                       onDrop={(event) => dropReordered('row', row.index, event)}
                       onDragEnd={stopDragging}
                       onClick={() => selectRow(row.index)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Tab') return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const nextIndex = row.index + (event.shiftKey ? -1 : 1);
+                        const nextHeader =
+                          nextIndex >= 0
+                            ? tableRootRef.current?.querySelector<HTMLElement>(`[data-context-row="${nextIndex}"]`)
+                            : null;
+                        if (nextHeader) {
+                          selectRow(nextIndex);
+                          nextHeader.focus();
+                        }
+                      }}
                     >
                       {row.getDisplayIndex() + 1}
                     </th>
@@ -953,7 +1000,11 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                                 typingCellRef.current.columnID === cell.column.id;
                               const currentValue = typeof rawCell === 'object' ? rawCell.formula : rawCell;
                               typingCellRef.current = { rowID: row.original.id, columnID: cell.column.id };
-                              updateCell(row.original.id, index, isContinuing ? `${currentValue}${event.key}` : event.key);
+                              updateCell(
+                                row.original.id,
+                                index,
+                                isContinuing ? `${currentValue}${event.key}` : event.key,
+                              );
                               return;
                             }
                             if (event.key === 'Enter' || event.key === 'F2') {
