@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { FieldDescription, FieldError, FieldLabel, RenderCustomComponent, useField } from '@payloadcms/ui';
 import type { JSONFieldClientProps } from 'payload';
-import { validateDataTable } from '../shared/dataTable.js';
+import { normalizeDataTableValue, validateDataTable } from '../shared/dataTable.js';
 import type { DataTableValue, ResolvedDataTableOptions } from '../shared/types.js';
 import { DataTableEditor } from './DataTableEditor.js';
 
@@ -15,7 +15,7 @@ export function DataTableField({
   maxHeight,
 }: JSONFieldClientProps & { options: ResolvedDataTableOptions; maxHeight?: number | string }) {
   const validate = useCallback(
-    (value: unknown) => validateDataTable(value, options, Boolean(field.required)),
+    (value: unknown) => validateDataTable(normalizeDataTableValue(value), options, Boolean(field.required)),
     [field.required, options],
   );
   const {
@@ -26,6 +26,7 @@ export function DataTableField({
     showError,
     customComponents: { Label, Description, Error: CustomError, BeforeInput, AfterInput } = {},
   } = useField<DataTableValue | null>({ potentiallyStalePath: incomingPath, validate });
+  const normalizedValue = useMemo(() => normalizeDataTableValue(value), [value]);
   return (
     <div
       className={['field-type', 'data-table-field', field.admin?.className].filter(Boolean).join(' ')}
@@ -42,7 +43,7 @@ export function DataTableField({
       />
       {BeforeInput}
       <DataTableEditor
-        value={value}
+        value={normalizedValue}
         options={options}
         maxHeight={maxHeight}
         readOnly={Boolean(readOnly || disabled || field.admin?.readOnly)}

@@ -29,12 +29,19 @@ export { phoneField } from './phone-field/server/field.js';
 export type { PhoneField, PhoneFieldConfig } from './phone-field/server/field.js';
 export type { PhoneFieldValue } from './phone-field/shared/types.js';
 
-export { dataTableField, createDataTable, resolveDataTableOptions, validateDataTable } from './data-table-field/index.js';
+export {
+  dataTableField,
+  createDataTable,
+  evaluateDataTable,
+  resolveDataTableOptions,
+  validateDataTable,
+} from './data-table-field/index.js';
 export type {
   DataTableColumn,
   DataTableFieldConfig,
   DataTableOptions,
   DataTableRow,
+  DataTableResponseCell,
   DataTableValue,
   ResolvedDataTableOptions,
 } from './data-table-field/index.js';
