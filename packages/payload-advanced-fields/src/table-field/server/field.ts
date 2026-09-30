@@ -7,10 +7,12 @@ import type {
   StructuredTableFieldConfig,
   TableField,
   TableFieldConfig,
+  TableValue,
 } from '../shared/types.js';
-import { resolveTableOptions, validateTable } from '../shared/table.js';
+import { columnName, resolveTableOptions, validateTable } from '../shared/table.js';
 import { validateCSVTable } from '../shared/csv.js';
 import { tableJSONSchema } from './schema.js';
+import { evaluateTable } from '../shared/formulas.js';
 
 export function tableField(config: StructuredTableFieldConfig): ArrayField;
 export function tableField(config: CSVTableFieldConfig): TextareaField;
@@ -83,6 +85,7 @@ export function tableField(config: TableFieldConfig = {}): TableField {
     headerRow,
     caption,
     formulas,
+    computeFormulas,
     palette,
     stickyRows,
     name = 'table',
@@ -90,6 +93,7 @@ export function tableField(config: TableFieldConfig = {}): TableField {
     required = false,
     admin,
     validate,
+    hooks: suppliedHooks,
     ...rest
   } = config;
   const options = resolveTableOptions({
@@ -104,6 +108,7 @@ export function tableField(config: TableFieldConfig = {}): TableField {
     headerRow,
     caption,
     formulas,
+    computeFormulas,
   });
   const resolvedOptions = () => ({
     ...options,
@@ -131,10 +136,29 @@ export function tableField(config: TableFieldConfig = {}): TableField {
         const result = validateCSVTable(value, resolvedOptions(), required);
         return result !== true ? result : customValidate ? customValidate(value, args) : true;
       },
+      hooks: suppliedHooks,
       admin: { ...nativeAdmin, components },
     } as TextareaField;
   }
   const customValidate = validate as JSONField['validate'];
+  const cellIdsAfterRead = ({ value }: { value?: unknown }) => {
+    if (!value || typeof value !== 'object' || !Array.isArray((value as TableValue).rows)) return value;
+    const table = value as TableValue;
+    const results = options.computeFormulas ? evaluateTable(table) : undefined;
+    return {
+      ...table,
+      columns: table.columns.map((column) => ({ ...column, columnId: column.id })),
+      rows: table.rows.map((row, rowIndex) => ({
+        ...row,
+        rowId: row.id,
+        cells: row.cells.map((value, columnIndex) => ({
+          cellId: `${columnName(columnIndex)}${rowIndex + 1}`,
+          value: results?.[rowIndex]?.[columnIndex] ?? value,
+          ...(typeof value === 'object' && value !== null && 'formula' in value ? { formula: value.formula } : {}),
+        })),
+      })),
+    };
+  };
   return {
     ...rest,
     name,
@@ -142,6 +166,10 @@ export function tableField(config: TableFieldConfig = {}): TableField {
     required,
     type: 'json',
     jsonSchema: (rest as JSONTableFieldConfig).jsonSchema ?? tableJSONSchema(name, options, required),
+    hooks: {
+      ...suppliedHooks,
+      afterRead: [cellIdsAfterRead, ...(suppliedHooks?.afterRead ?? [])],
+    },
     validate: (value, args) => {
       const result = validateTable(value, resolvedOptions(), required);
       return result !== true ? result : customValidate ? customValidate(value, args) : true;

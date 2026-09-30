@@ -26,6 +26,7 @@ import {
 } from './Appearance.js';
 import { useRowSizing } from './useRowSizing.js';
 import { ColumnResize } from './ColumnResize.js';
+import { FormatMenu } from './FormatMenu.js';
 import { TableMenu } from './TableMenu.js';
 
 export function StructuredTableField({
@@ -122,36 +123,29 @@ export function StructuredTableField({
             </TableMenu>
           )}
           {!isReadOnly && rows.length > 0 && columns.length > 0 && presentation.palette.length > 0 && (
-            <TableMenu label="Format">
-              <BackgroundChoices
-                options={presentation}
-                label="Cell background"
-                apply={(key) =>
-                  setAppearance(
-                    setBackground(
-                      appearance,
-                      [selected && rows.some((row) => row.id === selected.row) ? selected.row : rows[0].id],
-                      [selected?.column ?? ('name' in columns[0] ? columns[0].name : '')],
-                      key,
-                    ),
-                  )
-                }
-              />
-              <BackgroundChoices
-                options={presentation}
-                label="Row background"
-                apply={(key) =>
-                  setAppearance(
-                    setBackground(
-                      appearance,
-                      [selected && rows.some((row) => row.id === selected.row) ? selected.row : rows[0].id],
-                      undefined,
-                      key,
-                    ),
-                  )
-                }
-              />
-            </TableMenu>
+            <FormatMenu
+              options={presentation}
+              applyCell={(key) =>
+                setAppearance(
+                  setBackground(
+                    appearance,
+                    [selected && rows.some((row) => row.id === selected.row) ? selected.row : rows[0].id],
+                    [selected?.column ?? ('name' in columns[0] ? columns[0].name : '')],
+                    key,
+                  ),
+                )
+              }
+              applyRow={(key) =>
+                setAppearance(
+                  setBackground(
+                    appearance,
+                    [selected && rows.some((row) => row.id === selected.row) ? selected.row : rows[0].id],
+                    undefined,
+                    key,
+                  ),
+                )
+              }
+            />
           )}
           <TableMenu label="View">
             <button type="button" onClick={() => setWidths({})}>

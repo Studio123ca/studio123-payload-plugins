@@ -21,6 +21,7 @@ export function resolveTableOptions(options: TableOptions = {}): ResolvedTableOp
     headerRow: options.headerRow ?? true,
     caption: options.caption ?? options.storage !== 'csv',
     formulas: options.formulas ?? false,
+    computeFormulas: options.computeFormulas ?? true,
   };
   for (const key of ['minRows', 'maxRows', 'initialRows', 'minColumns', 'maxColumns', 'initialColumns'] as const) {
     if (!Number.isSafeInteger(resolved[key]) || resolved[key] < 0)

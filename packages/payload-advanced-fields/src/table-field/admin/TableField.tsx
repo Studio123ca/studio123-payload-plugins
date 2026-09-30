@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { FieldDescription, FieldError, FieldLabel, RenderCustomComponent, useField, useLocale } from '@payloadcms/ui';
 import type { JSONFieldClientProps, TextareaFieldClientProps } from 'payload';
-import type { ResolvedTableOptions, TableValue } from '../shared/types.js';
+import type { ResolvedTableOptions, TableCell, TableValue } from '../shared/types.js';
 import { validateTable } from '../shared/table.js';
 import { csvToTable, tableToCSV, validateCSVTable } from '../shared/csv.js';
 import { TableEditor } from './TableEditor.js';
@@ -45,9 +45,31 @@ export function TableField({
         if (typeof value !== 'string') throw new Error('Expected a CSV string.');
         return { table: csvToTable(value, relaxedOptions) };
       }
-      const valid = validateTable(value, relaxedOptions);
+      const table = value as TableValue & {
+        columns: Array<TableValue['columns'][number] & { columnId?: unknown }>;
+        rows: Array<
+          TableValue['rows'][number] & {
+            cells: Array<TableCell | { cellId: string; value: TableCell }>;
+          }
+        >;
+      };
+      const storedTable: TableValue = {
+        ...table,
+        columns: table.columns.map((item) => {
+          const { columnId: _columnId, ...column } = item as typeof item & { columnId?: unknown };
+          return column;
+        }),
+        rows: table.rows.map((item) => {
+          const { rowId: _rowId, ...row } = item as typeof item & { rowId?: unknown };
+          const cells = item.cells.map((cell) =>
+            typeof cell === 'object' && cell !== null && 'cellId' in cell && 'value' in cell ? cell.value : cell,
+          ) as TableCell[];
+          return { ...row, cells };
+        }),
+      };
+      const valid = validateTable(storedTable, relaxedOptions);
       if (valid !== true) throw new Error(valid);
-      return { table: value as TableValue };
+      return { table: storedTable };
     } catch (error) {
       return { table: null, error: error instanceof Error ? error.message : 'Invalid table data.' };
     }

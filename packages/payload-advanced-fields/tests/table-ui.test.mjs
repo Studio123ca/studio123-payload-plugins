@@ -22,10 +22,15 @@ await build({
   alias: { '@payloadcms/ui': resolve(packageRoot, 'tests/fixtures/payload-ui.tsx') },
   loader: { '.css': 'empty' },
 });
-const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost/' });
+const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+  pretendToBeVisual: true,
+  url: 'http://localhost/',
+});
 for (const name of [
   'window',
   'document',
+  'Element',
+  'Node',
   'HTMLElement',
   'HTMLInputElement',
   'HTMLTextAreaElement',
@@ -33,8 +38,12 @@ for (const name of [
   'MouseEvent',
   'KeyboardEvent',
   'File',
+  'MutationObserver',
 ])
   globalThis[name] = dom.window[name];
+globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
+globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
+globalThis.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { createRoot } = await import('react-dom/client');
 const { TableField, StructuredTableField, Fixture, calls } = await import(pathToFileURL(entry));
@@ -68,12 +77,28 @@ const click = async (element) => {
 };
 const value = () => JSON.parse(document.querySelector('[data-value]').textContent);
 const cell = (row = 0, column = 0) => document.querySelector(`[data-cell="${row}:${column}"] textarea`);
+const edit = async (element) => {
+  await act(async () => element.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true })));
+  await act(async () => element.focus());
+};
 const input = async (element, text) => {
   await act(async () => {
+    element.dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
     element.focus();
     Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value').set.call(element, text);
     element.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   });
+};
+const drag = async (source, target) => {
+  const dataTransfer = { dropEffect: '', effectAllowed: '', setData() {} };
+  const event = (type) => {
+    const next = new dom.window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(next, 'dataTransfer', { value: dataTransfer });
+    return next;
+  };
+  await act(async () => source.dispatchEvent(event('dragstart')));
+  await act(async () => target.dispatchEvent(event('dragover')));
+  await act(async () => target.dispatchEvent(event('drop')));
 };
 const reset = async () => {
   if (root) await act(async () => root.unmount());
@@ -139,6 +164,13 @@ test('spreadsheet cells display calculated values and preserve escaped literal i
   await act(async () => cell().blur());
   assert.equal(cell().value, '5');
   assert.deepEqual(value().rows[0].cells[0], { formula: '=2+3' });
+  assert.ok(button('Help'));
+  await click(button('Help'));
+  assert.match(document.querySelector('[role=dialog]').textContent, /AVERAGE\(C1:C4\)/);
+  assert.match(document.querySelector('[role=dialog]').textContent, /Individual cells: =A1\+B1/);
+  assert.match(document.querySelector('[role=dialog]').textContent, /SUM\(A1,C3,E5\)/);
+  await click(button('Close'));
+  assert.equal(document.querySelector('[role=dialog]'), null);
   await input(cell(), "'=2+3");
   await act(async () => cell().blur());
   assert.equal(cell().value, '=2+3');
@@ -211,23 +243,20 @@ test('structured editor delegates nested row operations and cell permissions to 
   assert.equal(native.permissions, permissions.fields);
 });
 
-test('keyboard selection copies and clears a rectangle, and undo refreshes visible drafts', async () => {
+test('keyboard selection, editing and clipboard actions work from a selected cell', async () => {
   await reset();
   const table = createTable(options);
   table.rows[0].cells = ['A', 'B'];
   table.rows[1].cells = ['C', 'D'];
+  table.rows[1].cells = ['C', 'D'];
   await render({ value: table });
-  await act(async () => cell().focus());
-  await act(async () =>
-    cell().dispatchEvent(
-      new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, shiftKey: true, bubbles: true }),
-    ),
-  );
-  await act(async () =>
-    cell(0, 1).dispatchEvent(
-      new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, shiftKey: true, bubbles: true }),
-    ),
-  );
+  const key = async (target, event) =>
+    act(async () => target.dispatchEvent(new dom.window.KeyboardEvent('keydown', { bubbles: true, ...event })));
+  const cellElement = (row = 0, column = 0) => document.querySelector(`[data-cell="${row}:${column}"]`);
+  await act(async () => cellElement().focus());
+  await key(cellElement(), { key: 'ArrowRight' });
+  await key(cellElement(0, 1), { key: 'ArrowDown', shiftKey: true });
+  await key(cellElement(1, 1), { key: 'ArrowLeft', shiftKey: true });
   assert.equal(document.querySelectorAll('td[data-selected]').length, 4);
   let copied;
   await act(async () => {
@@ -252,6 +281,107 @@ test('keyboard selection copies and clears a rectangle, and undo refreshes visib
   );
   await click(button('Undo'));
   assert.equal(cell(1, 1).value, 'D');
+  await key(cellElement(1, 0), { key: 'Enter' });
+  assert.equal(cell(1, 0).readOnly, false);
+  await key(cell(1, 0), { key: 'Escape' });
+  assert.equal(document.activeElement, cellElement(1, 0));
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 1);
+  await key(cellElement(1, 0), { key: 'ArrowRight' });
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 1);
+  assert.equal(document.activeElement, cellElement(1, 1));
+  await act(async () => cellElement(1, 0).focus());
+  await key(cellElement(1, 0), { key: 'Tab' });
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 1);
+  assert.equal(document.activeElement, cellElement(1, 1));
+});
+
+test('dragging across cells selects a rectangle', async () => {
+  await reset();
+  await render({ value: createTable(options) });
+  const start = document.querySelector('[data-cell="0:0"]');
+  const destination = document.querySelector('[data-cell="1:1"]');
+  const scroll = document.querySelector('.advanced-table__scroll');
+  const pointer = (type, target, { buttons = 1 } = {}) => {
+    const event = new dom.window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperties(event, {
+      buttons: { value: buttons },
+      clientX: { value: 10 },
+      clientY: { value: 10 },
+    });
+    target.dispatchEvent(event);
+  };
+  const originalElementFromPoint = document.elementFromPoint;
+  document.elementFromPoint = () => destination;
+  await act(async () => pointer('pointerdown', start));
+  assert.equal(cell().readOnly, true);
+  await act(async () => pointer('pointermove', scroll));
+  document.elementFromPoint = originalElementFromPoint;
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 4);
+  await edit(cell(1, 1));
+  assert.equal(cell(1, 1).readOnly, false);
+});
+
+test('sort uses the active column and format choices are organized into submenus', async () => {
+  await reset();
+  const table = createTable(options);
+  table.rows[0].cells = ['Zebra', '2'];
+  table.rows[1].cells = ['Apple', '1'];
+  await render({ value: table });
+  await click(button('Sort column A A–Z'));
+  assert.deepEqual(
+    value().rows.map((row) => row.cells[0]),
+    ['Apple', 'Zebra'],
+  );
+  await click(button('Sort column A Z–A'));
+  assert.deepEqual(
+    value().rows.map((row) => row.cells[0]),
+    ['Zebra', 'Apple'],
+  );
+  assert.ok(button('Cell styles'));
+  assert.ok(button('Row styles'));
+});
+
+test('table menus insert beside the active row or column and drag handles reorder the grid', async () => {
+  await reset();
+  const table = createTable(options);
+  table.rows[0].cells = ['A1', 'B1'];
+  table.rows[1].cells = ['A2', 'B2'];
+  await render({ value: table });
+
+  await click(button('Add row before'));
+  assert.deepEqual(value().rows[0].cells, ['', '']);
+  await click(button('Add column before'));
+  assert.deepEqual(value().rows[0].cells, ['', '', '']);
+  const firstColumnID = value().columns[0].id;
+
+  await click(document.querySelector('thead th:nth-child(2)'));
+  await drag(document.querySelector('thead th:nth-child(2)'), document.querySelector('thead th:nth-child(3)'));
+  assert.equal(value().columns[1].id, firstColumnID);
+
+  await click(document.querySelector('tbody tr:nth-child(1) th'));
+  await drag(document.querySelector('tbody tr:nth-child(1) th'), document.querySelector('tbody tr:nth-child(2) th'));
+  assert.deepEqual(value().rows[1].cells, ['', '', '']);
+});
+
+test('clicking a row or column header selects its cells, and Delete clears the selection', async () => {
+  await reset();
+  const table = createTable(options);
+  table.rows[0].cells = ['A', 'B'];
+  table.rows[1].cells = ['C', 'D'];
+  await render({ value: table });
+  const clickHeader = async (element) =>
+    act(async () => element.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })));
+  const cellElement = (row = 0, column = 0) => document.querySelector(`[data-cell="${row}:${column}"]`);
+  const key = async (element, event) =>
+    act(async () => element.dispatchEvent(new dom.window.KeyboardEvent('keydown', { bubbles: true, ...event })));
+  await clickHeader(document.querySelector('thead th:nth-child(2)'));
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 2);
+  await key(cellElement(0, 0), { key: 'Delete' });
+  assert.deepEqual(value().rows[0].cells, ['', 'B']);
+  await clickHeader(document.querySelector('tbody tr:nth-child(2) th'));
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 2);
+  await key(cellElement(0, 0), { key: 'Backspace' });
+  assert.deepEqual(value().rows[1].cells, ['', '']);
 });
 
 test('CSV import replaces the table atomically and can be undone; oversized imports preserve data', async () => {
@@ -360,7 +490,8 @@ test('background and freeze changes persist in JSON and participate in undo', as
   await reset();
   const table = createTable(options);
   await render({ value: table });
-  await click(document.querySelector('[aria-label="Cell background"] button'));
+  await click(button('Cell styles'));
+  await click(document.querySelector('[aria-label="Cell styles"] button'));
   assert.equal(value().appearance.cells[table.rows[0].id][table.columns[0].id], 'muted');
   await click(button('Freeze through this row'));
   assert.deepEqual(value().appearance.stickyRows, { top: 1, bottom: 0 });
@@ -374,7 +505,8 @@ test('CSV appearance changes are session-only', async () => {
   await reset();
   const csv = 'Name,Value\r\nExample,123';
   await render({ value: csv, config: resolveTableOptions({ storage: 'csv' }) });
-  await click(document.querySelector('[aria-label="Cell background"] button'));
+  await click(button('Cell styles'));
+  await click(document.querySelector('[aria-label="Cell styles"] button'));
   await click(button('Freeze through this row'));
   assert.equal(value(), csv);
   assert.equal(document.querySelector('tbody tr').dataset.sticky, 'top');

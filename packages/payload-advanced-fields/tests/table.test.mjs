@@ -36,6 +36,35 @@ test('content tables have independent IDs and reject malformed API writes', () =
   assert.notEqual(validateTable(null, content, true), true);
 });
 
+test('JSON API reads expose row, column and positional cell IDs without changing stored values', () => {
+  const field = tableField({ name: 'data' });
+  const table = createTable(content);
+  table.rows.push({ id: 'second-row', cells: ['C', 'D'] });
+  const response = field.hooks.afterRead[0]({ value: table });
+  assert.deepEqual(
+    response.columns.map((column) => column.columnId),
+    table.columns.map((column) => column.id),
+  );
+  assert.deepEqual(
+    response.rows.map((row) => row.rowId),
+    table.rows.map((row) => row.id),
+  );
+  assert.deepEqual(
+    response.rows.map((row) => row.cells.map((cell) => cell.cellId)),
+    [
+      ['A1', 'B1'],
+      ['A2', 'B2'],
+      ['A3', 'B3'],
+    ],
+  );
+  assert.deepEqual(
+    response.rows.map((row) => row.cells.map((cell) => cell.value)),
+    table.rows.map((row) => row.cells),
+  );
+  assert.equal('rowId' in table.rows[0], false);
+  assert.equal('columnId' in table.columns[0], false);
+});
+
 test('configuration rejects invalid limits and incompatible storage/mode choices', () => {
   for (const config of [
     { minRows: 5, maxRows: 2 },

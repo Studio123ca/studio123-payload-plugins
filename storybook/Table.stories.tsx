@@ -7,6 +7,7 @@ import {
   pasteCells,
   resolveTableOptions,
 } from '../packages/payload-advanced-fields/src/table-field/shared/table.js';
+import { evaluateTable } from '../packages/payload-advanced-fields/src/table-field/shared/formulas.js';
 import { csvToTable, tableToCSV } from '../packages/payload-advanced-fields/src/table-field/shared/csv.js';
 import { resolveTablePresentation } from '../packages/payload-advanced-fields/src/table-field/shared/presentation.js';
 import type {
@@ -21,6 +22,7 @@ type Args = FieldControls &
     mode: 'content' | 'spreadsheet' | 'structured';
     storage: 'json' | 'csv';
     formulas: boolean;
+    computeFormulas: boolean;
     headerRow: boolean;
     initialRows: number;
     initialColumns: number;
@@ -63,6 +65,20 @@ const sheet = pasteCells(
 sheet.columns.forEach((column, i) => {
   column.label = ['Quantity', 'Unit price', 'Total'][i];
 });
+const sheetResults = evaluateTable(sheet);
+const apiResponse = {
+  ...sheet,
+  columns: sheet.columns.map((column) => ({ ...column, columnId: column.id })),
+  rows: sheet.rows.map((row, rowIndex) => ({
+    ...row,
+    rowId: row.id,
+    cells: row.cells.map((value, columnIndex) => ({
+      cellId: `${String.fromCharCode(65 + columnIndex)}${rowIndex + 1}`,
+      value: sheetResults[rowIndex][columnIndex],
+      ...(typeof value === 'object' && value !== null && 'formula' in value ? { formula: value.formula } : {}),
+    })),
+  })),
+};
 
 const meta = {
   title: 'Fields/Table',
@@ -73,6 +89,7 @@ const meta = {
     mode: 'content',
     storage: 'json',
     formulas: false,
+    computeFormulas: true,
     headerRow: true,
     initialRows: 2,
     initialColumns: 2,
@@ -88,6 +105,11 @@ const meta = {
     mode: { control: 'select', options: ['content', 'spreadsheet', 'structured'] },
     storage: { control: 'radio', options: ['json', 'csv'], if: { arg: 'mode', eq: 'content' } },
     formulas: { control: 'boolean', if: { arg: 'mode', eq: 'spreadsheet' } },
+    computeFormulas: {
+      control: 'boolean',
+      description: 'Evaluate formulas in JSON API reads before returning cell values.',
+      if: { arg: 'mode', eq: 'spreadsheet' },
+    },
     headerRow: { control: 'boolean', if: { arg: 'mode', neq: 'structured' } },
     initialRows: { control: { type: 'number', min: 0, max: 100 } },
     initialColumns: { control: { type: 'number', min: 1, max: 20 } },
@@ -98,7 +120,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Content tables store JSON or CSV strings. Structured tables use native Payload arrays. Spreadsheets support bounded formulas. Settings reset the in-memory example; this does not migrate persisted data.',
+          'Content tables store JSON or CSV strings. Structured tables use native Payload arrays. Spreadsheets support bounded formulas and, by default, compute formula values in JSON API reads while retaining their expressions. Settings reset the in-memory example; this does not migrate persisted data.',
       },
     },
   },
@@ -168,10 +190,11 @@ export const CSVStorage: Story = {
   args: { storage: 'csv', initialValue: 'Product,Price\r\n"Widget, large",19.95\r\nWidget small,9.95' },
 };
 export const Spreadsheet: Story = {
-  args: { mode: 'spreadsheet', formulas: true, initialValue: sheet },
+  args: { mode: 'spreadsheet', formulas: true, initialValue: apiResponse },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const quantity = canvas.getByRole('textbox', { name: 'A1: Quantity' });
+    await userEvent.dblClick(quantity);
     await userEvent.clear(quantity);
     await userEvent.type(quantity, '20');
     await userEvent.tab();
@@ -206,7 +229,10 @@ export const Menus: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Edit' }));
     await userEvent.click(page.getByRole('button', { name: 'Undo' }));
     await waitFor(() => expect(canvas.queryByRole('textbox', { name: 'A4: Specification' })).not.toBeInTheDocument());
-    await userEvent.click(canvas.getByRole('button', { name: 'Column A actions' }));
+    await userEvent.pointer({
+      target: canvas.getByRole('columnheader', { name: /A/ }),
+      keys: '[MouseRight]',
+    });
     await expect(page.getByRole('button', { name: 'Move left' })).toBeDisabled();
     await userEvent.keyboard('{Escape}');
     await expect(page.queryByRole('button', { name: 'Move left' })).not.toBeInTheDocument();

@@ -92,6 +92,7 @@
   },
   "dependencies": {
     "@codemirror/lang-html": "^6.4.11",
+    "@headlessui/react": "^2.2.10",
     "@uiw/react-codemirror": "^4.25.10",
     "@uiw/react-color": "^2.10.3",
     "libphonenumber-js": "^1.13.8",

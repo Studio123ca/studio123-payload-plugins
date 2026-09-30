@@ -51,15 +51,17 @@ export function BackgroundChoices({
   options,
   label,
   apply,
+  showLabel = false,
 }: {
   options: ResolvedTablePresentation;
   label: string;
   apply: (key?: string) => void;
+  showLabel?: boolean;
 }) {
   if (!options.palette.length) return null;
   return (
     <div className="advanced-table__menu-group" role="group" aria-label={label}>
-      <span>{label}</span>
+      {showLabel && <span>{label}</span>}
       {options.palette.map((color) => (
         <button type="button" key={color.key} onClick={() => apply(color.key)}>
           <i
@@ -98,7 +100,6 @@ export function FreezeChoices({
   const current = stickyCounts(appearance, options, count);
   return (
     <div className="advanced-table__menu-group" role="group" aria-label="Sticky rows">
-      <span>Sticky rows</span>
       <button
         type="button"
         onClick={() =>

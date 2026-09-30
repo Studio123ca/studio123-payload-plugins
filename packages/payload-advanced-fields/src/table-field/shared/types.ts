@@ -39,6 +39,8 @@ export type TableOptions = TablePresentationConfig & {
   headerRow?: boolean;
   caption?: boolean;
   formulas?: boolean;
+  /** Evaluate spreadsheet formulas in JSON API reads. Defaults to true. */
+  computeFormulas?: boolean;
 };
 
 export type ResolvedTableOptions = Required<Omit<TableOptions, keyof TablePresentationConfig>> &
@@ -49,11 +51,12 @@ export type JSONTableFieldConfig = Partial<Omit<JSONField, 'type' | 'admin'>> & 
 } & TableOptions & { storage?: 'json' };
 export type CSVTableFieldConfig = Partial<Omit<TextareaField, 'type' | 'admin'>> & {
   admin?: TableAdmin<TextareaField['admin']>;
-} & Omit<TableOptions, 'mode' | 'storage' | 'caption' | 'formulas'> & {
+} & Omit<TableOptions, 'mode' | 'storage' | 'caption' | 'formulas' | 'computeFormulas'> & {
     mode?: 'content';
     storage: 'csv';
     caption?: false;
     formulas?: false;
+    computeFormulas?: false;
   };
 /** Native Payload fields: their validation, access, defaults and hooks are preserved. */
 export type TableColumn = TextField | TextareaField | NumberField | CheckboxField | SelectField;

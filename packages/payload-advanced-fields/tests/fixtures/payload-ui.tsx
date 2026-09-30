@@ -100,3 +100,14 @@ export function ConfirmationModal({ modalSlug, heading, body, onConfirm, confirm
     </div>
   );
 }
+export function Drawer({ slug, title, children }: any) {
+  const context = useContext(Context);
+  if (context.modal !== slug) return null;
+  return (
+    <div role="dialog" aria-label={title}>
+      <h2>{title}</h2>
+      {children}
+      <button onClick={() => context.setModal(null)}>Close</button>
+    </div>
+  );
+}

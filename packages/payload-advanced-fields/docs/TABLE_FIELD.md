@@ -119,7 +119,7 @@ tableField({
 
 Inputs such as `12`, `1.25`, and `1e3` become numbers; lowercase `true` and `false` become booleans. Leading-zero strings such as `0012` remain text. Prefix an input with an apostrophe to force text: `'123`, `'true`, or `'=A1+1`. That escape apostrophe is not stored. Empty cells are stored as empty strings; API clients may also supply `null`.
 
-With `formulas: true`, an input beginning with `=` is stored as `{ formula: '=A1+B1' }`. An unfocused cell displays its result; focus shows its expression. With formulas disabled, `=...` remains literal text.
+With `formulas: true`, an input beginning with `=` is stored as `{ formula: '=A1+B1' }`. An unfocused cell displays its result; focus shows its expression. JSON API reads evaluate formulas server-side by default and return both the computed `value` and original `formula`; set `computeFormulas: false` to return the stored value instead. With formulas disabled, `=...` remains literal text.
 
 Supported formula syntax:
 
@@ -128,6 +128,17 @@ Supported formula syntax:
 - `SUM`, `AVERAGE`, `MIN`, `MAX`, and `COUNT`, with comma-separated arguments and ranges.
 
 Addresses always refer to **body cells**: column labels and the optional header row do not affect numbering. References are positional. Moving, inserting, duplicating, or deleting rows/columns does **not rewrite expressions**; an expression such as `=A1` continues to refer to the current A1. This is a bounded table calculator, not an Excel-compatible workbook engine.
+
+JSON API reads add explicit response-only identifiers: `columnId`, `rowId`, and `{ cellId, value }` cell records. They preserve the compact stored table shape while giving integrations stable IDs and the current A1-style address:
+
+```json
+{
+  "columns": [{ "id": "column-id", "columnId": "column-id", "label": "Quantity" }],
+  "rows": [{ "id": "row-id", "rowId": "row-id", "cells": [{ "cellId": "A1", "value": 12 }] }]
+}
+```
+
+These IDs are response-only and are ignored by the admin editor on a subsequent read. CSV and structured tables retain their respective API shapes.
 
 Arithmetic treats blank/null cells as zero and booleans as 0/1. Aggregates count/use numeric values and ignore text, blanks, and booleans. Errors in referenced formulas propagate. Supported errors are `#ERROR!`, `#NAME?`, `#REF!`, `#VALUE!`, `#DIV/0!`, `#NUM!`, `#CYCLE!`, and `#LIMIT!`.
 
@@ -144,12 +155,17 @@ const resultRows = evaluateTable(document.estimates);
 
 ## Keyboard, clipboard, history, and files
 
-- Tab/Shift+Tab move through body cells; at either end, Tab leaves the table normally.
-- Enter/Shift+Enter move down/up. Alt+Enter inserts a line break.
-- Alt+Arrow moves focus. Alt+Shift+Arrow extends a rectangular selection. Shift-click also selects a rectangle.
-- **Copy cells** copies the selection as TSV. The browser's Copy command copies a selected rectangle; within one cell it retains normal text-copy behavior.
+- The toolbar's **Help** button opens a Payload drawer with the relevant navigation, selection, paste, and formula guidance.
+- Tab/Shift+Tab move the selected cell forward or backward; at either end, Tab leaves the table normally.
+- Arrow keys move the selected cell. Shift+Arrow, Shift-click, or dragging across cells extends a rectangular selection.
+- Double-click a cell or press Enter when it is selected to edit it. While editing, Enter/Shift+Enter move down/up, Alt+Enter inserts a line break, and Escape exits editing. Click a row or column header to select it; right-click a header for its actions.
+- **Sort** orders rows by the selected column, using calculated values for spreadsheet formulas and keeping blank cells last.
+- **Format** opens separate cell and row style menus, keeping palette choices out of the main toolbar menu.
+- Click a row or column header to select it, then drag the selected header onto another row or column to reorganize the grid. The row and column context menus also provide move commands.
+- Use a row or column menu to add a blank row or column before or after its current position.
+- **Copy cells** and **Paste cells** work with the current selection as TSV. The browser's Copy/Paste commands also work directly in the grid; within one cell, they retain normal text editing behavior.
 - Multi-cell TSV paste starts at the selection's top-left corner and can expand the table within its limits. A rejected paste leaves the table unchanged. Single-line, single-cell paste uses ordinary text editing.
-- **Clear cells** empties the selection; **Clear table** removes the entire value. Undo can restore either action.
+- **Clear cells**, Delete, and Backspace empty the selection; **Clear table** removes the entire value. Undo can restore either action.
 - Undo/Redo retain up to 50 table edits during the current editing session. Paste/import are single actions. Cell keystrokes are separate edits. History is cleared by external form resets, version restores that change the value, locale changes, or switching nested field paths.
 - **Import CSV** replaces the current table as one undoable action, using the current header-row setting. JSON captions are retained; imported columns get new IDs. Files are limited to 2 MB. Use UTF-8 comma-separated CSV; semicolon-delimited regional exports and XLSX are not supported.
 - **Export CSV** includes the header row when enabled, omits captions/IDs/widths, and exports calculated spreadsheet values rather than expressions. Potential spreadsheet-execution prefixes (`=`, `+`, `-`, `@`, leading tabs/newlines) are escaped with a leading apostrophe, including negative numbers. This export is intended for interchange, not lossless backup. Use the JSON API to preserve formulas, types, and metadata.
@@ -254,7 +270,7 @@ Before releasing into a consuming app, also verify its import map, database save
 
 ### Admin menus and structured headers
 
-Content and spreadsheet tables use a compact menu row: **Table** contains create/clear and CSV import/export, **Edit** contains undo/redo and copy/clear cells, and **Insert** adds rows or columns, and **View → Reset column widths** restores the default sizes. Row and column ellipsis buttons use Payload's portalled popup, including keyboard navigation and Escape dismissal, without expanding or clipping the grid.
+Content and spreadsheet tables use a compact menu row: **Table** contains create/clear and CSV import/export, **Edit** contains undo/redo and copy/clear cells, and **Insert** adds rows or columns, and **View → Reset column widths** restores the default sizes. Right-click row and column headers to open their Payload-styled context menus without expanding or clipping the grid.
 
 Structured tables display fixed headers from each configured column's label (falling back to its field name). Editors cannot rename these headers. Native input labels remain available to assistive technology while the visible label appears once above the column; native field permissions, validation, and controls are retained.
 
