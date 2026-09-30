@@ -496,13 +496,13 @@ export function DataTableMenubar({
                 <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
                   <Menubar.Item className="data-table__menu-item" onSelect={onImportCSV}>
                     <span className="data-table__context-icon" aria-hidden>
-                      <FiUpload />
+                      <FiDownload />
                     </span>
                     Import CSV
                   </Menubar.Item>
                   <Menubar.Item className="data-table__menu-item" onSelect={onExportCSV}>
                     <span className="data-table__context-icon" aria-hidden>
-                      <FiDownload />
+                      <FiUpload />
                     </span>
                     Export CSV
                   </Menubar.Item>

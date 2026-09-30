@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.5
+
+- Added Google Sheets-style keyboard shortcuts for selecting, inserting, and deleting rows and columns.
+- Fixed row and column selection so the nearest surviving item remains selected after shortcut deletion.
+- Adjusted quick-format toolbar icon sizing and corrected the Import CSV and Export CSV icon directions.
+
 ## 1.2.4
 
 - Added nested Format → Background and Format → Text color submenus with independent text-color appearance storage.
