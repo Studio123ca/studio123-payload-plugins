@@ -27,13 +27,18 @@ export const normalizeAllowedCountries = (allowedCountries?: string[]): CountryC
 
 export const resolveDefaultCountry = (
   defaultCountry?: string,
-  _enabledCountries?: string[],
+  enabledCountries?: string[],
 ): CountryCode | undefined => {
   const normalizedDefaultCountry = normalizeCountry(defaultCountry);
   if (normalizedDefaultCountry) return normalizedDefaultCountry;
 
+  const normalizedEnabledCountries = normalizeAllowedCountries(enabledCountries);
+  if (normalizedEnabledCountries?.length) return normalizedEnabledCountries[0];
+
   return 'US';
 };
+
+export const getSupportedCountries = (): CountryCode[] => getCountries();
 
 export const composePhoneDraft = (base: string, extension?: string) => {
   const trimmedBase = base.trim();
@@ -143,7 +148,7 @@ export const inferPhoneCountry = (
 };
 
 export const validatePhoneInput = (
-  input: string,
+  input: unknown,
   options: {
     allowedCountries?: string[];
     defaultCountry?: CountryCode;
@@ -151,6 +156,9 @@ export const validatePhoneInput = (
     promptForCountry?: boolean;
   } = {},
 ) => {
+  if (typeof input !== 'string') {
+    return options.required ? 'Enter a phone number.' : 'Enter a valid phone number.';
+  }
   const { base } = parsePhoneDraft(input);
   const trimmed = base.trim();
   if (!trimmed) {
@@ -193,17 +201,16 @@ export const normalizePhoneValue = (
   value: PhoneFieldValue | null | undefined,
   options: { allowedCountries?: string[] } = {},
 ) => {
-  if (!value?.number) return null;
+  if (!value || typeof value.number !== 'string' || !value.number.trim()) return null;
 
-  const phoneNumber = safelyParsePhoneNumber(value.number);
+  const parsed = parsePhoneDraft(value.number);
+  const phoneNumber = safelyParsePhoneNumber(parsed.base.trim());
   if (!phoneNumber) return null;
 
   const allowedCountries = normalizeAllowedCountries(options.allowedCountries);
   if (allowedCountries && phoneNumber.country && !allowedCountries.includes(phoneNumber.country)) return null;
 
-  return {
-    ...phoneToValue(phoneNumber),
-  };
+  return phoneToValueWithExtension(phoneNumber, value.ext || parsed.extension);
 };
 
 export const formatPhoneDisplayValue = (

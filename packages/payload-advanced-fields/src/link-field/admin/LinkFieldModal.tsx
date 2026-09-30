@@ -355,29 +355,29 @@ function LinkFieldModalBody({ collectionSlugs, defaultType, extension, modalSlug
           buttonStyle="secondary"
           margin={false}
           onClick={() => {
-            onCancel();
+            setDraft(emptyDraft(defaultType));
+            setExtensionDraft(null);
+            onSave(null);
+            extension?.onSave?.(null);
             closeModal(modalSlug);
           }}
           size="medium"
           type="button"
         >
-          Cancel
+          Clear
         </Button>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <Button
             buttonStyle="secondary"
             margin={false}
             onClick={() => {
-              setDraft(emptyDraft(defaultType));
-              setExtensionDraft(null);
-              onSave(null);
-              extension?.onSave?.(null);
+              onCancel();
               closeModal(modalSlug);
             }}
             size="medium"
             type="button"
           >
-            Clear
+            Cancel
           </Button>
           <Button margin={false} onClick={handleSave} size="medium" type="button">
             Save

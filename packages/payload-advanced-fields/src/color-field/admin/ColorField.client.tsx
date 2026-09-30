@@ -43,7 +43,7 @@ const TooltipPickerWrapper = ({ PickerComponent, color, onChange, pickerProps, i
 
   // color can be a string (hex) or object with hex and alpha
   const hexColor = typeof color === 'string' ? color : color?.hex || '#ffffff';
-  const alphaValue = typeof color === 'object' && color?.alpha ? color.alpha : 1;
+  const alphaValue = typeof color === 'object' && typeof color?.alpha === 'number' ? color.alpha : 1;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -53,7 +53,7 @@ const TooltipPickerWrapper = ({ PickerComponent, color, onChange, pickerProps, i
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' && isOpen) {
+      if ((event.key === 'Enter' || event.key === 'Escape') && isOpen) {
         event.preventDefault();
         setIsOpen(false);
       }
@@ -97,6 +97,9 @@ const TooltipPickerWrapper = ({ PickerComponent, color, onChange, pickerProps, i
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <Button
+        type="button"
+        aria-expanded={isOpen}
+        aria-label="Select color"
         onClick={(e: any) => {
           e.preventDefault();
           e.stopPropagation();
@@ -272,6 +275,7 @@ const ColorField = ({
         // Direct HSVA object (h, s, v, a properties at top level)
         newAlpha = colorData.a;
       }
+      if (disableAlpha) newAlpha = 1;
 
       const newSlug = generateColorSlug(newHex);
 
@@ -314,7 +318,7 @@ const ColorField = ({
 
       setValue(newColorValue);
     },
-    [processedPresetColors, setValue],
+    [disableAlpha, processedPresetColors, setValue],
   );
 
   // Build picker props dynamically based on picker type
@@ -330,7 +334,7 @@ const ColorField = ({
       (pickerType === 'chrome' && supportsAlpha)
     ) {
       // Ensure we have a valid HSVA object
-      let hsva = normalizedValue?.hsva || { h: 0, s: 0, v: 100, a: 1 };
+      const hsva = colorValueToHsva(normalizedValue);
       // Make sure all properties are present and valid
       return {
         h: typeof hsva.h === 'number' ? hsva.h : 0,
@@ -341,12 +345,12 @@ const ColorField = ({
     } else {
       return hexValue;
     }
-  }, [pickerType, normalizedValue?.hsva, supportsAlpha, hexValue]);
+  }, [pickerType, normalizedValue, supportsAlpha, hexValue]);
 
   const pickerProps: Record<string, any> = useMemo(() => {
     const props: Record<string, any> = {
       color: colorForPicker,
-      onChange: handleColorChange,
+      onChange: isReadOnly ? undefined : handleColorChange,
       style: {
         ...(pickerSize && { width: pickerSize, height: pickerSize }),
         ...(!pickerSize && { width: '100%' }),

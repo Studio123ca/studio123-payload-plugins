@@ -180,7 +180,12 @@ export const processColorOption = (color: ColorOption | string | undefined): Col
  * Supports: #RGB, #RRGGBB, #RGBA, #RRGGBBAA
  */
 export const parseHexWithAlpha = (hex: string): { hex: string; alpha?: number } => {
-  const cleanHex = hex.replace('#', '').toUpperCase();
+  if (typeof hex !== 'string') throw new Error('Invalid hex color format');
+  const cleanHex = hex.trim().replace(/^#/, '').toUpperCase();
+
+  if (!/^[0-9A-F]+$/.test(cleanHex) || ![3, 4, 6, 8].includes(cleanHex.length)) {
+    throw new Error(`Invalid hex color format: ${hex}`);
+  }
 
   if (cleanHex.length === 3) {
     // #RGB -> #RRGGBB
@@ -210,13 +215,16 @@ export const parseHexWithAlpha = (hex: string): { hex: string; alpha?: number } 
  * Parse rgba string: rgba(r, g, b, a) or rgb(r, g, b)
  */
 export const parseRgbaString = (rgba: string): { rgb: RGB; hex: string; alpha?: number } => {
-  const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  const match = rgba.trim().match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/i);
   if (!match) throw new Error(`Invalid rgba format: ${rgba}`);
 
   const r = parseInt(match[1], 10);
   const g = parseInt(match[2], 10);
   const b = parseInt(match[3], 10);
   const a = match[4] ? parseFloat(match[4]) : undefined;
+  if ([r, g, b].some((channel) => channel < 0 || channel > 255) || (a !== undefined && (a < 0 || a > 1))) {
+    throw new Error(`Invalid rgba format: ${rgba}`);
+  }
 
   const hex = rgbToHex(r, g, b);
   return {
@@ -244,6 +252,9 @@ export const hexToRgb = (hex: string): RGB | null => {
  * Convert RGB to hex
  */
 export const rgbToHex = (r: number, g: number, b: number): string => {
+  if (![r, g, b].every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 255)) {
+    throw new Error('RGB channels must be between 0 and 255');
+  }
   return (
     '#' +
     [r, g, b]
@@ -291,10 +302,49 @@ export const rgbToHsv = (rgb: RGB): HSV => {
   };
 };
 
+export const rgbToHsl = (rgb: RGB): HSL => {
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+
+  if (delta !== 0) {
+    s = delta / (1 - Math.abs(2 * l - 1));
+    if (max === r) h = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / delta + 2) / 6;
+    else h = ((r - g) / delta + 4) / 6;
+  }
+
+  return {
+    h: Math.round(h * 360),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100),
+    ...(rgb.a !== undefined && { a: rgb.a }),
+  };
+};
+
 /**
  * Convert HSV to RGB
  */
 export const hsvToRgb = (hsv: HSV): RGB => {
+  if (
+    !Number.isFinite(hsv.h) ||
+    !Number.isFinite(hsv.s) ||
+    !Number.isFinite(hsv.v) ||
+    hsv.h < 0 ||
+    hsv.h > 360 ||
+    hsv.s < 0 ||
+    hsv.s > 100 ||
+    hsv.v < 0 ||
+    hsv.v > 100
+  ) {
+    throw new Error('HSV values are out of range');
+  }
   const h = hsv.h / 360;
   const s = hsv.s / 100;
   const v = hsv.v / 100;
@@ -361,6 +411,19 @@ export const hsvaToRgb = (hsva: HSVA): RGB => {
  * Convert HSL to RGB
  */
 export const hslToRgb = (hsl: HSL): RGB => {
+  if (
+    !Number.isFinite(hsl.h) ||
+    !Number.isFinite(hsl.s) ||
+    !Number.isFinite(hsl.l) ||
+    hsl.h < 0 ||
+    hsl.h > 360 ||
+    hsl.s < 0 ||
+    hsl.s > 100 ||
+    hsl.l < 0 ||
+    hsl.l > 100
+  ) {
+    throw new Error('HSL values are out of range');
+  }
   const h = hsl.h / 360;
   const s = hsl.s / 100;
   const l = hsl.l / 100;
@@ -432,7 +495,7 @@ export const parseColorInput = (input: unknown): { hex: string; alpha?: number }
     // Try CSS color name first (case-insensitive)
     const lowerInput = input.toLowerCase();
     if (lowerInput in CSS_COLOR_NAMES) {
-      return { hex: CSS_COLOR_NAMES[lowerInput] };
+      return parseHexWithAlpha(CSS_COLOR_NAMES[lowerInput]);
     }
 
     // Try hex format (with optional alpha)
@@ -453,9 +516,10 @@ export const parseColorInput = (input: unknown): { hex: string; alpha?: number }
 
     // If it's already a ColorValue with hex, extract hex and alpha
     if (typeof obj.hex === 'string') {
+      const parsed = parseHexWithAlpha(obj.hex);
       return {
-        hex: obj.hex,
-        alpha: typeof obj.alpha === 'number' ? obj.alpha : undefined,
+        hex: parsed.hex,
+        alpha: typeof obj.alpha === 'number' ? obj.alpha : parsed.alpha,
       };
     }
 
@@ -468,9 +532,21 @@ export const parseColorInput = (input: unknown): { hex: string; alpha?: number }
       };
     }
 
+    if ('h' in obj && 's' in obj && 'l' in obj) {
+      const hsl = obj as unknown as HSL;
+      const rgb = hslToRgb(hsl);
+      return {
+        hex: rgbToHex(rgb.r, rgb.g, rgb.b),
+        alpha: hsl.a,
+      };
+    }
+
     // If it's an RGB object
     if ('r' in obj && 'g' in obj && 'b' in obj) {
       const rgb = obj as unknown as RGB;
+      if (![rgb.r, rgb.g, rgb.b].every((channel) => Number.isFinite(channel) && channel >= 0 && channel <= 255)) {
+        throw new Error('Invalid RGB color object');
+      }
       const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
       return {
         hex,
@@ -497,28 +573,36 @@ export const normalizeColorValue = (value: unknown): ColorValue | null => {
     if (!rgb) return null;
 
     const hsv = rgbToHsv(rgb);
+    const hsl = rgbToHsl(rgb);
     const slug = generateColorSlug(hex);
 
     // Build RGBA and HSVA with alpha if provided
     const rgba: RGBA | undefined = alpha !== undefined ? { ...rgb, a: alpha } : undefined;
 
     const hsva: HSVA | undefined = alpha !== undefined ? { ...hsv, a: alpha } : undefined;
+    const hsla: HSLA | undefined = alpha !== undefined ? { ...hsl, a: alpha } : undefined;
 
     return {
       hex,
-      slug,
+      slug:
+        typeof value === 'object' &&
+        value !== null &&
+        'slug' in value &&
+        typeof (value as Record<string, unknown>).slug === 'string'
+          ? ((value as Record<string, unknown>).slug as string)
+          : slug,
       alpha,
       rgb,
       rgba,
       hsv,
       hsva,
+      hsl,
+      hsla,
       ...(typeof value === 'object' && value !== null && 'label' in value && typeof (value as any).label === 'string'
         ? { label: (value as any).label }
         : {}),
     };
-  } catch (e) {
-    // If parsing fails, report the error and return null
-    console.error('Color normalization error:', e);
+  } catch {
     return null;
   }
 };
@@ -531,14 +615,13 @@ export const colorValueToHsva = (colorValue: ColorValue | null): HSVA => {
     return { h: 0, s: 0, v: 100, a: 1 };
   }
 
-  return (
-    colorValue.hsva || {
-      h: 0,
-      s: 0,
-      v: 100,
-      a: colorValue.alpha ?? 1,
-    }
-  );
+  if (colorValue.hsva) return colorValue.hsva;
+  if (colorValue.hsv) return { ...colorValue.hsv, a: colorValue.alpha ?? colorValue.hsv.a ?? 1 };
+  if (colorValue.rgb) {
+    const hsv = rgbToHsv(colorValue.rgb);
+    return { ...hsv, a: colorValue.alpha ?? colorValue.rgb.a ?? 1 };
+  }
+  return { h: 0, s: 0, v: 100, a: colorValue.alpha ?? 1 };
 };
 
 /**
@@ -550,20 +633,38 @@ export const colorValueToHsva = (colorValue: ColorValue | null): HSVA => {
  * Extract alpha value from any format in ColorOption
  */
 export const getAlphaFromOption = (option: ColorOption): number => {
-  if (option.alpha !== undefined) return option.alpha;
-  if (option.rgba?.a !== undefined) return option.rgba.a;
-  if (option.hsla?.a !== undefined) return option.hsla.a;
-  if (option.hsva?.a !== undefined) return option.hsva.a;
-  return 1; // Default to fully opaque
+  const alpha =
+    option.alpha ??
+    option.rgba?.a ??
+    option.rgb?.a ??
+    option.hsla?.a ??
+    option.hsl?.a ??
+    option.hsva?.a ??
+    option.hsv?.a ??
+    1;
+  if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) throw new Error('Alpha must be between 0 and 1');
+  return alpha;
 };
 
 export const resolveColorOption = (
-  option: ColorOption,
+  option: ColorOption | string,
 ): { hex: string; alpha: number; slug?: string; label?: string } => {
+  const normalizedOption: ColorOption = typeof option === 'string' ? { hex: option } : option;
+
+  if (!normalizedOption || typeof normalizedOption !== 'object') {
+    throw new Error('ColorOption must be an object or color string');
+  }
+
   // Count how many color formats are provided
-  const colorFormats = [option.hex, option.rgb, option.rgba, option.hsl, option.hsla, option.hsv, option.hsva].filter(
-    (format) => format !== undefined,
-  );
+  const colorFormats = [
+    normalizedOption.hex,
+    normalizedOption.rgb,
+    normalizedOption.rgba,
+    normalizedOption.hsl,
+    normalizedOption.hsla,
+    normalizedOption.hsv,
+    normalizedOption.hsva,
+  ].filter((format) => format !== undefined);
 
   if (colorFormats.length === 0) {
     throw new Error('ColorOption must have at least one color format (hex, rgb, rgba, hsl, hsla, hsv, or hsva)');
@@ -578,24 +679,24 @@ export const resolveColorOption = (
   let hex: string;
 
   try {
-    if (option.hex) {
-      hex = option.hex;
-    } else if (option.rgba) {
-      hex = rgbToHex(option.rgba.r, option.rgba.g, option.rgba.b);
-    } else if (option.rgb) {
-      hex = rgbToHex(option.rgb.r, option.rgb.g, option.rgb.b);
-    } else if (option.hsla) {
-      const hsl = { h: option.hsla.h, s: option.hsla.s, l: option.hsla.l } as HSL;
+    if (normalizedOption.hex) {
+      hex = parseHexWithAlpha(normalizedOption.hex).hex;
+    } else if (normalizedOption.rgba) {
+      hex = rgbToHex(normalizedOption.rgba.r, normalizedOption.rgba.g, normalizedOption.rgba.b);
+    } else if (normalizedOption.rgb) {
+      hex = rgbToHex(normalizedOption.rgb.r, normalizedOption.rgb.g, normalizedOption.rgb.b);
+    } else if (normalizedOption.hsla) {
+      const hsl = { h: normalizedOption.hsla.h, s: normalizedOption.hsla.s, l: normalizedOption.hsla.l } as HSL;
       const rgb = hslToRgb(hsl);
       hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-    } else if (option.hsl) {
-      const rgb = hslToRgb(option.hsl);
+    } else if (normalizedOption.hsl) {
+      const rgb = hslToRgb(normalizedOption.hsl);
       hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-    } else if (option.hsva) {
-      const rgb = hsvaToRgb(option.hsva);
+    } else if (normalizedOption.hsva) {
+      const rgb = hsvaToRgb(normalizedOption.hsva);
       hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-    } else if (option.hsv) {
-      const rgb = hsvToRgb(option.hsv);
+    } else if (normalizedOption.hsv) {
+      const rgb = hsvToRgb(normalizedOption.hsv);
       hex = rgbToHex(rgb.r, rgb.g, rgb.b);
     } else {
       throw new Error('Unable to determine color format');
@@ -604,12 +705,18 @@ export const resolveColorOption = (
     throw new Error(`Failed to resolve ColorOption: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  const alpha = getAlphaFromOption(option);
+  const parsedHex = normalizedOption.hex ? parseHexWithAlpha(normalizedOption.hex) : undefined;
+  const alpha = normalizedOption.alpha ?? parsedHex?.alpha ?? getAlphaFromOption(normalizedOption);
 
   return {
     hex,
     alpha,
-    ...(option.slug && { slug: option.slug }),
-    ...(option.label && { label: option.label }),
+    ...(normalizedOption.slug && { slug: normalizedOption.slug }),
+    ...(normalizedOption.label && { label: normalizedOption.label }),
   };
+};
+
+export const validateColorValue = (value: unknown, required = false): true | string => {
+  if (value == null || value === '') return required ? 'Choose a color.' : true;
+  return normalizeColorValue(value) ? true : 'Enter a valid color.';
 };

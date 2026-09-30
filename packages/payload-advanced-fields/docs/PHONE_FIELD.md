@@ -115,5 +115,7 @@ The field stores canonical phone metadata:
 - When the country selector is enabled, national-format numbers are parsed using the selected country
 - If the number is cleared, the selected country remains in place for the next entry
 - If `countries.enabledCountries` is omitted, all supported countries are available
+- If `countries.enabledCountries` is provided without `defaultCountry`, the first valid allowed country is used as the default
 - The extension field is optional and stored as `ext` in the JSON value
-- If `formatter` is a function, it receives the parsed phone parts and the formatted output is stored on the saved value as `custom`
+- If `formatter` is a function, it runs during server-side normalization with the parsed phone parts and stores its output as `custom`; the admin displays an existing custom value without evaluating serialized code in the browser
+- Server-side `beforeValidate` normalization keeps valid API writes in the same canonical shape as admin edits; invalid values remain available for validation feedback

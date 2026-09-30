@@ -1,6 +1,6 @@
 import type { JSONField } from 'payload';
 import type { ColorField, ColorOption, ColorPickerType } from '../shared/types.js';
-import { resolveColorOption } from '../shared/utils.js';
+import { normalizeColorValue, resolveColorOption, validateColorValue } from '../shared/utils.js';
 
 export type ColorFieldConfig = Partial<Omit<ColorField, 'type'>> & {
   pickerType?: ColorPickerType;
@@ -27,6 +27,7 @@ export const colorField = (config: ColorFieldConfig = {}): ColorField => {
     disableAlpha = false,
     swatches,
     admin,
+    hooks,
     ...rest
   } = config;
 
@@ -35,9 +36,14 @@ export const colorField = (config: ColorFieldConfig = {}): ColorField => {
 
   const resolvedDefault = defaultColor
     ? resolveColorOption(defaultColor)
-    : presetColors
+    : presetColors?.length
       ? resolveColorOption(presetColors[0])
       : undefined;
+
+  const normalizeHook = ({ value }: { value: unknown }) => {
+    if (value == null || value === '') return null;
+    return normalizeColorValue(value) ?? value;
+  };
 
   return {
     name,
@@ -45,9 +51,19 @@ export const colorField = (config: ColorFieldConfig = {}): ColorField => {
     type: 'json',
     required,
     localized,
+    validate: (value) => validateColorValue(value, required),
     defaultValue: resolvedDefault
-      ? { hex: resolvedDefault.hex, slug: resolvedDefault.slug, label: resolvedDefault.label }
+      ? {
+          hex: resolvedDefault.hex,
+          alpha: resolvedDefault.alpha,
+          slug: resolvedDefault.slug,
+          label: resolvedDefault.label,
+        }
       : undefined,
+    hooks: {
+      ...hooks,
+      beforeValidate: [normalizeHook, ...(hooks?.beforeValidate ?? [])],
+    },
     admin: {
       ...admin,
       components: {

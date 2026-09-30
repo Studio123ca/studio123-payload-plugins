@@ -253,6 +253,8 @@ The ColorField supports multiple input formats that are automatically normalized
 
 All formats are automatically converted to internal HSV representation for pickers, then stored with complete RGB, HSL, and HSV data.
 
+`defaultColor` accepts either a color string such as `'#4ECDC4'` or a `ColorOption`. Empty preset arrays leave the field without a default. Invalid hex characters, channel values, and alpha values are rejected by server validation. Valid API values are normalized during `beforeValidate`, while invalid values remain available for validation feedback.
+
 ## API Usage
 
 Once stored, you can access the color in multiple formats:

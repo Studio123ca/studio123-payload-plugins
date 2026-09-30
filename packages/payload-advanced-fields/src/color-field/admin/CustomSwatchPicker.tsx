@@ -164,9 +164,11 @@ export const CustomSwatchPicker = ({
             }}
           >
             <button
+              type="button"
               onClick={() => handleSwatchClick(swatch)}
               disabled={readOnly}
               aria-label={swatch.label || swatch.hex}
+              aria-pressed={isSelected}
               style={{
                 width: '100%',
                 aspectRatio: '1 / 1',

@@ -2,10 +2,16 @@ import type { JSONField } from 'payload';
 import type {
   PhoneField,
   PhoneFieldClientProps,
+  PhoneFieldValue,
   PhoneCountrySelectorConfig,
   PhoneNumberFormatter,
 } from '../shared/types.js';
-import { validatePhoneInput, resolveDefaultCountry } from '../shared/utils.js';
+import {
+  normalizePhoneValue,
+  resolveDefaultCountry,
+  toPhoneFormatterParts,
+  validatePhoneInput,
+} from '../shared/utils.js';
 
 export type PhoneFieldConfig = Partial<Omit<PhoneField, 'type' | 'formatter'>> &
   PhoneFieldClientProps & {
@@ -28,9 +34,9 @@ export const phoneField = (config: PhoneFieldConfig = {}): PhoneField => {
     extension,
     formatter,
     admin,
+    hooks,
     ...rest
   } = config;
-  const formatterSource = typeof formatter === 'function' ? formatter.toString() : undefined;
   const clientFormatter = typeof formatter === 'function' ? 'custom' : formatter;
 
   const normalizedCountries: Required<Pick<PhoneCountrySelectorConfig, 'enabled'>> & PhoneCountrySelectorConfig = {
@@ -45,6 +51,17 @@ export const phoneField = (config: PhoneFieldConfig = {}): PhoneField => {
     placeholder: extension?.placeholder,
   };
   const normalizedDefaultCountry = resolveDefaultCountry(defaultCountry, normalizedCountries.enabledCountries);
+  const normalizeHook = ({ value }: { value: unknown }) => {
+    if (value == null || value === '') return null;
+    const normalized = normalizePhoneValue(value as PhoneFieldValue, {
+      allowedCountries: normalizedCountries.enabledCountries,
+    });
+    if (!normalized) return value;
+    if (typeof formatter === 'function') {
+      return { ...normalized, custom: formatter(toPhoneFormatterParts(normalized)) };
+    }
+    return normalized;
+  };
 
   return {
     name,
@@ -54,7 +71,7 @@ export const phoneField = (config: PhoneFieldConfig = {}): PhoneField => {
     localized,
     required,
     validate: (value) => {
-      const phoneValue = value as { number?: string } | null | undefined;
+      const phoneValue = value as { number?: unknown } | null | undefined;
       if (!phoneValue?.number) return required ? 'Enter a phone number.' : true;
 
       return validatePhoneInput(phoneValue.number, {
@@ -66,6 +83,10 @@ export const phoneField = (config: PhoneFieldConfig = {}): PhoneField => {
     },
     countries: normalizedCountries,
     extension: normalizedExtension,
+    hooks: {
+      ...hooks,
+      beforeValidate: [normalizeHook, ...(hooks?.beforeValidate ?? [])],
+    },
     admin: {
       ...admin,
       components: {
@@ -77,7 +98,6 @@ export const phoneField = (config: PhoneFieldConfig = {}): PhoneField => {
             countries: normalizedCountries,
             extension: normalizedExtension,
             formatterMode: clientFormatter,
-            formatterSource,
           },
         },
         ...(admin?.components || {}),

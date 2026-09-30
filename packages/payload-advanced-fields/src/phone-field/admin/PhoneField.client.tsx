@@ -7,9 +7,10 @@ import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
 import { FieldError } from '@payloadcms/ui/fields/FieldError';
 import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
 import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
+import { useLocale } from '@payloadcms/ui/providers/Locale';
 import type { JSONFieldClientProps } from 'payload';
 import type { CountryCode } from 'libphonenumber-js/max';
-import type { PhoneFieldClientProps, PhoneFieldValue, PhoneNumberFormatter } from '../shared/types.js';
+import type { PhoneFieldClientProps, PhoneFieldValue } from '../shared/types.js';
 import {
   composePhoneDraft,
   formatPhoneDisplayValue,
@@ -19,7 +20,7 @@ import {
   normalizeAllowedCountries,
   parsePhoneDraft,
   parsePhoneInput,
-  toPhoneFormatterParts,
+  getSupportedCountries,
   resolveDefaultCountry,
   validatePhoneInput,
 } from '../shared/utils.js';
@@ -90,16 +91,9 @@ const isFormatablePhoneValue = (value: PhoneFieldValue | null | undefined) =>
   Boolean(value?.number && (value.national || value.international));
 
 export function PhoneField(props: Props) {
-  const {
-    field,
-    path,
-    readOnly,
-    defaultCountry,
-    countries,
-    extension,
-    formatterMode = 'international',
-    formatterSource,
-  } = props;
+  const { field, path, readOnly, defaultCountry, countries, extension, formatterMode = 'international' } = props;
+  const locale = useLocale();
+  const localeCode = locale?.code || 'en';
   const countriesEnabled = Boolean(countries?.enabled);
   const extensionEnabled = Boolean(extension?.enabled);
   const normalizedEnabledCountries = useMemo(
@@ -107,17 +101,9 @@ export function PhoneField(props: Props) {
     [countries?.enabledCountries],
   );
   const normalizedDefaultCountry = resolveDefaultCountry(defaultCountry, normalizedEnabledCountries);
-  const customFormatter = useMemo(() => {
-    if (formatterMode !== 'custom' || !formatterSource) return undefined;
-    try {
-      return new Function('parts', `return (${formatterSource})(parts);`) as PhoneNumberFormatter;
-    } catch {
-      return undefined;
-    }
-  }, [formatterMode, formatterSource]);
   const getDisplayValue = (phoneValue: PhoneFieldValue) => {
     if (formatterMode === 'national') return formatPhoneDisplayValue(phoneValue, 'national');
-    if (formatterMode === 'custom' && customFormatter) return customFormatter(toPhoneFormatterParts(phoneValue));
+    if (formatterMode === 'custom' && phoneValue.custom) return phoneValue.custom;
     return formatPhoneDisplayValue(phoneValue, 'international');
   };
   const [draftNumber, setDraftNumber] = useState<string>('');
@@ -146,15 +132,15 @@ export function PhoneField(props: Props) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const lastCommittedRef = useRef<string>('');
 
-  const label = resolveLocalizedLabel(field.label, 'en', field.name);
-  const description = resolveLocalizedLabel(field.admin?.description, 'en', '');
-  const placeholderText = resolveLocalizedLabel((field.admin as any)?.placeholder, 'en', '');
+  const label = resolveLocalizedLabel(field.label, localeCode, field.name);
+  const description = resolveLocalizedLabel(field.admin?.description, localeCode, '');
+  const placeholderText = resolveLocalizedLabel((field.admin as any)?.placeholder, localeCode, '');
   const extensionPlaceholder = extension?.placeholder || 'ext.';
   const isLocalized = Boolean(field.localized);
   const isReadOnly = Boolean(readOnly || disabled || field.admin?.readOnly);
   const styles = useMemo(() => mergeFieldStyles(field), [field]);
   const countryOptions = useMemo(
-    () => normalizedEnabledCountries || [normalizedDefaultCountry || 'US'],
+    () => normalizedEnabledCountries || getSupportedCountries(),
     [normalizedDefaultCountry, normalizedEnabledCountries],
   );
   const inferredCountry = useMemo(() => {
@@ -163,8 +149,8 @@ export function PhoneField(props: Props) {
   const indicatorCountry = selectedCountry || inferredCountry || normalizedDefaultCountry || 'US';
   const countryIndicatorLabel = useMemo(() => {
     if (!countriesEnabled) return '';
-    return getCountryLabel(indicatorCountry, 'en', countries);
-  }, [countries, countriesEnabled, indicatorCountry]);
+    return getCountryLabel(indicatorCountry, localeCode, countries);
+  }, [countries, countriesEnabled, indicatorCountry, localeCode]);
   const countryIndicatorWidth = useMemo(() => {
     if (!countriesEnabled) return undefined;
     const estimated = Math.max(
@@ -203,16 +189,7 @@ export function PhoneField(props: Props) {
     setSelectedCountry((value.country as CountryCode | undefined) || normalizedDefaultCountry);
     setDraftNumber(value.custom || getDisplayValue(value));
     setDraftExtension(extensionEnabled ? parts.extension : '');
-  }, [
-    customFormatter,
-    extensionEnabled,
-    formatterMode,
-    isDraftDirty,
-    isFocused,
-    normalizedDefaultCountry,
-    selectedCountry,
-    value,
-  ]);
+  }, [extensionEnabled, formatterMode, isDraftDirty, isFocused, normalizedDefaultCountry, selectedCountry, value]);
 
   const commitDraft = (rawNumber: string, rawExtension: string, countryOverride?: CountryCode) => {
     const country = countryOverride ?? selectedCountry ?? inferredCountry ?? normalizedDefaultCountry;
@@ -271,7 +248,7 @@ export function PhoneField(props: Props) {
     setLiveError(null);
     setIsDraftDirty(false);
     const displayValue = getDisplayValue(normalized);
-    setValue(customFormatter ? { ...normalized, custom: displayValue } : normalized);
+    setValue(normalized);
     setSelectedCountry(normalized.country as CountryCode | undefined);
     setDraftNumber(displayValue);
     setDraftExtension(extensionEnabled ? normalized.ext || extensionValue : '');
@@ -279,6 +256,7 @@ export function PhoneField(props: Props) {
 
   const handleFocus = () => setIsFocused(true);
   const handleBlur = (event: FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    if (event.relatedTarget instanceof Node && wrapperRef.current?.contains(event.relatedTarget)) return;
     setIsFocused(false);
     commitDraft(draftNumber, draftExtension);
   };
@@ -324,7 +302,7 @@ export function PhoneField(props: Props) {
             }}
           >
             {countriesEnabled ? (
-              <label
+              <div
                 aria-label="Country"
                 style={{
                   ...sharedControlStyle,
@@ -343,6 +321,7 @@ export function PhoneField(props: Props) {
                 }}
               >
                 <select
+                  aria-label="Country"
                   disabled={isReadOnly}
                   style={{
                     ...sharedControlStyle,
@@ -359,11 +338,11 @@ export function PhoneField(props: Props) {
                 >
                   {countryOptions.map((country) => (
                     <option key={country} value={country}>
-                      {getCountrySelectLabel(country, 'en', countries)}
+                      {getCountrySelectLabel(country, localeCode, countries)}
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
             ) : null}
             <input
               aria-label={label}

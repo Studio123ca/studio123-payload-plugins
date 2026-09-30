@@ -2,6 +2,10 @@
 
 ## Next
 
+- Fixed Phone Field country defaults and dropdown focus behavior, exposed all supported countries when no allowlist is configured, preserved extensions during server normalization, hardened non-string validation, and moved custom formatter execution to the server hook.
+- Fixed Color Field string defaults, empty preset handling, alpha preservation, malformed color validation, picker initialization, read-only interaction, and swatch accessibility.
+- Added server-side `beforeValidate` normalization for phone and color fields while preserving user-provided hooks.
+- Moved the Link Field drawer's Clear action to the left and Cancel beside Save.
 - Added opt-in row-backed Data Table storage with a hidden managed row collection, parent access checks, and a paginated row endpoint.
 - Added `storage.mode`, pagination limits, storage manifests, and shared row-page metadata for large tables.
 - Updated the admin field to hydrate row-backed tables through the protected endpoint and updated the Paginated API Storybook story to exercise the row-backed response shape.
