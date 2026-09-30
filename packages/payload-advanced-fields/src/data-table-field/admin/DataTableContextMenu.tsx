@@ -1,6 +1,8 @@
 'use client';
 
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import { BsArrowDownUp } from 'react-icons/bs';
+import { TbFreezeRow } from 'react-icons/tb';
 import {
   FiArrowDown,
   FiArrowLeft,
@@ -46,6 +48,7 @@ type Props = {
   onApplyBackground: (key?: string) => void;
   onFreezeRows: (top: number, bottom: number) => void;
   onSort: (direction: 'ascending' | 'descending', column: number) => void;
+  hasSelection: boolean;
 };
 
 function Item({
@@ -53,16 +56,22 @@ function Item({
   icon,
   shortcut,
   disabled = false,
+  danger = false,
   onSelect,
 }: {
   children: ReactNode;
   icon: ReactNode;
   shortcut?: string;
   disabled?: boolean;
+  danger?: boolean;
   onSelect: () => void;
 }) {
   return (
-    <ContextMenu.Item className="data-table__context-item" disabled={disabled} onSelect={onSelect}>
+    <ContextMenu.Item
+      className={`data-table__context-item${danger ? ' data-table__context-item--danger' : ''}`}
+      disabled={disabled}
+      onSelect={onSelect}
+    >
       <span className="data-table__context-icon" aria-hidden>
         {icon}
       </span>
@@ -104,10 +113,20 @@ function FormatChoices({ options, onApply }: { options: ResolvedDataTableOptions
   );
 }
 
-function Submenu({ label, children, icon }: { label: string; children: ReactNode; icon: ReactNode }) {
+function Submenu({
+  label,
+  children,
+  icon,
+  disabled = false,
+}: {
+  label: string;
+  children: ReactNode;
+  icon: ReactNode;
+  disabled?: boolean;
+}) {
   return (
     <ContextMenu.Sub>
-      <ContextMenu.SubTrigger className="data-table__context-item">
+      <ContextMenu.SubTrigger className="data-table__context-item" disabled={disabled}>
         <span className="data-table__context-icon" aria-hidden>
           {icon}
         </span>
@@ -145,6 +164,7 @@ export function DataTableContextMenu({
   onApplyBackground,
   onFreezeRows,
   onSort,
+  hasSelection,
 }: Props) {
   if (disabled) return <>{children}</>;
   const close = () => onTargetChange(null);
@@ -162,27 +182,27 @@ export function DataTableContextMenu({
                 Add column
               </Item>
               <Separator />
-              <Item icon={<FiDelete />} onSelect={onClearSelection}>
+              <Item icon={<FiDelete />} danger disabled={!hasSelection} onSelect={onClearSelection}>
                 Clear selection
               </Item>
             </>
           )}
           {target?.kind === 'cell' && (
             <>
-              <Item icon={<FiCopy />} shortcut="⌘C" onSelect={onCopy}>
+              <Item icon={<FiCopy />} disabled={!hasSelection} shortcut="⌘C" onSelect={onCopy}>
                 Copy cells
               </Item>
-              <Item icon={<FiCopy />} shortcut="⌘V" onSelect={onPaste}>
+              <Item icon={<FiCopy />} disabled={!hasSelection} shortcut="⌘V" onSelect={onPaste}>
                 Paste cells
               </Item>
-              <Item icon={<FiCopy />} shortcut="⌘X" onSelect={onCut}>
+              <Item icon={<FiCopy />} disabled={!hasSelection} shortcut="⌘X" onSelect={onCut}>
                 Cut cells
               </Item>
-              <Item icon={<FiDelete />} shortcut="⌫" onSelect={onClearSelection}>
+              <Item icon={<FiDelete />} danger disabled={!hasSelection} shortcut="⌫" onSelect={onClearSelection}>
                 Clear cells
               </Item>
               {options.formats.length > 0 && (
-                <Submenu label="Format" icon={<FiDroplet />}>
+                <Submenu label="Format" icon={<FiDroplet />} disabled={!hasSelection}>
                   <FormatChoices options={options} onApply={onApplyBackground} />
                 </Submenu>
               )}
@@ -227,24 +247,6 @@ export function DataTableContextMenu({
           )}
           {target?.kind === 'row' && (
             <>
-              {options.formats.length > 0 && (
-                <Submenu label="Format" icon={<FiDroplet />}>
-                  <FormatChoices options={options} onApply={onApplyBackground} />
-                </Submenu>
-              )}
-              {options.stickyRows.enabled && (
-                <Submenu label="Freeze rows" icon={<FiArrowDown />}>
-                  <Item icon={<FiArrowDown />} onSelect={() => onFreezeRows(target.row + 1, 0)}>
-                    Freeze through this row
-                  </Item>
-                  <Item icon={<FiArrowUp />} onSelect={() => onFreezeRows(0, value.rows.length - target.row)}>
-                    Freeze from this row
-                  </Item>
-                  <Item icon={<FiDelete />} onSelect={() => onFreezeRows(0, 0)}>
-                    Unfreeze rows
-                  </Item>
-                </Submenu>
-              )}
               <Submenu label="Insert" icon={<FiPlus />}>
                 <Item
                   icon={<FiArrowUp />}
@@ -268,7 +270,7 @@ export function DataTableContextMenu({
                   Duplicate row
                 </Item>
               </Submenu>
-              <Submenu label="Move" icon={<FiArrowUp />}>
+              <Submenu label="Move" icon={<BsArrowDownUp />}>
                 <Item
                   icon={<FiArrowUp />}
                   disabled={target.row === 0}
@@ -284,9 +286,28 @@ export function DataTableContextMenu({
                   Move down
                 </Item>
               </Submenu>
+              {options.formats.length > 0 && (
+                <Submenu label="Format" icon={<FiDroplet />} disabled={!hasSelection}>
+                  <FormatChoices options={options} onApply={onApplyBackground} />
+                </Submenu>
+              )}
+              {options.stickyRows.enabled && (
+                <Submenu label="Freeze rows" icon={<TbFreezeRow />}>
+                  <Item icon={<FiArrowDown />} onSelect={() => onFreezeRows(target.row + 1, 0)}>
+                    Freeze through this row
+                  </Item>
+                  <Item icon={<FiArrowUp />} onSelect={() => onFreezeRows(0, value.rows.length - target.row)}>
+                    Freeze from this row
+                  </Item>
+                  <Item icon={<FiDelete />} onSelect={() => onFreezeRows(0, 0)}>
+                    Unfreeze rows
+                  </Item>
+                </Submenu>
+              )}
               <Separator />
               <Item
                 icon={<FiTrash2 />}
+                danger
                 disabled={value.rows.length <= options.rows.min}
                 onSelect={() => onDeleteRow(target.row)}
               >
@@ -296,11 +317,6 @@ export function DataTableContextMenu({
           )}
           {target?.kind === 'column' && (
             <>
-              {options.formats.length > 0 && (
-                <Submenu label="Format" icon={<FiDroplet />}>
-                  <FormatChoices options={options} onApply={onApplyBackground} />
-                </Submenu>
-              )}
               <Submenu label="Insert" icon={<FiPlus />}>
                 <Item
                   icon={<FiArrowLeft />}
@@ -324,7 +340,7 @@ export function DataTableContextMenu({
                   Duplicate column
                 </Item>
               </Submenu>
-              <Submenu label="Move" icon={<FiArrowLeft />}>
+              <Submenu label="Move" icon={<BsArrowDownUp />}>
                 <Item
                   icon={<FiArrowLeft />}
                   disabled={target.column === 0}
@@ -340,9 +356,15 @@ export function DataTableContextMenu({
                   Move right
                 </Item>
               </Submenu>
+              {options.formats.length > 0 && (
+                <Submenu label="Format" icon={<FiDroplet />} disabled={!hasSelection}>
+                  <FormatChoices options={options} onApply={onApplyBackground} />
+                </Submenu>
+              )}
               <Separator />
               <Item
                 icon={<FiTrash2 />}
+                danger
                 disabled={value.columns.length <= options.columns.min}
                 onSelect={() => onDeleteColumn(target.column)}
               >

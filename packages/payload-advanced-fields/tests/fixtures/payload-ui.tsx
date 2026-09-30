@@ -114,3 +114,23 @@ export function Drawer({ slug, title, children }: any) {
     </div>
   );
 }
+export function DialogModal({ slug, children }: any) {
+  const context = useContext(Context);
+  if (context.modal !== slug) return null;
+  return <div role="dialog">{children}</div>;
+}
+export function DialogHeader({ title }: any) {
+  return <h2>{title}</h2>;
+}
+export function DialogBody({ children }: any) {
+  return <div>{children}</div>;
+}
+export function DialogFooter({ children }: any) {
+  return <div>{children}</div>;
+}
+export function DialogCancel({ label, onClick }: any) {
+  return <button onClick={onClick}>{label}</button>;
+}
+export function DialogConfirm({ label, onClick }: any) {
+  return <button onClick={onClick}>{label}</button>;
+}

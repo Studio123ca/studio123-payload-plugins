@@ -78,6 +78,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const [dragging, setDragging] = useState<{ kind: 'row' | 'column'; index: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ kind: 'row' | 'column'; index: number } | null>(null);
   const [csvError, setCSVError] = useState<string | null>(null);
+  const [virtualScrollTop, setVirtualScrollTop] = useState(0);
   const [stickyLayoutVersion, setStickyLayoutVersion] = useState(0);
   const tableRootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -220,6 +221,22 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const addColumn = () => {
     if (!value) return;
     commit(insertDataTableColumn(value, value.columns.length, options));
+  };
+  const addRows = (count: number) => {
+    if (!value || count < 1) return;
+    let next = value;
+    for (let index = 0; index < count && next.rows.length < options.rows.max; index += 1) {
+      next = insertDataTableRow(next, next.rows.length, options);
+    }
+    if (next !== value) commit(next);
+  };
+  const addColumns = (count: number) => {
+    if (!value || count < 1) return;
+    let next = value;
+    for (let index = 0; index < count && next.columns.length < options.columns.max; index += 1) {
+      next = insertDataTableColumn(next, next.columns.length, options);
+    }
+    if (next !== value) commit(next);
   };
   const sortRows = (direction: 'ascending' | 'descending', columnIndex: number) => {
     if (!value) return;
@@ -417,6 +434,11 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     link.click();
     URL.revokeObjectURL(url);
   };
+  const handleGridBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+    if (next?.closest('.data-table__context-content, .data-table__menu-content')) return;
+    if (!next || !tableRootRef.current?.contains(next)) table.resetCellSelection(true);
+  };
   const applyBackground = (key?: string) => {
     if (!value) return;
     let rows: string[] = [];
@@ -442,6 +464,16 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const freezeRows = (top: number, bottom: number) => {
     if (!value) return;
     commit({ ...value, appearance: { ...value.appearance, stickyRows: { top, bottom } } });
+  };
+  const focusedRowIndex = table.getFocusedCell()?.row.index;
+  const canFreezeRows = options.stickyRows.enabled && focusedRowIndex !== undefined;
+  const freezeThroughFocusedRow = () => {
+    if (!value || focusedRowIndex === undefined) return;
+    freezeRows(focusedRowIndex + 1, 0);
+  };
+  const freezeFromFocusedRow = () => {
+    if (!value || focusedRowIndex === undefined) return;
+    freezeRows(0, value.rows.length - focusedRowIndex);
   };
   const focusActiveCell = () => {
     const focused = table.getFocusedCell();
@@ -585,6 +617,31 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
       event.shiftKey ? redo() : undo();
     }
   };
+  const allRows = value ? table.getRowModel().rows : [];
+  const virtualizeRows = allRows.length > 200;
+  const virtualRowHeight = 43;
+  const virtualViewportHeight = typeof maxHeight === 'number' ? maxHeight : 640;
+  const virtualOverscan = 8;
+  const virtualStart = virtualizeRows
+    ? Math.max(sticky.top, Math.floor(virtualScrollTop / virtualRowHeight) - virtualOverscan)
+    : sticky.top;
+  const virtualEnd = virtualizeRows
+    ? Math.min(
+        allRows.length - sticky.bottom,
+        Math.ceil((virtualScrollTop + virtualViewportHeight) / virtualRowHeight) + virtualOverscan,
+      )
+    : allRows.length - sticky.bottom;
+  const renderedRows = virtualizeRows
+    ? [
+        ...allRows.slice(0, sticky.top),
+        ...allRows.slice(virtualStart, Math.max(virtualStart, virtualEnd)),
+        ...allRows.slice(Math.max(allRows.length - sticky.bottom, 0)),
+      ]
+    : allRows;
+  const virtualTopSpacer = virtualizeRows ? Math.max(0, virtualStart - sticky.top) * virtualRowHeight : 0;
+  const virtualBottomSpacer = virtualizeRows
+    ? Math.max(0, allRows.length - sticky.bottom - virtualEnd) * virtualRowHeight
+    : 0;
   if (!value) {
     return readOnly ? (
       <p className="data-table__empty">No data table has been created.</p>
@@ -607,23 +664,35 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
         <DataTableMenubar
           canAddRow={value.rows.length < options.rows.max}
           canAddColumn={value.columns.length < options.columns.max}
+          canAddRows={value.rows.length < options.rows.max}
+          canAddColumns={value.columns.length < options.columns.max}
+          maxRowsToAdd={options.rows.max - value.rows.length}
+          maxColumnsToAdd={options.columns.max - value.columns.length}
           onAddRow={addRow}
           onAddColumn={addColumn}
+          onAddRows={addRows}
+          onAddColumns={addColumns}
           onClear={() => commit(null)}
           canUndo={canUndo}
           canRedo={canRedo}
           onUndo={undo}
           onRedo={redo}
           canCopy={table.getSelectedCellCount() > 0}
-          canPaste={Boolean(table.getFocusedCell())}
+          canPaste={table.getSelectedCellCount() > 0}
           canCut={table.getSelectedCellCount() > 0}
           onCopy={copySelection}
           onPaste={pasteSelection}
           onCut={cutSelection}
           onClearSelection={clearSelection}
+          canFreezeRows={canFreezeRows}
+          onFreezeThroughCurrentRow={freezeThroughFocusedRow}
+          onFreezeFromCurrentRow={freezeFromFocusedRow}
+          onUnfreezeRows={() => freezeRows(0, 0)}
           onImportCSV={importCSV}
           onExportCSV={exportCSV}
           formats={options.formats}
+          hasSelection={table.getSelectedCellCount() > 0}
+          formulasEnabled={options.formulas.enabled}
           onApplyBackground={applyBackground}
         />
       )}
@@ -663,6 +732,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
         onApplyBackground={applyBackground}
         onFreezeRows={freezeRows}
         onSort={sortRows}
+        hasSelection={table.getSelectedCellCount() > 0}
       >
         <div
           ref={scrollRef}
@@ -670,7 +740,11 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
           style={{ maxHeight }}
           tabIndex={0}
           aria-label="Data table grid"
+          onScroll={(event) => {
+            if (virtualizeRows) setVirtualScrollTop(event.currentTarget.scrollTop);
+          }}
           onContextMenu={handleContextMenu}
+          onBlur={handleGridBlur}
           onKeyDown={handleGridKeyDown}
         >
           <table aria-label="Data table" style={{ width: 48 + table.getTotalSize() }}>
@@ -748,19 +822,25 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
               ))}
             </thead>
             <tbody ref={stickyBodyRef}>
-              {table.getRowModel().rows.map((row, rowIndex, renderedRows) => {
+              {virtualTopSpacer > 0 && (
+                <tr aria-hidden>
+                  <td colSpan={value.columns.length + 1} style={{ height: virtualTopSpacer, padding: 0 }} />
+                </tr>
+              )}
+              {renderedRows.map((row) => {
+                const rowIndex = allRows.indexOf(row);
                 const displayIndex = row.getDisplayIndex();
                 const stickyPosition =
                   rowIndex < sticky.top
                     ? 'top'
-                    : rowIndex >= renderedRows.length - sticky.bottom
+                    : rowIndex >= allRows.length - sticky.bottom
                       ? 'bottom'
                       : undefined;
                 const stickyOffset =
                   stickyPosition === 'top'
                     ? `${41 + rowIndex * 43}px`
                     : stickyPosition === 'bottom'
-                      ? `${(renderedRows.length - rowIndex - 1) * 43}px`
+                      ? `${(allRows.length - rowIndex - 1) * 43}px`
                       : undefined;
                 return (
                   <tr
@@ -844,6 +924,11 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                   </tr>
                 );
               })}
+              {virtualBottomSpacer > 0 && (
+                <tr aria-hidden>
+                  <td colSpan={value.columns.length + 1} style={{ height: virtualBottomSpacer, padding: 0 }} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

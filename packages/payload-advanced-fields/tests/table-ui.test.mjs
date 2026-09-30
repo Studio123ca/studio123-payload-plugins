@@ -50,6 +50,11 @@ const formatOptions = resolveDataTableOptions({
   columns: { initial: 1 },
   formats: [{ key: 'highlight', label: 'Highlight', background: '#fff3c4' }],
 });
+const formulaOptions = resolveDataTableOptions({
+  rows: { initial: 1 },
+  columns: { initial: 1 },
+  formulas: { enabled: true, compute: false },
+});
 const field = { name: 'dataTable', type: 'json', label: 'Data Table' };
 
 async function render({ value = null, readOnly = false, tableOptions = options } = {}) {
@@ -101,6 +106,73 @@ test('creates and edits a Data Table value', async () => {
   assert.equal(stored().columns.length, 1);
 });
 
+test('confirms before clearing the table', async () => {
+  const value = createDataTable(options);
+  await render({ value });
+  await selectMenuItem('Table', 'Clear table');
+  assert.match(document.querySelector('[role="dialog"]')?.textContent ?? '', /remove all rows/);
+  await act(async () => document.querySelector('[role="dialog"] button')?.click());
+  assert.notEqual(stored(), null);
+  await selectMenuItem('Table', 'Clear table');
+  await act(async () => [...document.querySelectorAll('[role="dialog"] button')].at(-1)?.click());
+  assert.equal(stored(), null);
+});
+
+test('freezes rows from the active cell through the Edit menu', async () => {
+  const freezeOptions = resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 1 } });
+  const value = createDataTable(freezeOptions);
+  await render({ value, tableOptions: freezeOptions });
+  await act(async () =>
+    document
+      .querySelector('[data-context-cell="1:0"]')
+      .dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, button: 0 })),
+  );
+  await act(async () => {
+    button('Edit').dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  });
+  await act(async () => menuItem('Freeze rows').click());
+  await act(async () => menuItem('Freeze through current row').click());
+  assert.deepEqual(stored().appearance.stickyRows, { top: 2, bottom: 0 });
+  await act(async () => {
+    button('Edit').dispatchEvent(new dom.window.MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+  });
+  await act(async () => menuItem('Freeze rows').click());
+  await act(async () => menuItem('Unfreeze rows').click());
+  assert.deepEqual(stored().appearance.stickyRows, { top: 0, bottom: 0 });
+});
+
+test('bulk adds rows and columns from the Insert menu', async () => {
+  const bulkOptions = resolveDataTableOptions({
+    rows: { initial: 1, max: 10 },
+    columns: { initial: 1, max: 10 },
+  });
+  await render({ value: createDataTable(bulkOptions), tableOptions: bulkOptions });
+  await selectMenuItem('Insert', 'Add rows…');
+  await act(async () => {
+    const input = document.querySelector('[role="dialog"] input[type="number"]');
+    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, '5');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    [...document.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent === 'Add rows').click();
+  });
+  await selectMenuItem('Insert', 'Add columns…');
+  await act(async () => {
+    const input = document.querySelector('[role="dialog"] input[type="number"]');
+    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, '5');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    [...document.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent === 'Add columns').click();
+  });
+  assert.equal(stored().rows.length, 6);
+  assert.equal(stored().columns.length, 6);
+});
+
+test('virtualizes large row sets while preserving the table row count', async () => {
+  const largeOptions = resolveDataTableOptions({ rows: { initial: 250 }, columns: { initial: 2 } });
+  await render({ value: createDataTable(largeOptions), tableOptions: largeOptions });
+  const renderedRows = document.querySelectorAll('tbody th[data-context-row]');
+  assert.ok(renderedRows.length < 250);
+  assert.ok(renderedRows.length > 0);
+});
+
 test('updates headers and respects read-only mode', async () => {
   const value = createDataTable(options);
   await render({ value });
@@ -133,10 +205,27 @@ test('orders menus and opens the keyboard shortcuts drawer', async () => {
 
 test('shows the Format menu only when formats are configured', async () => {
   await render({ value: createDataTable(formatOptions), tableOptions: formatOptions });
+  assert.equal(button('Format').disabled, true);
   assert.deepEqual(
     [...document.querySelectorAll('.data-table__menubar > button')].map((element) => element.textContent),
     ['Table', 'Edit', 'Insert', 'Format', 'Help'],
   );
+  await act(async () =>
+    document
+      .querySelector('[data-context-cell="0:0"]')
+      .dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, button: 0 })),
+  );
+  assert.equal(button('Format').disabled, false);
+});
+
+test('shows formula help only when formulas are enabled', async () => {
+  await render({ value: createDataTable(formulaOptions), tableOptions: formulaOptions });
+  await selectMenuItem('Help', 'Formula help');
+  const dialog = document.querySelector('[role="dialog"]');
+  assert.match(dialog?.textContent ?? '', /SUM\(A1:A5\)/);
+  assert.equal(dialog?.querySelectorAll('code').length, 7);
+  assert.match(dialog?.textContent ?? '', /SUM\(A1,B1,C3\)/);
+  await act(async () => document.querySelector('[role="dialog"] button')?.click());
 });
 
 test('context menus mutate the active row and column', async () => {
@@ -197,6 +286,20 @@ test('keeps keyboard navigation inside the grid', async () => {
   await act(async () => document.activeElement.dispatchEvent(selectAll));
   assert.equal(selectAll.defaultPrevented, true);
   assert.equal(document.querySelectorAll('td[data-selected]').length, 4);
+});
+
+test('clears the cell selection when the grid loses focus', async () => {
+  const value = createDataTable(resolveDataTableOptions({ rows: { initial: 2 }, columns: { initial: 2 } }));
+  await render({ value });
+  const cell = document.querySelector('[data-context-cell="0:0"]');
+  await act(async () => cell.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, button: 0 })));
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 1);
+  await act(async () =>
+    document
+      .querySelector('.data-table__scroll')
+      .dispatchEvent(new dom.window.FocusEvent('focusout', { bubbles: true, relatedTarget: document.body })),
+  );
+  assert.equal(document.querySelectorAll('td[data-selected]').length, 0);
 });
 
 test('reorders rows and columns with header drag and drop', async () => {

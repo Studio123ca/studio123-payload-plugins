@@ -17,9 +17,10 @@ test('data table factory creates a JSON field with a DataTableField admin compon
   assert.equal(field.admin.components.Field.path, '@studio123/payload-advanced-fields/data-table/client');
   assert.equal(field.admin.components.Field.exportName, 'DataTableField');
   assert.deepEqual(field.admin.components.Field.clientProps.options, {
-    columns: { initial: 4, min: 1, max: 20 },
-    rows: { initial: 2, min: 1, max: 100 },
-    formulas: { enabled: false, compute: true },
+    columns: { initial: 4, min: 1, max: Infinity },
+    rows: { initial: 2, min: 1, max: Infinity },
+    formulas: { enabled: false, compute: false },
+    apiResponse: { includeIds: false, computeFormulas: false },
     formats: [],
     stickyRows: { enabled: true, top: 0, bottom: 0 },
   });
@@ -35,19 +36,29 @@ test('data table values have stable IDs and rectangular text cells', () => {
   assert.notEqual(table.columns[0].id, table.columns[1].id);
 });
 
+test('API reads keep the stored shape unless response features are enabled', () => {
+  const options = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 1 } });
+  const table = createDataTable(options);
+  table.rows[0].cells[0] = 'Raw value';
+  const field = dataTableField({});
+  assert.deepEqual(field.hooks.afterRead[0]({ value: table }), table);
+});
+
 test('data table field forwards spreadsheet options to the client component', () => {
   const field = dataTableField({
     name: 'forecast',
     rows: { min: 2 },
     columns: { min: 2 },
     formulas: { enabled: true, compute: false },
+    apiResponse: { includeIds: false, computeFormulas: false },
     stickyRows: { enabled: true, top: 1 },
     formats: [{ key: 'blue', label: 'Blue', background: 'var(--theme-elevation-100)' }],
   });
   assert.deepEqual(field.admin.components.Field.clientProps.options, {
-    columns: { initial: 3, min: 2, max: 20 },
-    rows: { initial: 3, min: 2, max: 100 },
+    columns: { initial: 3, min: 2, max: Infinity },
+    rows: { initial: 3, min: 2, max: Infinity },
     formulas: { enabled: true, compute: false },
+    apiResponse: { includeIds: false, computeFormulas: false },
     formats: [{ key: 'blue', label: 'Blue', background: 'var(--theme-elevation-100)' }],
     stickyRows: { enabled: true, top: 1, bottom: 0 },
   });
@@ -62,7 +73,10 @@ test('formula-enabled API reads expose stable response IDs and computed values',
   const table = createDataTable(options);
   table.rows[0].cells = ['2', '3', { formula: '=A1+B1' }];
   assert.deepEqual(evaluateDataTable(table)[0][2], 5);
-  const field = dataTableField({ formulas: { enabled: true, compute: true } });
+  const field = dataTableField({
+    formulas: { enabled: true },
+    apiResponse: { includeIds: true, computeFormulas: true },
+  });
   const response = field.hooks.afterRead[0]({ value: table });
   assert.equal(response.columns[0].columnId, response.columns[0].id);
   assert.equal(response.rows[0].rowId, response.rows[0].id);

@@ -20,6 +20,7 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     columns,
     rows,
     formulas,
+    apiResponse,
     formats,
     stickyRows,
     name = 'dataTable',
@@ -32,6 +33,7 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     columns,
     rows,
     formulas,
+    apiResponse,
     formats,
     stickyRows,
   });
@@ -41,18 +43,27 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
   const afterRead = ({ value }: { value?: unknown }) => {
     if (!value || typeof value !== 'object' || !Array.isArray((value as DataTableValue).rows)) return value;
     const table = value as DataTableValue;
-    const results = options.formulas.compute ? evaluateDataTable(table) : undefined;
+    if (!options.apiResponse.includeIds && !options.apiResponse.computeFormulas) return value;
+    const results = options.apiResponse.computeFormulas ? evaluateDataTable(table) : undefined;
     return {
       ...table,
-      columns: table.columns.map((column) => ({ ...column, columnId: column.id })),
+      columns: options.apiResponse.includeIds
+        ? table.columns.map((column) => ({ ...column, columnId: column.id }))
+        : table.columns,
       rows: table.rows.map((row, rowIndex) => ({
         ...row,
-        rowId: row.id,
-        cells: row.cells.map((cell, columnIndex) => ({
-          cellId: `${columnName(columnIndex)}${rowIndex + 1}`,
-          value: results?.[rowIndex]?.[columnIndex] ?? (typeof cell === 'object' ? cell.formula : cell),
-          ...(typeof cell === 'object' ? { formula: cell.formula } : {}),
-        })),
+        ...(options.apiResponse.includeIds ? { rowId: row.id } : {}),
+        ...(options.apiResponse.computeFormulas || options.apiResponse.includeIds
+          ? {
+              cells: row.cells.map((cell, columnIndex) => ({
+                ...(options.apiResponse.includeIds
+                  ? { cellId: `${columnName(columnIndex)}${rowIndex + 1}` }
+                  : {}),
+                value: results?.[rowIndex]?.[columnIndex] ?? (typeof cell === 'object' ? cell.formula : cell),
+                ...(typeof cell === 'object' ? { formula: cell.formula } : {}),
+              })),
+            }
+          : {}),
       })),
     };
   };

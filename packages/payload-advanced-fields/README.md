@@ -17,7 +17,7 @@ A collection of enhanced field types for Payload CMS.
 - **Code Editor Field** - Syntax-highlighted code editing with CodeMirror
 - **Link Field** - Internal/external link management with validation
 - **Phone Field** - Canonical phone data with country selector, extension input, validation, and custom formatting
-- **Data Table Field** - A JSON-backed text table built with TanStack Table
+- **Data Table Field** - A JSON-backed spreadsheet-style table built with TanStack Table, Radix menus, CSV import/export, formulas, sticky rows, reordering, and row virtualization for large tables
 - **Optimized Bundling** - Each field is independently bundled for minimal bloat
 - **Tree-shakeable** - Import only what you need
 - **Full TypeScript Support** - Complete type definitions included
@@ -50,11 +50,19 @@ import { dataTableField } from '@studio123/payload-advanced-fields/data-table';
 
 const fields = [
   dataTableField({ name: 'specifications' }),
-  dataTableField({ name: 'priceList', rows: { initial: 5 }, columns: { initial: 4 } }),
+  dataTableField({
+    name: 'priceList',
+    rows: { initial: 5 },
+    columns: { initial: 4 },
+    formulas: { enabled: true },
+    apiResponse: { computeFormulas: true, includeIds: true },
+  }),
 ];
 ```
 
 See the [Data Table field guide](docs/DATA_TABLE_FIELD.md) for the value contract and configuration. This package currently pins Payload and `@payloadcms/ui` to `4.0.0-canary.37`.
+
+Data Table dimensions default to three initial rows and columns with a minimum of one. Maximum rows and columns are unlimited unless `rows.max` or `columns.max` is configured. API response IDs and computed formula values are opt-in through `apiResponse`; stored values remain compact by default.
 
 ### Complete Global Configuration with Multiple Fields
 
@@ -203,7 +211,7 @@ import { ColorField } from '@studio123/payload-advanced-fields/color/client';
 - **Code Field** - Compiled with TypeScript (uses external @codemirror)
 - **Link Field** - Compiled with TypeScript (minimal dependencies)
 - **Phone Field** - Compiled with TypeScript and powered by `libphonenumber-js`
-- **Table Field** - Compiled with TypeScript, with a separate client entry point and packaged CSS; no additional runtime dependency
+- **Data Table Field** - Compiled with TypeScript, with a separate client entry point and packaged CSS; no additional runtime dependency
 
 This ensures users only pay for what they use - if you only use ColorField, you don't load CodeMirror.
 

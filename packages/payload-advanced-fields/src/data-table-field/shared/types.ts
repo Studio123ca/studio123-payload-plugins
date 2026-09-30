@@ -62,6 +62,10 @@ export type DataTableOptions = {
   columns?: DataTableDimensionOptions;
   rows?: DataTableDimensionOptions;
   formulas?: boolean | { enabled?: boolean; compute?: boolean };
+  apiResponse?: {
+    includeIds?: boolean;
+    computeFormulas?: boolean;
+  };
   formats?: DataTableFormat[];
   stickyRows?: { enabled?: boolean; top?: number; bottom?: number };
 };
@@ -70,6 +74,7 @@ export type ResolvedDataTableOptions = {
   columns: ResolvedDataTableDimensionOptions;
   rows: ResolvedDataTableDimensionOptions;
   formulas: { enabled: boolean; compute: boolean };
+  apiResponse: { includeIds: boolean; computeFormulas: boolean };
   formats: DataTableFormat[];
   stickyRows: { enabled: boolean; top: number; bottom: number };
 };

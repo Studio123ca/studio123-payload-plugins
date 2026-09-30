@@ -5,22 +5,28 @@ export const MAX_DATA_TABLE_FORMULA_LENGTH = 1_024;
 
 export function resolveDataTableOptions(options: DataTableOptions = {}): ResolvedDataTableOptions {
   const formulaOptions = typeof options.formulas === 'object' ? options.formulas : undefined;
+  const apiResponseOptions = options.apiResponse ?? {};
+  const computeFormulas = apiResponseOptions.computeFormulas ?? formulaOptions?.compute ?? false;
   const columnOptions = options.columns ?? {};
   const rowOptions = options.rows ?? {};
   const resolved = {
     columns: {
       initial: columnOptions.initial ?? 3,
       min: columnOptions.min ?? 1,
-      max: columnOptions.max ?? 20,
+      max: columnOptions.max ?? Number.POSITIVE_INFINITY,
     },
     rows: {
       initial: rowOptions.initial ?? 3,
       min: rowOptions.min ?? 1,
-      max: rowOptions.max ?? 100,
+      max: rowOptions.max ?? Number.POSITIVE_INFINITY,
     },
     formulas: {
       enabled: formulaOptions?.enabled ?? (typeof options.formulas === 'boolean' ? options.formulas : false),
-      compute: formulaOptions?.compute ?? true,
+      compute: computeFormulas,
+    },
+    apiResponse: {
+      includeIds: apiResponseOptions.includeIds ?? false,
+      computeFormulas,
     },
     formats: options.formats ?? [],
     stickyRows: {
@@ -37,6 +43,7 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
     ['columns.max', resolved.columns.max],
     ['rows.max', resolved.rows.max],
   ] as const) {
+    if (name.endsWith('.max') && value === Number.POSITIVE_INFINITY) continue;
     if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive integer.`);
   }
   if (
@@ -48,8 +55,6 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
     throw new Error('Initial dimensions must not exceed the configured maximums.');
   if (resolved.columns.min > resolved.columns.max || resolved.rows.min > resolved.rows.max)
     throw new Error('Minimum dimensions must not exceed the configured maximums.');
-  if (resolved.columns.max > 100 || resolved.rows.max > 1_000)
-    throw new Error('Data tables support at most 100 columns and 1,000 rows.');
   if (!Array.isArray(resolved.formats) || resolved.formats.length > 32)
     throw new Error('Data table formats may contain at most 32 entries.');
   const formatKeys = new Set<string>();

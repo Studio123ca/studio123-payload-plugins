@@ -1,17 +1,21 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useEffect, useMemo, useState } from 'react';
 import { DataTableField } from '../packages/payload-advanced-fields/src/data-table-field/admin/DataTableField.js';
 import {
   createDataTable,
   resolveDataTableOptions,
 } from '../packages/payload-advanced-fields/src/data-table-field/shared/dataTable.js';
+import { csvToDataTable } from '../packages/payload-advanced-fields/src/data-table-field/shared/csv.js';
+import type { DataTableValue } from '../packages/payload-advanced-fields/src/data-table-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
 
 type Args = FieldControls & {
-  columns: { initial: number; max: number; min: number };
-  rows: { initial: number; max: number; min: number };
+  columns: { initial: number; max?: number; min: number };
+  rows: { initial: number; max?: number; min: number };
   maxHeight: number;
   formulas: boolean | { enabled?: boolean; compute?: boolean };
+  apiResponse: { includeIds?: boolean; computeFormulas?: boolean };
   formats: Array<{
     key: string;
     label: string;
@@ -31,7 +35,8 @@ example.rows[1].cells = ['Gizmo', '$40.00', 'Made to order'];
 const formulaOptions = resolveDataTableOptions({
   columns: { initial: 3 },
   rows: { initial: 3 },
-  formulas: { enabled: true, compute: true },
+  formulas: { enabled: true },
+  apiResponse: { computeFormulas: true },
 });
 const formulaExample = createDataTable(formulaOptions);
 formulaExample.columns[0].label = 'Units';
@@ -69,16 +74,39 @@ freezeExample.rows.forEach((row, index) => {
 });
 freezeExample.appearance = { stickyRows: { top: 1, bottom: 1 } };
 
+function LargeDataTableStory(args: Args, { globals }: any) {
+  const [value, setValue] = useState<DataTableValue | null>(null);
+  const options = useMemo(() => resolveDataTableOptions(args), [args]);
+  useEffect(() => {
+    let active = true;
+    fetch('/customers-1000.csv')
+      .then((response) => response.text())
+      .then((csv) => {
+        if (active) setValue(csvToDataTable(csv, options));
+      });
+    return () => {
+      active = false;
+    };
+  }, [options]);
+  if (!value) return <p>Loading large data table…</p>;
+  return (
+    <PayloadField args={{ ...args, initialValue: value }} theme={globals.theme} locale={globals.locale}>
+      <DataTableField {...fieldProps(args, 'json')} options={options} maxHeight={args.maxHeight} />
+    </PayloadField>
+  );
+}
+
 const meta = {
   title: 'Fields/Data Table',
   tags: ['autodocs'],
   args: {
     ...commonArgs,
     label: 'Data Table',
-    columns: { initial: 3, max: 20, min: 1 },
-    rows: { initial: 3, max: 100, min: 1 },
+    columns: { initial: 3, min: 1 },
+    rows: { initial: 3, min: 1 },
     maxHeight: 420,
     formulas: false,
+    apiResponse: { includeIds: false, computeFormulas: false },
     formats: [],
     stickyRows: { enabled: true, top: 0, bottom: 0 },
   },
@@ -87,7 +115,8 @@ const meta = {
     columns: { control: 'object', description: 'Configure initial, minimum, and maximum columns.' },
     rows: { control: 'object', description: 'Configure initial, minimum, and maximum rows.' },
     maxHeight: { control: { type: 'number', min: 120, max: 1_000 } },
-    formulas: { control: 'object', description: 'Use { enabled: true, compute: true } for spreadsheet formulas.' },
+    formulas: { control: 'object', description: 'Configure formula editing and evaluation.' },
+    apiResponse: { control: 'object', description: 'Opt into response IDs and computed formula values.' },
     formats: { control: 'object', description: 'Optional format choices. The Format menu is hidden when empty.' },
     stickyRows: { control: 'object', description: 'Configure sticky top and bottom row counts.' },
   },
@@ -107,7 +136,7 @@ type Story = StoryObj<typeof meta>;
 export const Playground: Story = {};
 export const Populated: Story = { args: { initialValue: example } };
 export const Formulas: Story = {
-  args: { initialValue: formulaExample, formulas: { enabled: true, compute: true } },
+  args: { initialValue: formulaExample, formulas: { enabled: true }, apiResponse: { computeFormulas: true } },
 };
 export const Formatted: Story = {
   args: { initialValue: formattedExample, formats: formatOptions.formats },
@@ -118,6 +147,16 @@ export const FreezeRows: Story = {
     maxHeight: 220,
     stickyRows: { enabled: true, top: 1, bottom: 1 },
   },
+};
+export const LimitedColumnsRows: Story = {
+  args: {
+    columns: { initial: 3, min: 1, max: 6 },
+    rows: { initial: 3, min: 1, max: 8 },
+  },
+};
+export const LargeDataTable: Story = {
+  args: { maxHeight: 520 },
+  render: LargeDataTableStory,
 };
 export const ReadOnly: Story = { args: { initialValue: example, readOnly: true } };
 export const RequiredEmpty: Story = { args: { required: true, showError: true } };
