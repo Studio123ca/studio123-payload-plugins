@@ -23,6 +23,15 @@ test('data table factory creates a JSON field with a DataTableField admin compon
     formulas: { enabled: false, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
     formats: [],
+    textFormats: {
+      enabled: false,
+      bold: false,
+      italic: false,
+      underline: false,
+      strikethrough: false,
+      alignment: false,
+      wrapping: false,
+    },
     stickyRows: { enabled: true, top: 0, bottom: 0 },
   });
 });
@@ -61,6 +70,15 @@ test('data table field forwards spreadsheet options to the client component', ()
     formulas: { enabled: true, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
     formats: [{ key: 'blue', label: 'Blue', background: 'var(--theme-elevation-100)' }],
+    textFormats: {
+      enabled: false,
+      bold: false,
+      italic: false,
+      underline: false,
+      strikethrough: false,
+      alignment: false,
+      wrapping: false,
+    },
     stickyRows: { enabled: true, top: 1, bottom: 0 },
   });
 });

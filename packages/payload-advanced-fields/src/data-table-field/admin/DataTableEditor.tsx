@@ -17,7 +17,13 @@ import {
 import { DataTableMenubar } from './DataTableMenubar.js';
 import { DataTableContextMenu, type DataTableContextTarget } from './DataTableContextMenu.js';
 import { createDataTable, MAX_DATA_TABLE_CELL_LENGTH } from '../shared/dataTable.js';
-import { dataTableBackgroundStyle, setDataTableBackground, stickyRowCounts } from '../shared/appearance.js';
+import {
+  dataTableBackgroundStyle,
+  dataTableTextStyle,
+  setDataTableBackground,
+  setDataTableTextStyle,
+  stickyRowCounts,
+} from '../shared/appearance.js';
 import { evaluateDataTable } from '../shared/formulas.js';
 import { parseDelimited, stringifyDelimited } from '../shared/clipboard.js';
 import { csvToDataTable, dataTableToCSV } from '../shared/csv.js';
@@ -34,7 +40,13 @@ import {
   copyDataTableSelection,
   pasteDataTableCells,
 } from '../shared/operations.js';
-import type { DataTableCell, DataTableRow, DataTableValue, ResolvedDataTableOptions } from '../shared/types.js';
+import type {
+  DataTableCell,
+  DataTableRow,
+  DataTableTextStyle,
+  DataTableValue,
+  ResolvedDataTableOptions,
+} from '../shared/types.js';
 import { useDataTableController } from './useDataTableController.js';
 import { useRowSizing } from './useRowSizing.js';
 import './styles.css';
@@ -516,11 +528,39 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     if (!rows.length || (columns && !columns.length)) return;
     commit({ ...value, appearance: setDataTableBackground(value.appearance, rows, columns, key) });
   };
+  const applyTextStyle = (patch: DataTableTextStyle | undefined) => {
+    if (!value || !options.textFormats.enabled || !table.getSelectedCellCount()) return;
+    const bounds = table.getCellSelectionBounds();
+    const rows = [
+      ...new Set(
+        bounds.flatMap((selection) =>
+          value.rows.slice(selection.minRowIndex, selection.maxRowIndex + 1).map((row) => row.id),
+        ),
+      ),
+    ];
+    const columns = [
+      ...new Set(
+        bounds.flatMap((selection) =>
+          value.columns.slice(selection.minColumnIndex, selection.maxColumnIndex + 1).map((column) => column.id),
+        ),
+      ),
+    ];
+    commit({ ...value, appearance: setDataTableTextStyle(value.appearance, rows, columns, patch) });
+  };
+  const toggleTextStyle = (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => {
+    const focused = table.getFocusedCell();
+    if (!focused || !value) return;
+    const current = dataTableTextStyle(value, focused.row.id, focused.column.id);
+    applyTextStyle({ [key]: !current?.[key] });
+  };
   const freezeRows = (top: number, bottom: number) => {
     if (!value) return;
     commit({ ...value, appearance: { ...value.appearance, stickyRows: { top, bottom } } });
   };
   const focusedRowIndex = table.getFocusedCell()?.row.index;
+  const focusedCell = table.getFocusedCell();
+  const activeTextStyle =
+    value && focusedCell ? dataTableTextStyle(value, focusedCell.row.id, focusedCell.column.id) : undefined;
   const canFreezeRows = options.stickyRows.enabled && focusedRowIndex !== undefined;
   const freezeThroughFocusedRow = () => {
     if (!value || focusedRowIndex === undefined) return;
@@ -679,6 +719,38 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     }
     if (!modifier) return;
     const key = event.key.toLowerCase();
+    if (options.textFormats.enabled && table.getSelectedCellCount()) {
+      if (key === 'b' && options.textFormats.bold) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleTextStyle('bold');
+        return;
+      }
+      if (key === 'i' && options.textFormats.italic) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleTextStyle('italic');
+        return;
+      }
+      if (key === 'u' && options.textFormats.underline) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleTextStyle('underline');
+        return;
+      }
+      if (key === 'x' && event.shiftKey && options.textFormats.strikethrough) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleTextStyle('strikethrough');
+        return;
+      }
+      if (event.shiftKey && options.textFormats.alignment && ['l', 'e', 'r'].includes(key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        applyTextStyle({ align: key === 'l' ? 'left' : key === 'e' ? 'center' : 'right' });
+        return;
+      }
+    }
     if (key === 'c' && table.getSelectedCellCount()) {
       event.preventDefault();
       event.stopPropagation();
@@ -771,9 +843,13 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
           onImportCSV={importCSV}
           onExportCSV={exportCSV}
           formats={options.formats}
+          textFormats={options.textFormats}
+          activeTextStyle={activeTextStyle}
           hasSelection={table.getSelectedCellCount() > 0}
           formulasEnabled={options.formulas.enabled}
           onApplyBackground={applyBackground}
+          onApplyTextStyle={applyTextStyle}
+          onToggleTextStyle={toggleTextStyle}
           selectionLabel={selectionLabel}
           onCopySelection={copySelectionLabel}
           onInsertFormula={insertFormula}
@@ -813,6 +889,8 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
         onPaste={pasteSelection}
         onCut={cutSelection}
         onApplyBackground={applyBackground}
+        onApplyTextStyle={applyTextStyle}
+        onToggleTextStyle={toggleTextStyle}
         onFreezeRows={freezeRows}
         onSort={sortRows}
         hasSelection={table.getSelectedCellCount() > 0}
@@ -999,6 +1077,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                       const rawCell = value.rows[row.index].cells[index];
                       const selectionEdges = cell.getSelectionEdges();
                       const background = dataTableBackgroundStyle(value, options, row.original.id, cell.column.id);
+                      const textStyle = dataTableTextStyle(value, row.original.id, cell.column.id);
                       const isEditing =
                         editingCell?.rowID === row.original.id && editingCell.columnID === cell.column.id;
                       const activateEditing = () => {
@@ -1011,6 +1090,14 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                           style={{
                             width: cell.column.getSize(),
                             ...background,
+                            fontWeight: textStyle?.bold ? 700 : undefined,
+                            fontStyle: textStyle?.italic ? 'italic' : undefined,
+                            textDecoration:
+                              [textStyle?.underline ? 'underline' : '', textStyle?.strikethrough ? 'line-through' : '']
+                                .filter(Boolean)
+                                .join(' ') || undefined,
+                            textAlign: textStyle?.align,
+                            whiteSpace: textStyle?.wrap === false ? 'nowrap' : undefined,
                           }}
                           data-colored={background ? true : undefined}
                           data-context-cell={`${row.getDisplayIndex()}:${index}`}

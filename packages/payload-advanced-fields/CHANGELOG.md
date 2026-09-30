@@ -8,6 +8,10 @@
 - Fixed resized column widths being rejected by Payload validation when a drag exceeded the supported bounds.
 - Constrained the selection indicator so long selections do not push the copy button off-screen.
 - Added one-second checkmark feedback after copying the current selection.
+- Added an inline text-formatting toolbar for active selections with React Icons, active-state highlighting, and grouped dividers for text styles, alignment, and clearing formats.
+- Treated left alignment as the default active state for cells without an explicit alignment style.
+- Grouped Insert menu actions into Rows, Columns, and Formulas submenus.
+- Removed the divider between Rows and Columns and added insertion-specific icons.
 
 ## 1.2.2
 

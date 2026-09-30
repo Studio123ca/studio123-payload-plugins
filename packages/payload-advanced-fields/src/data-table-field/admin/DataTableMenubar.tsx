@@ -13,6 +13,11 @@ import {
   useModal,
 } from '@payloadcms/ui';
 import {
+  FiAlignCenter,
+  FiAlignJustify,
+  FiAlignLeft,
+  FiAlignRight,
+  FiBold,
   FiChevronRight,
   FiCopy,
   FiCornerUpLeft,
@@ -24,14 +29,18 @@ import {
   FiDownload,
   FiHelpCircle,
   FiHash,
+  FiItalic,
   FiPlus,
   FiScissors,
   FiTrash2,
+  FiType,
+  FiUnderline,
   FiUpload,
 } from 'react-icons/fi';
-import { TbFreezeRow } from 'react-icons/tb';
+import { MdStrikethroughS } from 'react-icons/md';
+import { TbColumnInsertRight, TbFreezeRow, TbRowInsertBottom } from 'react-icons/tb';
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import type { DataTableFormat } from '../shared/types.js';
+import type { DataTableFormat, DataTableTextStyle, ResolvedDataTableTextFormats } from '../shared/types.js';
 
 const shortcuts = [
   ['Copy selected cells', '⌘ C / Ctrl C'],
@@ -76,6 +85,167 @@ const formulaInsertOptions = [
   ['COUNT', 'Counts numeric values in the current selection.'],
 ] as const;
 
+function TextFormatChoices({
+  formats,
+  onApply,
+  onToggle,
+}: {
+  formats: ResolvedDataTableTextFormats;
+  onApply: (patch: DataTableTextStyle | undefined) => void;
+  onToggle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
+}) {
+  return (
+    <>
+      {formats.bold && (
+        <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('bold')}>
+          Bold <kbd className="data-table__shortcut">⌘B</kbd>
+        </Menubar.Item>
+      )}
+      {formats.italic && (
+        <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('italic')}>
+          Italic <kbd className="data-table__shortcut">⌘I</kbd>
+        </Menubar.Item>
+      )}
+      {formats.underline && (
+        <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('underline')}>
+          Underline <kbd className="data-table__shortcut">⌘U</kbd>
+        </Menubar.Item>
+      )}
+      {formats.strikethrough && (
+        <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('strikethrough')}>
+          Strikethrough <kbd className="data-table__shortcut">⇧⌘X</kbd>
+        </Menubar.Item>
+      )}
+      {(formats.alignment || formats.wrapping) && <Menubar.Separator className="data-table__menu-separator" />}
+      {formats.alignment && (
+        <Menubar.Sub>
+          <Menubar.SubTrigger className="data-table__menu-item">
+            <span className="data-table__context-icon" aria-hidden>
+              <FiType />
+            </span>
+            Alignment
+            <FiChevronRight className="data-table__menu-chevron" aria-hidden />
+          </Menubar.SubTrigger>
+          <Menubar.Portal>
+            <Menubar.SubContent className="data-table__context-content">
+              <Menubar.Item className="data-table__menu-item" onSelect={() => onApply({ align: 'left' })}>
+                Left
+              </Menubar.Item>
+              <Menubar.Item className="data-table__menu-item" onSelect={() => onApply({ align: 'center' })}>
+                Center <kbd className="data-table__shortcut">⇧⌘E</kbd>
+              </Menubar.Item>
+              <Menubar.Item className="data-table__menu-item" onSelect={() => onApply({ align: 'right' })}>
+                Right <kbd className="data-table__shortcut">⇧⌘R</kbd>
+              </Menubar.Item>
+            </Menubar.SubContent>
+          </Menubar.Portal>
+        </Menubar.Sub>
+      )}
+      {formats.wrapping && (
+        <Menubar.Item className="data-table__menu-item" onSelect={() => onToggle('wrap')}>
+          Toggle wrapping
+        </Menubar.Item>
+      )}
+      <Menubar.Item className="data-table__menu-item" onSelect={() => onApply(undefined)}>
+        Clear text formatting
+      </Menubar.Item>
+    </>
+  );
+}
+
+function TextFormattingToolbar({
+  formats,
+  activeStyle,
+  onApply,
+  onToggle,
+}: {
+  formats: ResolvedDataTableTextFormats;
+  activeStyle?: DataTableTextStyle;
+  onApply: (patch: DataTableTextStyle | undefined) => void;
+  onToggle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
+}) {
+  const hasTextStyleOptions = formats.bold || formats.italic || formats.underline || formats.strikethrough;
+  const actions = [
+    formats.bold && {
+      label: 'Bold',
+      icon: <FiBold aria-hidden />,
+      onClick: () => onToggle('bold'),
+      active: activeStyle?.bold,
+    },
+    formats.italic && {
+      label: 'Italic',
+      icon: <FiItalic aria-hidden />,
+      onClick: () => onToggle('italic'),
+      active: activeStyle?.italic,
+    },
+    formats.underline && {
+      label: 'Underline',
+      icon: <FiUnderline aria-hidden />,
+      onClick: () => onToggle('underline'),
+      active: activeStyle?.underline,
+    },
+    formats.strikethrough && {
+      label: 'Strikethrough',
+      icon: <MdStrikethroughS aria-hidden />,
+      onClick: () => onToggle('strikethrough'),
+      active: activeStyle?.strikethrough,
+    },
+    hasTextStyleOptions && formats.alignment && { divider: true },
+    formats.alignment && {
+      label: 'Align left',
+      icon: <FiAlignLeft aria-hidden />,
+      onClick: () => onApply({ align: 'left' }),
+      // Left is the table's default alignment when no explicit style is stored.
+      active: !activeStyle?.align || activeStyle.align === 'left',
+    },
+    formats.alignment && {
+      label: 'Align center',
+      icon: <FiAlignCenter aria-hidden />,
+      onClick: () => onApply({ align: 'center' }),
+      active: activeStyle?.align === 'center',
+    },
+    formats.alignment && {
+      label: 'Align right',
+      icon: <FiAlignRight aria-hidden />,
+      onClick: () => onApply({ align: 'right' }),
+      active: activeStyle?.align === 'right',
+    },
+    formats.wrapping && {
+      label: 'Toggle wrapping',
+      icon: <FiAlignJustify aria-hidden />,
+      onClick: () => onToggle('wrap'),
+      active: activeStyle?.wrap,
+    },
+    (hasTextStyleOptions || formats.alignment || formats.wrapping) && { divider: true },
+    { label: 'Clear text formatting', icon: <FiType aria-hidden />, onClick: () => onApply(undefined) },
+  ].filter(Boolean) as Array<
+    { divider: true } | { label: string; icon: React.ReactNode; onClick: () => void; active?: boolean }
+  >;
+
+  return (
+    <div className="data-table__text-toolbar" aria-label="Text formatting">
+      {actions.map((action, index) =>
+        'divider' in action ? (
+          <span className="data-table__text-toolbar-divider" key={`divider-${index}`} aria-hidden />
+        ) : (
+          <button
+            className="data-table__text-toolbar-button"
+            key={action.label}
+            type="button"
+            aria-label={action.label}
+            title={action.label}
+            aria-pressed={action.active ?? false}
+            data-active={action.active || undefined}
+            onClick={action.onClick}
+          >
+            {action.icon}
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
+
 type Props = {
   canAddRow: boolean;
   canAddColumn: boolean;
@@ -106,9 +276,13 @@ type Props = {
   onImportCSV: () => void;
   onExportCSV: () => void;
   formats: DataTableFormat[];
+  textFormats: ResolvedDataTableTextFormats;
+  activeTextStyle?: DataTableTextStyle;
   hasSelection: boolean;
   formulasEnabled: boolean;
   onApplyBackground: (key?: string) => void;
+  onApplyTextStyle: (patch: DataTableTextStyle | undefined) => void;
+  onToggleTextStyle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
   selectionLabel?: string;
   onCopySelection?: () => void | Promise<void>;
   onInsertFormula: (functionName: (typeof formulaInsertOptions)[number][0]) => void;
@@ -144,9 +318,13 @@ export function DataTableMenubar({
   onImportCSV,
   onExportCSV,
   formats,
+  textFormats,
+  activeTextStyle,
   hasSelection,
   formulasEnabled,
   onApplyBackground,
+  onApplyTextStyle,
+  onToggleTextStyle,
   selectionLabel,
   onCopySelection,
   onInsertFormula,
@@ -204,259 +382,321 @@ export function DataTableMenubar({
   return (
     <>
       <div className="data-table__toolbar">
-        <Menubar.Root className="data-table__menubar" aria-label="Data table actions">
-          <Menubar.Menu>
-            <Menubar.Trigger className="data-table__menu-trigger">Table</Menubar.Trigger>
-            <Menubar.Portal>
-              <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
-                <Menubar.Item className="data-table__menu-item" onSelect={onImportCSV}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiUpload />
-                  </span>
-                  Import CSV
-                </Menubar.Item>
-                <Menubar.Item className="data-table__menu-item" onSelect={onExportCSV}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiDownload />
-                  </span>
-                  Export CSV
-                </Menubar.Item>
-                <Menubar.Separator className="data-table__menu-separator" />
-                <Menubar.Item
-                  className="data-table__menu-item data-table__menu-item--danger"
-                  onSelect={() => openModal(clearTableModalSlug)}
-                >
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiTrash2 />
-                  </span>
-                  Clear table
-                </Menubar.Item>
-              </Menubar.Content>
-            </Menubar.Portal>
-          </Menubar.Menu>
-          <Menubar.Menu>
-            <Menubar.Trigger className="data-table__menu-trigger">Edit</Menubar.Trigger>
-            <Menubar.Portal>
-              <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
-                <Menubar.Item className="data-table__menu-item" disabled={!canUndo} onSelect={onUndo}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiCornerUpLeft />
-                  </span>
-                  Undo
-                  <kbd className="data-table__shortcut">⌘Z</kbd>
-                </Menubar.Item>
-                <Menubar.Item className="data-table__menu-item" disabled={!canRedo} onSelect={onRedo}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiCornerUpRight />
-                  </span>
-                  Redo
-                  <kbd className="data-table__shortcut">⇧⌘Z</kbd>
-                </Menubar.Item>
-                <Menubar.Separator className="data-table__menu-separator" />
-                <Menubar.Item className="data-table__menu-item" disabled={!canCopy} onSelect={onCopy}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiCopy />
-                  </span>
-                  Copy cells
-                  <kbd className="data-table__shortcut">⌘C</kbd>
-                </Menubar.Item>
-                <Menubar.Item className="data-table__menu-item" disabled={!canPaste} onSelect={onPaste}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiCopy />
-                  </span>
-                  Paste cells
-                  <kbd className="data-table__shortcut">⌘V</kbd>
-                </Menubar.Item>
-                <Menubar.Item className="data-table__menu-item" disabled={!canCut} onSelect={onCut}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiScissors />
-                  </span>
-                  Cut cells
-                  <kbd className="data-table__shortcut">⌘X</kbd>
-                </Menubar.Item>
-                <Menubar.Item
-                  className="data-table__menu-item data-table__menu-item--danger"
-                  disabled={!canCopy}
-                  onSelect={onClearSelection}
-                >
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiTrash2 />
-                  </span>
-                  Clear cells
-                  <kbd className="data-table__shortcut">⌫</kbd>
-                </Menubar.Item>
-                <Menubar.Separator className="data-table__menu-separator" />
-                <Menubar.Sub>
-                  <Menubar.SubTrigger className="data-table__menu-item" disabled={!canFreezeRows}>
-                    <span className="data-table__context-icon" aria-hidden>
-                      <TbFreezeRow />
-                    </span>
-                    Freeze rows
-                    <FiChevronRight className="data-table__context-chevron" aria-hidden />
-                  </Menubar.SubTrigger>
-                  <Menubar.Portal>
-                    <Menubar.SubContent className="data-table__context-content">
-                      <Menubar.Item className="data-table__menu-item" onSelect={onFreezeThroughCurrentRow}>
-                        <span className="data-table__context-icon" aria-hidden>
-                          <FiArrowDown />
-                        </span>
-                        Freeze through current row
-                      </Menubar.Item>
-                      <Menubar.Item className="data-table__menu-item" onSelect={onFreezeFromCurrentRow}>
-                        <span className="data-table__context-icon" aria-hidden>
-                          <FiArrowUp />
-                        </span>
-                        Freeze from current row
-                      </Menubar.Item>
-                      <Menubar.Item className="data-table__menu-item" onSelect={onUnfreezeRows}>
-                        <span className="data-table__context-icon" aria-hidden>
-                          <FiDelete />
-                        </span>
-                        Unfreeze rows
-                      </Menubar.Item>
-                    </Menubar.SubContent>
-                  </Menubar.Portal>
-                </Menubar.Sub>
-              </Menubar.Content>
-            </Menubar.Portal>
-          </Menubar.Menu>
-          <Menubar.Menu>
-            <Menubar.Trigger className="data-table__menu-trigger">Insert</Menubar.Trigger>
-            <Menubar.Portal>
-              <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
-                <Menubar.Item className="data-table__menu-item" disabled={!canAddRow} onSelect={onAddRow}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiPlus />
-                  </span>
-                  Add row
-                </Menubar.Item>
-                <Menubar.Item className="data-table__menu-item" disabled={!canAddColumn} onSelect={onAddColumn}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiPlus />
-                  </span>
-                  Add column
-                </Menubar.Item>
-                <Menubar.Separator className="data-table__menu-separator" />
-                <Menubar.Item
-                  className="data-table__menu-item"
-                  disabled={!canAddRows}
-                  onSelect={() => openBulkInsert('rows')}
-                >
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiPlus />
-                  </span>
-                  Add rows…
-                </Menubar.Item>
-                <Menubar.Item
-                  className="data-table__menu-item"
-                  disabled={!canAddColumns}
-                  onSelect={() => openBulkInsert('columns')}
-                >
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiPlus />
-                  </span>
-                  Add columns…
-                </Menubar.Item>
-                {formulasEnabled && (
-                  <>
-                    <Menubar.Separator className="data-table__menu-separator" />
-                    <Menubar.Sub>
-                      <Menubar.SubTrigger className="data-table__menu-item" disabled={!hasSelection}>
-                        <span className="data-table__context-icon" aria-hidden>
-                          <FiHash />
-                        </span>
-                        Formulas
-                        <FiChevronRight className="data-table__menu-chevron" aria-hidden />
-                      </Menubar.SubTrigger>
-                      <Menubar.Portal>
-                        <Menubar.SubContent className="data-table__context-content">
-                          {formulaInsertOptions.map(([name, description]) => (
-                            <Menubar.Item
-                              key={name}
-                              className="data-table__menu-item"
-                              disabled={!hasSelection}
-                              title={description}
-                              onSelect={() => onInsertFormula(name)}
-                            >
-                              <span className="data-table__context-icon" aria-hidden>
-                                <FiHash />
-                              </span>
-                              {name}
-                            </Menubar.Item>
-                          ))}
-                        </Menubar.SubContent>
-                      </Menubar.Portal>
-                    </Menubar.Sub>
-                  </>
-                )}
-              </Menubar.Content>
-            </Menubar.Portal>
-          </Menubar.Menu>
-          {formats.length > 0 && (
+        <div className="data-table__toolbar-main">
+          <Menubar.Root className="data-table__menubar" aria-label="Data table actions">
             <Menubar.Menu>
-              <Menubar.Trigger className="data-table__menu-trigger" disabled={!hasSelection}>
-                Format
-              </Menubar.Trigger>
+              <Menubar.Trigger className="data-table__menu-trigger">Table</Menubar.Trigger>
               <Menubar.Portal>
                 <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
-                  <Menubar.Label className="data-table__menu-label">Background</Menubar.Label>
-                  {formats.map((entry) => (
-                    <Menubar.Item
-                      key={entry.key}
-                      className="data-table__menu-item"
-                      disabled={!hasSelection}
-                      onSelect={() => onApplyBackground(entry.key)}
-                    >
-                      <span
-                        className="data-table__format-swatch"
-                        aria-hidden
-                        style={
-                          {
-                            '--data-table-swatch-light':
-                              typeof entry.background === 'string' ? entry.background : entry.background.light,
-                            '--data-table-swatch-dark':
-                              typeof entry.background === 'string' ? entry.background : entry.background.dark,
-                          } as CSSProperties
-                        }
-                      />
-                      {entry.label}
-                    </Menubar.Item>
-                  ))}
+                  <Menubar.Item className="data-table__menu-item" onSelect={onImportCSV}>
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiUpload />
+                    </span>
+                    Import CSV
+                  </Menubar.Item>
+                  <Menubar.Item className="data-table__menu-item" onSelect={onExportCSV}>
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiDownload />
+                    </span>
+                    Export CSV
+                  </Menubar.Item>
                   <Menubar.Separator className="data-table__menu-separator" />
                   <Menubar.Item
-                    className="data-table__menu-item"
-                    disabled={!hasSelection}
-                    onSelect={() => onApplyBackground()}
+                    className="data-table__menu-item data-table__menu-item--danger"
+                    onSelect={() => openModal(clearTableModalSlug)}
                   >
-                    Clear background
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiTrash2 />
+                    </span>
+                    Clear table
                   </Menubar.Item>
                 </Menubar.Content>
               </Menubar.Portal>
             </Menubar.Menu>
-          )}
-          <Menubar.Menu>
-            <Menubar.Trigger className="data-table__menu-trigger">Help</Menubar.Trigger>
-            <Menubar.Portal>
-              <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
-                <Menubar.Item className="data-table__menu-item" onSelect={() => openModal(shortcutsDrawerSlug)}>
-                  <span className="data-table__context-icon" aria-hidden>
-                    <FiHelpCircle />
-                  </span>
-                  Keyboard shortcuts
-                </Menubar.Item>
-                {formulasEnabled && <Menubar.Separator className="data-table__menu-separator" />}
-                {formulasEnabled && (
-                  <Menubar.Item className="data-table__menu-item" onSelect={() => openModal(formulaHelpDrawerSlug)}>
+            <Menubar.Menu>
+              <Menubar.Trigger className="data-table__menu-trigger">Edit</Menubar.Trigger>
+              <Menubar.Portal>
+                <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
+                  <Menubar.Item className="data-table__menu-item" disabled={!canUndo} onSelect={onUndo}>
                     <span className="data-table__context-icon" aria-hidden>
-                      <FiHash />
+                      <FiCornerUpLeft />
                     </span>
-                    Formula help
+                    Undo
+                    <kbd className="data-table__shortcut">⌘Z</kbd>
                   </Menubar.Item>
-                )}
-              </Menubar.Content>
-            </Menubar.Portal>
-          </Menubar.Menu>
-        </Menubar.Root>
+                  <Menubar.Item className="data-table__menu-item" disabled={!canRedo} onSelect={onRedo}>
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiCornerUpRight />
+                    </span>
+                    Redo
+                    <kbd className="data-table__shortcut">⇧⌘Z</kbd>
+                  </Menubar.Item>
+                  <Menubar.Separator className="data-table__menu-separator" />
+                  <Menubar.Item className="data-table__menu-item" disabled={!canCopy} onSelect={onCopy}>
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiCopy />
+                    </span>
+                    Copy cells
+                    <kbd className="data-table__shortcut">⌘C</kbd>
+                  </Menubar.Item>
+                  <Menubar.Item className="data-table__menu-item" disabled={!canPaste} onSelect={onPaste}>
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiCopy />
+                    </span>
+                    Paste cells
+                    <kbd className="data-table__shortcut">⌘V</kbd>
+                  </Menubar.Item>
+                  <Menubar.Item className="data-table__menu-item" disabled={!canCut} onSelect={onCut}>
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiScissors />
+                    </span>
+                    Cut cells
+                    <kbd className="data-table__shortcut">⌘X</kbd>
+                  </Menubar.Item>
+                  <Menubar.Item
+                    className="data-table__menu-item data-table__menu-item--danger"
+                    disabled={!canCopy}
+                    onSelect={onClearSelection}
+                  >
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiTrash2 />
+                    </span>
+                    Clear cells
+                    <kbd className="data-table__shortcut">⌫</kbd>
+                  </Menubar.Item>
+                  <Menubar.Separator className="data-table__menu-separator" />
+                  <Menubar.Sub>
+                    <Menubar.SubTrigger className="data-table__menu-item" disabled={!canFreezeRows}>
+                      <span className="data-table__context-icon" aria-hidden>
+                        <TbFreezeRow />
+                      </span>
+                      Freeze rows
+                      <FiChevronRight className="data-table__context-chevron" aria-hidden />
+                    </Menubar.SubTrigger>
+                    <Menubar.Portal>
+                      <Menubar.SubContent className="data-table__context-content">
+                        <Menubar.Item className="data-table__menu-item" onSelect={onFreezeThroughCurrentRow}>
+                          <span className="data-table__context-icon" aria-hidden>
+                            <FiArrowDown />
+                          </span>
+                          Freeze through current row
+                        </Menubar.Item>
+                        <Menubar.Item className="data-table__menu-item" onSelect={onFreezeFromCurrentRow}>
+                          <span className="data-table__context-icon" aria-hidden>
+                            <FiArrowUp />
+                          </span>
+                          Freeze from current row
+                        </Menubar.Item>
+                        <Menubar.Item className="data-table__menu-item" onSelect={onUnfreezeRows}>
+                          <span className="data-table__context-icon" aria-hidden>
+                            <FiDelete />
+                          </span>
+                          Unfreeze rows
+                        </Menubar.Item>
+                      </Menubar.SubContent>
+                    </Menubar.Portal>
+                  </Menubar.Sub>
+                </Menubar.Content>
+              </Menubar.Portal>
+            </Menubar.Menu>
+            <Menubar.Menu>
+              <Menubar.Trigger className="data-table__menu-trigger">Insert</Menubar.Trigger>
+              <Menubar.Portal>
+                <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
+                  <Menubar.Sub>
+                    <Menubar.SubTrigger className="data-table__menu-item">
+                      <span className="data-table__context-icon" aria-hidden>
+                        <TbRowInsertBottom />
+                      </span>
+                      Rows
+                      <FiChevronRight className="data-table__menu-chevron" aria-hidden />
+                    </Menubar.SubTrigger>
+                    <Menubar.Portal>
+                      <Menubar.SubContent className="data-table__context-content">
+                        <Menubar.Item className="data-table__menu-item" disabled={!canAddRow} onSelect={onAddRow}>
+                          <span className="data-table__context-icon" aria-hidden>
+                            <TbRowInsertBottom />
+                          </span>
+                          Add row
+                        </Menubar.Item>
+                        <Menubar.Item
+                          className="data-table__menu-item"
+                          disabled={!canAddRows}
+                          onSelect={() => openBulkInsert('rows')}
+                        >
+                          <span className="data-table__context-icon" aria-hidden>
+                            <TbRowInsertBottom />
+                          </span>
+                          Add rows…
+                        </Menubar.Item>
+                      </Menubar.SubContent>
+                    </Menubar.Portal>
+                  </Menubar.Sub>
+                  <Menubar.Sub>
+                    <Menubar.SubTrigger className="data-table__menu-item">
+                      <span className="data-table__context-icon" aria-hidden>
+                        <TbColumnInsertRight />
+                      </span>
+                      Columns
+                      <FiChevronRight className="data-table__menu-chevron" aria-hidden />
+                    </Menubar.SubTrigger>
+                    <Menubar.Portal>
+                      <Menubar.SubContent className="data-table__context-content">
+                        <Menubar.Item className="data-table__menu-item" disabled={!canAddColumn} onSelect={onAddColumn}>
+                          <span className="data-table__context-icon" aria-hidden>
+                            <TbColumnInsertRight />
+                          </span>
+                          Add column
+                        </Menubar.Item>
+                        <Menubar.Item
+                          className="data-table__menu-item"
+                          disabled={!canAddColumns}
+                          onSelect={() => openBulkInsert('columns')}
+                        >
+                          <span className="data-table__context-icon" aria-hidden>
+                            <TbColumnInsertRight />
+                          </span>
+                          Add columns…
+                        </Menubar.Item>
+                      </Menubar.SubContent>
+                    </Menubar.Portal>
+                  </Menubar.Sub>
+                  {formulasEnabled && (
+                    <>
+                      <Menubar.Separator className="data-table__menu-separator" />
+                      <Menubar.Sub>
+                        <Menubar.SubTrigger className="data-table__menu-item" disabled={!hasSelection}>
+                          <span className="data-table__context-icon" aria-hidden>
+                            <FiHash />
+                          </span>
+                          Formulas
+                          <FiChevronRight className="data-table__menu-chevron" aria-hidden />
+                        </Menubar.SubTrigger>
+                        <Menubar.Portal>
+                          <Menubar.SubContent className="data-table__context-content">
+                            {formulaInsertOptions.map(([name, description]) => (
+                              <Menubar.Item
+                                key={name}
+                                className="data-table__menu-item"
+                                disabled={!hasSelection}
+                                title={description}
+                                onSelect={() => onInsertFormula(name)}
+                              >
+                                <span className="data-table__context-icon" aria-hidden>
+                                  <FiHash />
+                                </span>
+                                {name}
+                              </Menubar.Item>
+                            ))}
+                          </Menubar.SubContent>
+                        </Menubar.Portal>
+                      </Menubar.Sub>
+                    </>
+                  )}
+                </Menubar.Content>
+              </Menubar.Portal>
+            </Menubar.Menu>
+            {(formats.length > 0 || textFormats.enabled) && (
+              <Menubar.Menu>
+                <Menubar.Trigger className="data-table__menu-trigger" disabled={!hasSelection}>
+                  Format
+                </Menubar.Trigger>
+                <Menubar.Portal>
+                  <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
+                    {textFormats.enabled && (
+                      <>
+                        <Menubar.Sub>
+                          <Menubar.SubTrigger className="data-table__menu-item" disabled={!hasSelection}>
+                            <span className="data-table__context-icon" aria-hidden>
+                              <FiType />
+                            </span>
+                            Text
+                            <FiChevronRight className="data-table__menu-chevron" aria-hidden />
+                          </Menubar.SubTrigger>
+                          <Menubar.Portal>
+                            <Menubar.SubContent className="data-table__context-content">
+                              <TextFormatChoices
+                                formats={textFormats}
+                                onApply={onApplyTextStyle}
+                                onToggle={onToggleTextStyle}
+                              />
+                            </Menubar.SubContent>
+                          </Menubar.Portal>
+                        </Menubar.Sub>
+                      </>
+                    )}
+                    {formats.length > 0 && (
+                      <>
+                        {textFormats.enabled && <Menubar.Separator className="data-table__menu-separator" />}
+                        <Menubar.Label className="data-table__menu-label">Background</Menubar.Label>
+                        {formats.map((entry) => (
+                          <Menubar.Item
+                            key={entry.key}
+                            className="data-table__menu-item"
+                            disabled={!hasSelection}
+                            onSelect={() => onApplyBackground(entry.key)}
+                          >
+                            <span
+                              className="data-table__format-swatch"
+                              aria-hidden
+                              style={
+                                {
+                                  '--data-table-swatch-light':
+                                    typeof entry.background === 'string' ? entry.background : entry.background.light,
+                                  '--data-table-swatch-dark':
+                                    typeof entry.background === 'string' ? entry.background : entry.background.dark,
+                                } as CSSProperties
+                              }
+                            />
+                            {entry.label}
+                          </Menubar.Item>
+                        ))}
+                        <Menubar.Separator className="data-table__menu-separator" />
+                        <Menubar.Item
+                          className="data-table__menu-item"
+                          disabled={!hasSelection}
+                          onSelect={() => onApplyBackground()}
+                        >
+                          Clear background
+                        </Menubar.Item>
+                      </>
+                    )}
+                  </Menubar.Content>
+                </Menubar.Portal>
+              </Menubar.Menu>
+            )}
+            <Menubar.Menu>
+              <Menubar.Trigger className="data-table__menu-trigger">Help</Menubar.Trigger>
+              <Menubar.Portal>
+                <Menubar.Content className="data-table__menu-content" align="start" sideOffset={5}>
+                  <Menubar.Item className="data-table__menu-item" onSelect={() => openModal(shortcutsDrawerSlug)}>
+                    <span className="data-table__context-icon" aria-hidden>
+                      <FiHelpCircle />
+                    </span>
+                    Keyboard shortcuts
+                  </Menubar.Item>
+                  {formulasEnabled && <Menubar.Separator className="data-table__menu-separator" />}
+                  {formulasEnabled && (
+                    <Menubar.Item className="data-table__menu-item" onSelect={() => openModal(formulaHelpDrawerSlug)}>
+                      <span className="data-table__context-icon" aria-hidden>
+                        <FiHash />
+                      </span>
+                      Formula help
+                    </Menubar.Item>
+                  )}
+                </Menubar.Content>
+              </Menubar.Portal>
+            </Menubar.Menu>
+          </Menubar.Root>
+          {hasSelection && textFormats.enabled && (
+            <TextFormattingToolbar
+              formats={textFormats}
+              activeStyle={activeTextStyle}
+              onApply={onApplyTextStyle}
+              onToggle={onToggleTextStyle}
+            />
+          )}
+        </div>
         {selectionLabel && (
           <div className="data-table__selection-indicator">
             <span>{selectionLabel}</span>

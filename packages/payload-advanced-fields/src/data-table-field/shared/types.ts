@@ -29,7 +29,37 @@ export type DataTablePaletteEntry = DataTableFormat;
 export type DataTableAppearance = {
   rows?: Record<string, string>;
   cells?: Record<string, Record<string, string>>;
+  text?: Record<string, Record<string, DataTableTextStyle>>;
   stickyRows?: { top: number; bottom: number };
+};
+
+export type DataTableTextStyle = {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  align?: 'left' | 'center' | 'right';
+  wrap?: boolean;
+};
+
+export type DataTableTextFormats = {
+  enabled?: boolean;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  alignment?: boolean;
+  wrapping?: boolean;
+};
+
+export type ResolvedDataTableTextFormats = {
+  enabled: boolean;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strikethrough: boolean;
+  alignment: boolean;
+  wrapping: boolean;
 };
 
 export type DataTableRow = {
@@ -67,6 +97,7 @@ export type DataTableOptions = {
     computeFormulas?: boolean;
   };
   formats?: DataTableFormat[];
+  textFormats?: boolean | DataTableTextFormats;
   stickyRows?: { enabled?: boolean; top?: number; bottom?: number };
 };
 
@@ -76,6 +107,7 @@ export type ResolvedDataTableOptions = {
   formulas: { enabled: boolean; compute: boolean };
   apiResponse: { includeIds: boolean; computeFormulas: boolean };
   formats: DataTableFormat[];
+  textFormats: ResolvedDataTableTextFormats;
   stickyRows: { enabled: boolean; top: number; bottom: number };
 };
 

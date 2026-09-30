@@ -5,6 +5,9 @@ export const MAX_DATA_TABLE_FORMULA_LENGTH = 1_024;
 
 export function resolveDataTableOptions(options: DataTableOptions = {}): ResolvedDataTableOptions {
   const formulaOptions = typeof options.formulas === 'object' ? options.formulas : undefined;
+  const textFormatOptions = typeof options.textFormats === 'object' ? options.textFormats : undefined;
+  const textFormatsEnabled =
+    options.textFormats === true || (textFormatOptions !== undefined && textFormatOptions.enabled !== false);
   const apiResponseOptions = options.apiResponse ?? {};
   const computeFormulas = apiResponseOptions.computeFormulas ?? formulaOptions?.compute ?? false;
   const columnOptions = options.columns ?? {};
@@ -29,6 +32,15 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
       computeFormulas,
     },
     formats: options.formats ?? [],
+    textFormats: {
+      enabled: textFormatsEnabled,
+      bold: textFormatsEnabled && (textFormatOptions?.bold ?? true),
+      italic: textFormatsEnabled && (textFormatOptions?.italic ?? true),
+      underline: textFormatsEnabled && (textFormatOptions?.underline ?? true),
+      strikethrough: textFormatsEnabled && (textFormatOptions?.strikethrough ?? true),
+      alignment: textFormatsEnabled && (textFormatOptions?.alignment ?? true),
+      wrapping: textFormatsEnabled && (textFormatOptions?.wrapping ?? true),
+    },
     stickyRows: {
       enabled: options.stickyRows?.enabled ?? true,
       top: options.stickyRows?.top ?? 0,
@@ -112,7 +124,7 @@ function validateAppearance(
 ): true | string {
   if (value === undefined) return true;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'Invalid data table appearance.';
-  const appearance = value as { rows?: unknown; cells?: unknown; stickyRows?: unknown };
+  const appearance = value as { rows?: unknown; cells?: unknown; text?: unknown; stickyRows?: unknown };
   const validRows = (rows: unknown) =>
     Boolean(rows && typeof rows === 'object' && !Array.isArray(rows)) &&
     Object.entries(rows as Record<string, unknown>).every(
@@ -131,6 +143,29 @@ function validateAppearance(
         )
       )
         return 'Invalid data table cell appearance.';
+    }
+  }
+  if (appearance.text !== undefined) {
+    if (!appearance.text || typeof appearance.text !== 'object' || Array.isArray(appearance.text))
+      return 'Invalid data table text appearance.';
+    for (const [rowID, cells] of Object.entries(appearance.text as Record<string, unknown>)) {
+      if (!rowIDs.includes(rowID) || !cells || typeof cells !== 'object' || Array.isArray(cells))
+        return 'Invalid data table text appearance.';
+      for (const [columnID, style] of Object.entries(cells as Record<string, unknown>)) {
+        if (
+          !columnIDs.includes(columnID) ||
+          !style ||
+          typeof style !== 'object' ||
+          Array.isArray(style) ||
+          Object.entries(style as Record<string, unknown>).some(([key, value]) => {
+            if (!['bold', 'italic', 'underline', 'strikethrough', 'wrap'].includes(key)) return true;
+            return typeof value !== 'boolean';
+          }) ||
+          ('align' in (style as Record<string, unknown>) &&
+            !['left', 'center', 'right'].includes(String((style as Record<string, unknown>).align)))
+        )
+          return 'Invalid data table text appearance.';
+      }
     }
   }
   if (appearance.stickyRows !== undefined) {

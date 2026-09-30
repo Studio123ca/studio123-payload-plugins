@@ -1,5 +1,11 @@
 import type { CSSProperties } from 'react';
-import type { DataTableAppearance, DataTableThemeColor, DataTableValue, ResolvedDataTableOptions } from './types.js';
+import type {
+  DataTableAppearance,
+  DataTableTextStyle,
+  DataTableThemeColor,
+  DataTableValue,
+  ResolvedDataTableOptions,
+} from './types.js';
 
 function color(value: DataTableThemeColor, theme: 'light' | 'dark') {
   return typeof value === 'string' ? value : value[theme];
@@ -42,6 +48,40 @@ export function setDataTableBackground(
     else delete cellStyles[row];
   });
   return Object.keys(cellStyles).length ? { ...next, cells: cellStyles } : { ...next, cells: undefined };
+}
+
+export function dataTableTextStyle(
+  table: DataTableValue,
+  rowID: string,
+  columnID: string,
+): DataTableTextStyle | undefined {
+  return table.appearance?.text?.[rowID]?.[columnID];
+}
+
+export function setDataTableTextStyle(
+  appearance: DataTableAppearance | undefined,
+  rows: string[],
+  columns: string[],
+  patch: DataTableTextStyle | undefined,
+): DataTableAppearance | undefined {
+  const next = appearance ?? {};
+  const text = { ...next.text };
+  rows.forEach((rowID) => {
+    const rowStyles = { ...text[rowID] };
+    columns.forEach((columnID) => {
+      if (!patch) delete rowStyles[columnID];
+      else {
+        const current = rowStyles[columnID] ?? {};
+        const style = { ...current, ...patch };
+        if (!Object.values(style).some((value) => value !== undefined && value !== false && value !== 'left'))
+          delete rowStyles[columnID];
+        else rowStyles[columnID] = style;
+      }
+    });
+    if (Object.keys(rowStyles).length) text[rowID] = rowStyles;
+    else delete text[rowID];
+  });
+  return Object.keys(text).length ? { ...next, text } : { ...next, text: undefined };
 }
 
 export function stickyRowCounts(table: DataTableValue, options: ResolvedDataTableOptions) {

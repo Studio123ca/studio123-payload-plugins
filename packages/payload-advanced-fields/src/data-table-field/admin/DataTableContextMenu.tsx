@@ -14,9 +14,10 @@ import {
   FiDroplet,
   FiPlus,
   FiTrash2,
+  FiType,
 } from 'react-icons/fi';
 import type { CSSProperties, ReactNode } from 'react';
-import type { DataTableValue, ResolvedDataTableOptions } from '../shared/types.js';
+import type { DataTableTextStyle, DataTableValue, ResolvedDataTableOptions } from '../shared/types.js';
 
 export type DataTableContextTarget =
   | { kind: 'cell'; row: number; column: number }
@@ -46,6 +47,8 @@ type Props = {
   onPaste: () => void;
   onCut: () => void;
   onApplyBackground: (key?: string) => void;
+  onApplyTextStyle: (patch: DataTableTextStyle | undefined) => void;
+  onToggleTextStyle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
   onFreezeRows: (top: number, bottom: number) => void;
   onSort: (direction: 'ascending' | 'descending', column: number) => void;
   hasSelection: boolean;
@@ -85,10 +88,87 @@ function Separator() {
   return <ContextMenu.Separator className="data-table__context-separator" />;
 }
 
-function FormatChoices({ options, onApply }: { options: ResolvedDataTableOptions; onApply: (key?: string) => void }) {
+function TextFormatChoices({
+  options,
+  onApply,
+  onToggle,
+}: {
+  options: ResolvedDataTableOptions;
+  onApply: (patch: DataTableTextStyle | undefined) => void;
+  onToggle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
+}) {
+  const formats = options.textFormats;
   return (
     <>
-      <ContextMenu.Label className="data-table__context-label">Background</ContextMenu.Label>
+      {formats.bold && (
+        <Item icon={<FiType />} shortcut="⌘B" onSelect={() => onToggle('bold')}>
+          Bold
+        </Item>
+      )}
+      {formats.italic && (
+        <Item icon={<FiType />} shortcut="⌘I" onSelect={() => onToggle('italic')}>
+          Italic
+        </Item>
+      )}
+      {formats.underline && (
+        <Item icon={<FiType />} shortcut="⌘U" onSelect={() => onToggle('underline')}>
+          Underline
+        </Item>
+      )}
+      {formats.strikethrough && (
+        <Item icon={<FiType />} shortcut="⇧⌘X" onSelect={() => onToggle('strikethrough')}>
+          Strikethrough
+        </Item>
+      )}
+      {formats.alignment && (
+        <Submenu label="Alignment" icon={<FiType />}>
+          <Item icon={<FiType />} onSelect={() => onApply({ align: 'left' })}>
+            Left
+          </Item>
+          <Item icon={<FiType />} shortcut="⇧⌘E" onSelect={() => onApply({ align: 'center' })}>
+            Center
+          </Item>
+          <Item icon={<FiType />} shortcut="⇧⌘R" onSelect={() => onApply({ align: 'right' })}>
+            Right
+          </Item>
+        </Submenu>
+      )}
+      {formats.wrapping && (
+        <Item icon={<FiType />} onSelect={() => onToggle('wrap')}>
+          Toggle wrapping
+        </Item>
+      )}
+      <Item icon={<FiDelete />} onSelect={() => onApply(undefined)}>
+        Clear text formatting
+      </Item>
+    </>
+  );
+}
+
+function FormatChoices({
+  options,
+  onApply,
+  onApplyTextStyle,
+  onToggleTextStyle,
+}: {
+  options: ResolvedDataTableOptions;
+  onApply: (key?: string) => void;
+  onApplyTextStyle: (patch: DataTableTextStyle | undefined) => void;
+  onToggleTextStyle: (key: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'wrap') => void;
+}) {
+  return (
+    <>
+      {options.textFormats.enabled && (
+        <>
+          <Submenu label="Text" icon={<FiType />}>
+            <TextFormatChoices options={options} onApply={onApplyTextStyle} onToggle={onToggleTextStyle} />
+          </Submenu>
+          {options.formats.length > 0 && <Separator />}
+        </>
+      )}
+      {options.formats.length > 0 && (
+        <ContextMenu.Label className="data-table__context-label">Background</ContextMenu.Label>
+      )}
       {options.formats.map((entry) => (
         <ContextMenu.Item key={entry.key} className="data-table__context-item" onSelect={() => onApply(entry.key)}>
           <span
@@ -106,9 +186,11 @@ function FormatChoices({ options, onApply }: { options: ResolvedDataTableOptions
           {entry.label}
         </ContextMenu.Item>
       ))}
-      <ContextMenu.Item className="data-table__context-item" onSelect={() => onApply()}>
-        Clear background
-      </ContextMenu.Item>
+      {options.formats.length > 0 && (
+        <ContextMenu.Item className="data-table__context-item" onSelect={() => onApply()}>
+          Clear background
+        </ContextMenu.Item>
+      )}
     </>
   );
 }
@@ -162,6 +244,8 @@ export function DataTableContextMenu({
   onPaste,
   onCut,
   onApplyBackground,
+  onApplyTextStyle,
+  onToggleTextStyle,
   onFreezeRows,
   onSort,
   hasSelection,
@@ -201,9 +285,14 @@ export function DataTableContextMenu({
               <Item icon={<FiDelete />} danger disabled={!hasSelection} shortcut="⌫" onSelect={onClearSelection}>
                 Clear cells
               </Item>
-              {options.formats.length > 0 && (
+              {(options.formats.length > 0 || options.textFormats.enabled) && (
                 <Submenu label="Format" icon={<FiDroplet />} disabled={!hasSelection}>
-                  <FormatChoices options={options} onApply={onApplyBackground} />
+                  <FormatChoices
+                    options={options}
+                    onApply={onApplyBackground}
+                    onApplyTextStyle={onApplyTextStyle}
+                    onToggleTextStyle={onToggleTextStyle}
+                  />
                 </Submenu>
               )}
               <Submenu label="Insert" icon={<FiPlus />}>
@@ -286,9 +375,14 @@ export function DataTableContextMenu({
                   Move down
                 </Item>
               </Submenu>
-              {options.formats.length > 0 && (
+              {(options.formats.length > 0 || options.textFormats.enabled) && (
                 <Submenu label="Format" icon={<FiDroplet />} disabled={!hasSelection}>
-                  <FormatChoices options={options} onApply={onApplyBackground} />
+                  <FormatChoices
+                    options={options}
+                    onApply={onApplyBackground}
+                    onApplyTextStyle={onApplyTextStyle}
+                    onToggleTextStyle={onToggleTextStyle}
+                  />
                 </Submenu>
               )}
               {options.stickyRows.enabled && (
@@ -356,9 +450,14 @@ export function DataTableContextMenu({
                   Move right
                 </Item>
               </Submenu>
-              {options.formats.length > 0 && (
+              {(options.formats.length > 0 || options.textFormats.enabled) && (
                 <Submenu label="Format" icon={<FiDroplet />} disabled={!hasSelection}>
-                  <FormatChoices options={options} onApply={onApplyBackground} />
+                  <FormatChoices
+                    options={options}
+                    onApply={onApplyBackground}
+                    onApplyTextStyle={onApplyTextStyle}
+                    onToggleTextStyle={onToggleTextStyle}
+                  />
                 </Submenu>
               )}
               <Separator />

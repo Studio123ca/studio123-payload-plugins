@@ -22,6 +22,17 @@ type Args = FieldControls & {
     background: string | { light: string; dark: string };
     text?: string | { light: string; dark: string };
   }>;
+  textFormats:
+    | boolean
+    | {
+        enabled?: boolean;
+        bold?: boolean;
+        italic?: boolean;
+        underline?: boolean;
+        strikethrough?: boolean;
+        alignment?: boolean;
+        wrapping?: boolean;
+      };
   stickyRows: { enabled?: boolean; top?: number; bottom?: number };
 };
 
@@ -53,56 +64,94 @@ const formatOptions = resolveDataTableOptions({
     { key: 'success', label: 'Success', background: 'var(--color-bg-success-tertiary, #d9f0df)' },
   ],
 });
-const formattedExample = createDataTable(formatOptions);
-formattedExample.columns[0].label = 'Product';
-formattedExample.columns[1].label = 'Status';
-formattedExample.columns[2].label = 'Notes';
-formattedExample.rows[0].cells = ['Widget', 'Ready', 'Format this row or cell from the menu'];
-formattedExample.rows[1].cells = ['Gizmo', 'Review', ''];
-formattedExample.appearance = { rows: { [formattedExample.rows[0].id]: 'highlight' } };
-const valueFormatsOptions = resolveDataTableOptions({
-  columns: { initial: 6 },
-  rows: { initial: 4 },
-  formulas: { enabled: true },
+const formattingExample = createDataTable(
+  resolveDataTableOptions({
+    ...formatOptions,
+    textFormats: true,
+  }),
+);
+formattingExample.columns[0].label = 'Product';
+formattingExample.columns[1].label = 'Status';
+formattingExample.columns[2].label = 'Notes';
+formattingExample.rows[0].cells = ['Widget', 'Ready', 'Background and text formatting'];
+formattingExample.rows[1].cells = ['Gizmo', 'Review', 'Select cells, then use Format'];
+formattingExample.appearance = {
+  rows: { [formattingExample.rows[0].id]: 'highlight' },
+  text: {
+    [formattingExample.rows[0].id]: {
+      [formattingExample.columns[0].id]: { bold: true },
+      [formattingExample.columns[1].id]: { italic: true, align: 'center' },
+    },
+  },
+};
+const formattedValuesExample = createDataTable(
+  resolveDataTableOptions({
+    columns: { initial: 10 },
+    rows: { initial: 4 },
+    formulas: { enabled: true },
+  }),
+);
+[
+  'Currency',
+  'Percent',
+  'Duration',
+  'Date',
+  'Time',
+  'Date difference',
+  'Time offset',
+  'Mixed units',
+  'Formula',
+  'Notes',
+].forEach((label, index) => {
+  formattedValuesExample.columns[index].label = label;
 });
-const valueFormatsExample = createDataTable(valueFormatsOptions);
-['Currency', 'Percent', 'Duration', 'Date', 'Time', 'Mixed formats'].forEach((label, index) => {
-  valueFormatsExample.columns[index].label = label;
-});
-valueFormatsExample.rows[0].cells = ['$4.10', '10%', '2.40ms', '2026-09-30', '12:30', '1s'];
-valueFormatsExample.rows[1].cells = ['$1.50', '5%', '1.20ms', '1d', '1h', '2.40ms'];
-valueFormatsExample.rows[2].cells = [
+formattedValuesExample.rows[0].cells = [
+  '$4.10',
+  '10%',
+  '2.40ms',
+  '2026-09-30',
+  '12:30',
+  '1d',
+  '1h',
+  '1s',
+  '2',
+  'Compatible formats',
+];
+formattedValuesExample.rows[1].cells = [
+  '$1.50',
+  '5%',
+  '1.20ms',
+  '2026-10-02',
+  '2h',
+  '',
+  '1h',
+  '2.40ms',
+  '3',
+  'Mixed units return #VALUE!',
+];
+formattedValuesExample.rows[2].cells = [
   { formula: '=SUM(A1:A2)' },
   { formula: '=B1+B2' },
   { formula: '=C1+C2' },
-  { formula: '=D1+D2' },
-  { formula: '=E1+E2' },
-  { formula: '=F1+F2' },
+  { formula: '=D1+F1' },
+  { formula: '=E1+G1' },
+  { formula: '=D2-D1' },
+  { formula: '=G1+E2' },
+  { formula: '=H1+H2' },
+  { formula: '=A3*B3' },
+  'Duration units and currencies must match.',
 ];
-valueFormatsExample.rows[3].cells = [
-  'Compatible values retain their display format.',
-  'Percent results keep the % sign.',
-  'Duration units must match.',
-  'Dates can be offset by durations.',
-  'Times can be offset by durations.',
-  'Mixed units return #VALUE!.',
-];
-const dateTimeOptions = resolveDataTableOptions({
-  columns: { initial: 4 },
-  rows: { initial: 3 },
-  formulas: { enabled: true },
-});
-const dateTimeExample = createDataTable(dateTimeOptions);
-['Date', 'Date difference', 'Time', 'Mixed units'].forEach((label, index) => {
-  dateTimeExample.columns[index].label = label;
-});
-dateTimeExample.rows[0].cells = ['2026-09-30', '1d', '12:30', '1s'];
-dateTimeExample.rows[1].cells = ['2026-10-02', '', '1h', '2.40ms'];
-dateTimeExample.rows[2].cells = [
-  { formula: '=A1+B1' },
-  { formula: '=A2-A1' },
-  { formula: '=C1+C2' },
-  { formula: '=D1+D2' },
+formattedValuesExample.rows[3].cells = [
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  'Formatted results retain compatible display formats.',
 ];
 const freezeOptions = resolveDataTableOptions({
   columns: { initial: 3 },
@@ -177,6 +226,7 @@ const meta = {
     formulas: false,
     apiResponse: { includeIds: false, computeFormulas: false },
     formats: [],
+    textFormats: false,
     stickyRows: { enabled: true, top: 0, bottom: 0 },
   },
   argTypes: {
@@ -187,6 +237,7 @@ const meta = {
     formulas: { control: 'object', description: 'Configure formula editing and evaluation.' },
     apiResponse: { control: 'object', description: 'Opt into response IDs and computed formula values.' },
     formats: { control: 'object', description: 'Optional format choices. The Format menu is hidden when empty.' },
+    textFormats: { control: 'object', description: 'Enable cell text formatting options.' },
     stickyRows: { control: 'object', description: 'Configure sticky top and bottom row counts.' },
   },
   render: (args, { globals }) => {
@@ -223,21 +274,14 @@ export const APIResponse: Story = {
     );
   },
 };
-export const Formatted: Story = {
-  args: { initialValue: formattedExample, formats: formatOptions.formats },
+export const Formatting: Story = {
+  args: { initialValue: formattingExample, formats: formatOptions.formats, textFormats: true },
 };
-export const ValueFormats: Story = {
+export const FormulaFormats: Story = {
   args: {
-    initialValue: valueFormatsExample,
+    initialValue: formattedValuesExample,
     formulas: { enabled: true },
-    maxHeight: 320,
-  },
-};
-export const DateTimeFormats: Story = {
-  args: {
-    initialValue: dateTimeExample,
-    formulas: { enabled: true },
-    maxHeight: 280,
+    maxHeight: 340,
   },
 };
 export const FreezeRows: Story = {
