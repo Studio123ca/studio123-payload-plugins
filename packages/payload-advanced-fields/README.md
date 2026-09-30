@@ -109,7 +109,7 @@ export const SiteSettings: GlobalConfig = {
             codeField({
               name: 'customCSS',
               label: 'Custom CSS',
-              language: 'html',
+              language: 'css',
               height: 400,
             }),
             phoneField({

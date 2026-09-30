@@ -44,6 +44,18 @@ export function useConfig() {
 export function useLocale() {
   return { code: useContext(Context).locale };
 }
+export function useTranslation() {
+  return {
+    t: (key: string, options: Record<string, unknown> = {}) => {
+      if (key === 'validation:required') return 'This field is required.';
+      if (key === 'validation:longerThanMin')
+        return `This value must be longer than the minimum length of ${options.minLength} characters.`;
+      if (key === 'validation:shorterThanMax')
+        return `This value must be shorter than the max length of ${options.maxLength} characters.`;
+      return key;
+    },
+  };
+}
 export function useDocumentInfo() {
   return useContext(Context);
 }
@@ -60,14 +72,19 @@ export function RenderFields(props: any) {
 export function RenderCustomComponent({ CustomComponent, Fallback }: any) {
   return CustomComponent ?? Fallback;
 }
-export function FieldLabel({ label }: any) {
-  return <label>{typeof label === 'string' ? label : ''}</label>;
+export function FieldLabel({ htmlFor, label, required }: any) {
+  return (
+    <label htmlFor={htmlFor}>
+      {typeof label === 'string' ? label : ''}
+      {required ? '*' : ''}
+    </label>
+  );
 }
 export function FieldError() {
   return null;
 }
-export function FieldDescription({ description }: any) {
-  return <p>{typeof description === 'string' ? description : ''}</p>;
+export function FieldDescription({ description, path }: any) {
+  return description ? <p id={`field-description-${path?.replace(/\./g, '__')}`}>{description}</p> : null;
 }
 export function Button({ children, buttonStyle: _buttonStyle, margin: _margin, size: _size, ...props }: any) {
   return <button {...props}>{children}</button>;

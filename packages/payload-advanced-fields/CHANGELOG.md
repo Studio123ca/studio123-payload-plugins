@@ -6,6 +6,7 @@
 - Fixed Color Field string defaults, empty preset handling, alpha preservation, malformed color validation, picker initialization, read-only interaction, and swatch accessibility.
 - Added server-side `beforeValidate` normalization for phone and color fields while preserving user-provided hooks.
 - Moved the Link Field drawer's Clear action to the left and Cancel beside Save.
+- Expanded the Code Field with CSS, JavaScript, TypeScript, JSX, TSX, JSON, Markdown, and plain-text modes; added localized labels and descriptions, safe height and row handling, length validation, accessibility metadata, and client regression coverage.
 - Added opt-in row-backed Data Table storage with a hidden managed row collection, parent access checks, and a paginated row endpoint.
 - Added `storage.mode`, pagination limits, storage manifests, and shared row-page metadata for large tables.
 - Updated the admin field to hydrate row-backed tables through the protected endpoint and updated the Paginated API Storybook story to exercise the row-backed response shape.

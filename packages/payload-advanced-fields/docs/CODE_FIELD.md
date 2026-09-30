@@ -26,30 +26,42 @@ import { codeField } from '@studio123/payload-advanced-fields/code';
 codeField({
   name: 'htmlCode',
   label: 'HTML Code',
-  description: 'Enter your HTML code here',
   required: true,
   localized: false,
   language: 'html',
   height: 400,
+  admin: {
+    description: 'Enter your HTML code here',
+  },
 });
 ```
 
 ## Configuration Options
 
-| Option        | Type             | Default     | Description                   |
-| ------------- | ---------------- | ----------- | ----------------------------- |
-| `name`        | string           | `'code'`    | Field name in the database    |
-| `label`       | string           | `'Code'`    | Display label in admin UI     |
-| `description` | string           | `undefined` | Help text for the field       |
-| `required`    | boolean          | `true`      | Whether the field is required |
-| `localized`   | boolean          | `false`     | Enable multi-language support |
-| `language`    | 'html' \| 'text' | `'html'`    | Syntax highlighting language  |
-| `height`      | number           | `360`       | Editor height in pixels       |
+| Option              | Type           | Default     | Description                                   |
+| ------------------- | -------------- | ----------- | --------------------------------------------- |
+| `name`              | string         | `'code'`    | Field name in the database                    |
+| `label`             | string         | `'Code'`    | Display label in admin UI                     |
+| `admin.description` | string         | `undefined` | Help text for the field                       |
+| `required`          | boolean        | `true`      | Whether the field is required                 |
+| `localized`         | boolean        | `false`     | Enable multi-language support                 |
+| `language`          | `CodeLanguage` | `'html'`    | Syntax highlighting language                  |
+| `height`            | number         | `360`       | Editor height in pixels                       |
+| `admin.rows`        | number         | `undefined` | Fallback editor height based on textarea rows |
 
 ## Supported Languages
 
 - **html** - HTML with syntax highlighting
+- **css** - CSS with syntax highlighting
+- **javascript** - JavaScript with syntax highlighting
+- **typescript** - TypeScript with syntax highlighting
+- **jsx** - JavaScript with JSX syntax highlighting
+- **tsx** - TypeScript with JSX syntax highlighting
+- **json** - JSON with syntax highlighting
+- **markdown** - Markdown with syntax highlighting
 - **text** - Plain text (no highlighting)
+
+The `height` option takes precedence over `admin.rows`. Heights are clamped to a safe range for the admin editor, and values longer than `maxLength` are truncated while editing. `minLength` and `maxLength` remain Payload validation constraints.
 
 ## Example Field Definition
 

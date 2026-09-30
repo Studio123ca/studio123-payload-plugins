@@ -1,11 +1,24 @@
 import type { TextareaField, PayloadComponent } from 'payload';
 
-export type CodeLanguage = 'html' | 'text';
+export const CODE_LANGUAGES = [
+  'html',
+  'css',
+  'javascript',
+  'typescript',
+  'jsx',
+  'tsx',
+  'json',
+  'markdown',
+  'text',
+] as const;
+
+export type CodeLanguage = (typeof CODE_LANGUAGES)[number];
 
 export type CodeFieldClientComponent = {
   height?: number;
   language?: CodeLanguage;
   localized?: boolean;
+  rows?: number;
 };
 
 export type CodeFieldErrorComponent = {

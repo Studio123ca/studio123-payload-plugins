@@ -6,6 +6,8 @@ export type { AdvancedFieldsPluginConfig } from './plugin.js';
 
 export { codeField } from './code-field/server/field.js';
 export type { CodeField, CodeFieldConfig } from './code-field/server/field.js';
+export { CODE_LANGUAGES } from './code-field/shared/types.js';
+export type { CodeLanguage } from './code-field/shared/types.js';
 
 export { linkField } from './link-field/server/field.js';
 export { getLinkHref } from './link-field/shared/getLinkHref.js';
