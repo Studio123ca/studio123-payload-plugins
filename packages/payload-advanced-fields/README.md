@@ -64,7 +64,7 @@ const fields = [
 
 See the [Data Table field guide](docs/DATA_TABLE_FIELD.md) for the value contract and configuration. This package currently pins Payload and `@payloadcms/ui` to `4.0.0-canary.37`.
 
-For tables that can outgrow a document response, configure `storage: { mode: 'rows' }` and add `advancedFieldsPlugin()` to register the managed row collection, save hooks, and paginated endpoint. See the [row-backed storage section](docs/DATA_TABLE_FIELD.md#row-backed-storage-and-pagination) for the complete configuration.
+For tables that can outgrow a document response, configure `storage: { mode: 'rows' }` and add `advancedFieldsPlugin()` to register the managed row collection, save hooks, and paginated endpoint. See the [row-backed storage section](docs/DATA_TABLE_FIELD.md#row-backed-storage) for the complete configuration.
 
 Data Table dimensions default to three initial rows and columns with a minimum of one. Maximum rows and columns are unlimited unless `rows.max` or `columns.max` is configured. API response IDs and computed formula values are opt-in through `apiResponse`; stored values remain compact by default.
 

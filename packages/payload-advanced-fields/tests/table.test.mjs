@@ -15,7 +15,6 @@ import {
 } from '../dist/data-table-field/index.js';
 import { advancedFieldsPlugin } from '../dist/index.js';
 import { pasteDataTableCells } from '../dist/data-table-field/shared/operations.js';
-import { createDataTableRowsEndpoint } from '../dist/data-table-field/server/storage.js';
 
 test('data table factory creates a JSON field with a DataTableField admin component', () => {
   const field = dataTableField({ name: 'pricing', label: 'Pricing', rows: { initial: 2 }, columns: { initial: 4 } });
@@ -203,49 +202,14 @@ test('registers row storage hooks, collection, and endpoint through the plugin',
     ],
   });
   const documents = config.collections.find((collection) => collection.slug === 'documents');
-  assert.equal(documents.endpoints[0].path, '/:id/data-table-rows/:field');
-  assert.equal(documents.hooks.beforeChange.length, 1);
+  assert.equal(documents.endpoints?.length ?? 0, 0);
+  assert.equal(documents.fields[0].fields[0].hooks.beforeChange.length, 1);
+  assert.equal(config.endpoints[0].path, '/data-tables/:tableId/rows');
   assert.equal(documents.hooks.afterChange.length, 1);
   assert.equal(
     config.collections.some((collection) => collection.slug === 'data-table-rows'),
     true,
   );
-});
-
-test('returns bounded row pages with global response IDs from the storage endpoint', async () => {
-  const options = resolveDataTableOptions({
-    rows: { initial: 4 },
-    columns: { initial: 1 },
-    apiResponse: { includeIds: true },
-    storage: { mode: 'rows', pagination: { enabled: true, defaultLimit: 2, maxLimit: 3 } },
-  });
-  const table = createDataTable(options);
-  const manifest = createDataTableStorageManifest(table);
-  const storedRows = table.rows.map((row, position) => ({ rowID: row.id, position, cells: row.cells }));
-  const endpoint = createDataTableRowsEndpoint({
-    collectionSlug: 'documents',
-    fieldName: 'grid',
-    options,
-  });
-  const response = await endpoint.handler({
-    routeParams: { id: 'doc-1', field: 'grid' },
-    url: 'http://localhost/api/documents/doc-1/data-table-rows/grid?page=2&limit=2',
-    payload: {
-      findByID: async () => ({ grid: manifest }),
-      find: async ({ page, limit }) => ({ docs: storedRows.slice((page - 1) * limit, page * limit) }),
-    },
-  });
-  const body = await response.json();
-  assert.deepEqual(body.pagination, {
-    page: 2,
-    limit: 2,
-    totalRows: 4,
-    totalPages: 2,
-    hasPreviousPage: true,
-    hasNextPage: false,
-  });
-  assert.equal(body.rows[0].rowId, table.rows[2].id);
-  assert.equal(body.rows[0].cells[0].cellId, 'A3');
 });
 
 test('validates safe data table link URLs', () => {

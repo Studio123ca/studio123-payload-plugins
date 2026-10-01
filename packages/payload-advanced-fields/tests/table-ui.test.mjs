@@ -6,7 +6,11 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { act, createElement } from 'react';
-import { createDataTable, resolveDataTableOptions } from '../dist/data-table-field/index.js';
+import {
+  createDataTable,
+  createDataTableStorageManifest,
+  resolveDataTableOptions,
+} from '../dist/data-table-field/index.js';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 await mkdir(resolve(packageRoot, '.cache'), { recursive: true });
@@ -57,13 +61,20 @@ const formulaOptions = resolveDataTableOptions({
 });
 const field = { name: 'dataTable', type: 'json', label: 'Data Table' };
 
-async function render({ value = null, readOnly = false, tableOptions = options } = {}) {
+async function render({
+  value = null,
+  readOnly = false,
+  tableOptions = options,
+  documentInfo = {},
+  config = {},
+  locale = 'en',
+} = {}) {
   if (!root) root = createRoot(document.querySelector('#root'));
   await act(async () =>
     root.render(
       createElement(
         Fixture,
-        { initialValue: value },
+        { initialValue: value, documentInfo, config, locale },
         createElement(DataTableField, { field, path: 'dataTable', options: tableOptions, readOnly }),
       ),
     ),
@@ -496,4 +507,96 @@ test('reorders rows and columns with header drag and drop', async () => {
   await dispatchDrag('dragover', column1);
   await dispatchDrag('drop', column1);
   assert.equal(stored().columns[0].label, 'Right');
+});
+
+test('row-backed editor loads bounded pages from the configured API route', async () => {
+  const tableOptions = resolveDataTableOptions({
+    rows: { initial: 3 },
+    columns: { initial: 1 },
+    storage: { mode: 'rows', pagination: { enabled: true, defaultLimit: 1, maxLimit: 2 } },
+  });
+  const value = createDataTable(tableOptions);
+  value.rows.forEach((row, index) => {
+    row.cells[0] = `cell-${index}`;
+  });
+  const manifest = { ...createDataTableStorageManifest(value), tableId: 'table-1', revisionId: 'rev-1' };
+  const originalFetch = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async (input) => {
+    const url = new URL(input);
+    urls.push(url);
+    const page = Number(url.searchParams.get('page'));
+    const rows = value.rows.slice((page - 1) * 2, page * 2);
+    return {
+      ok: true,
+      json: async () => ({ ...manifest, rows, pagination: { page, totalPages: 2, hasNextPage: page === 1 } }),
+    };
+  };
+  try {
+    await act(async () =>
+      render({
+        value: manifest,
+        tableOptions,
+        locale: 'fr',
+        documentInfo: { collectionSlug: 'pages', id: 'p1' },
+        config: { serverURL: 'https://example.test', routes: { api: '/content-api' } },
+      }),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    assert.deepEqual(
+      urls.map((url) => url.pathname),
+      ['/content-api/data-tables/table-1/rows'],
+    );
+    assert.deepEqual(
+      urls.map((url) => url.searchParams.get('page')),
+      ['1'],
+    );
+    assert.ok(
+      urls.every(
+        (url) =>
+          url.searchParams.get('revision') === 'rev-1' &&
+          url.searchParams.get('locale') === 'fr' &&
+          url.searchParams.get('limit') === '2',
+      ),
+    );
+    assert.equal(document.querySelectorAll('.data-table-field__storage-preview tbody tr').length, 2);
+    assert.equal(document.querySelector('.data-table-field__storage-status'), null);
+    const edit = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Edit table');
+    await act(async () => edit.click());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    assert.deepEqual(
+      urls.map((url) => url.searchParams.get('page')),
+      ['1', '1', '2'],
+    );
+    assert.equal(document.querySelectorAll('[data-context-row]').length, 3);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('row-backed editor rejects an ID-less manifest without fetching old routes', async () => {
+  const tableOptions = resolveDataTableOptions({ storage: { mode: 'rows' } });
+  const value = createDataTableStorageManifest(createDataTable(tableOptions));
+  delete value.tableId;
+  delete value.revisionId;
+  const originalFetch = globalThis.fetch;
+  const urls = [];
+  globalThis.fetch = async (input) => {
+    urls.push(String(input));
+    throw new Error('Unexpected request');
+  };
+  try {
+    await render({ value, tableOptions });
+    assert.equal(
+      urls.some((url) => url.includes('data-table-rows')),
+      false,
+    );
+    assert.match(document.querySelector('[role="alert"]')?.textContent ?? '', /missing its table identity/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

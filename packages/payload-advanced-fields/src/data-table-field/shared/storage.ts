@@ -1,16 +1,17 @@
 import type { DataTableRow, DataTableValue } from './types.js';
+import { createDataTableID } from './operations.js';
 
 export type DataTableRowRecord = {
   id?: string;
-  parentCollection: string;
-  parentID: string;
-  fieldPath: string;
+  tableId: string;
+  rowKey: string;
   rowID: string;
-  position: number;
   cells: DataTableRow['cells'];
 };
 
-export type DataTableStorageManifest = Omit<DataTableValue, 'rows'> & {
+export type DataTableStorageManifest = Omit<DataTableValue, 'rows' | 'tableId' | 'revisionId'> & {
+  tableId: string;
+  revisionId: string;
   storage: { mode: 'rows'; rowCount: number };
   rows: [];
 };
@@ -44,6 +45,8 @@ export function paginateDataTableRows(rows: DataTableRow[], page = 1, limit = 50
 export function createDataTableStorageManifest(value: DataTableValue): DataTableStorageManifest {
   return {
     version: 1,
+    tableId: value.tableId ?? createDataTableID(),
+    revisionId: value.revisionId ?? createDataTableID(),
     ...(value.headerRow === undefined ? {} : { headerRow: value.headerRow }),
     ...(value.caption === undefined ? {} : { caption: value.caption }),
     ...(value.appearance === undefined ? {} : { appearance: value.appearance }),
@@ -58,6 +61,10 @@ export function isDataTableStorageManifest(value: unknown): value is DataTableSt
   const candidate = value as Partial<DataTableStorageManifest>;
   return (
     candidate.version === 1 &&
+    typeof candidate.tableId === 'string' &&
+    candidate.tableId.length > 0 &&
+    typeof candidate.revisionId === 'string' &&
+    candidate.revisionId.length > 0 &&
     Array.isArray(candidate.columns) &&
     Array.isArray(candidate.rows) &&
     candidate.rows.length === 0 &&

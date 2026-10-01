@@ -56,7 +56,10 @@ function numeric(value: EvaluatedValue): NumericValue {
           format: { kind: 'time', seconds: time[3] !== undefined },
         };
     }
-    const match = /^\s*([+-]?)\s*((?:(?:[$€£¥]|USD|CAD|EUR|GBP)\s*)?)((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(%|ns|us|μs|µs|ms|min|s|h|d)?\s*$/i.exec(value);
+    const match =
+      /^\s*([+-]?)\s*((?:(?:[$€£¥]|USD|CAD|EUR|GBP)\s*)?)((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(%|ns|us|μs|µs|ms|min|s|h|d)?\s*$/i.exec(
+        value,
+      );
     if (match) {
       const sign = match[1] === '-' ? -1 : 1;
       const prefix = match[2].trim();
@@ -99,8 +102,7 @@ function mergeFormats(left?: NumericFormat, right?: NumericFormat): NumericForma
   if (!left) return right;
   if (!right) return left;
   if (left.kind !== right.kind) throw new Error('#VALUE!');
-  if (left.kind === 'currency' && right.kind === 'currency' && left.prefix !== right.prefix)
-    throw new Error('#VALUE!');
+  if (left.kind === 'currency' && right.kind === 'currency' && left.prefix !== right.prefix) throw new Error('#VALUE!');
   if (left.kind === 'duration' && right.kind === 'duration' && left.unit !== right.unit) throw new Error('#VALUE!');
   return left;
 }
@@ -121,7 +123,8 @@ function addValues(left: EvaluatedValue, right: EvaluatedValue, sign = 1): Numer
     throw new Error('#VALUE!');
   }
   if (b.format?.kind === 'date' || b.format?.kind === 'time') {
-    if (a.format?.kind === 'duration' && sign > 0) return { value: b.value + durationMilliseconds(a), format: b.format };
+    if (a.format?.kind === 'duration' && sign > 0)
+      return { value: b.value + durationMilliseconds(a), format: b.format };
     throw new Error('#VALUE!');
   }
   return { value: a.value + sign * b.value, format: mergeFormats(a.format, b.format) };
@@ -132,8 +135,8 @@ function durationMilliseconds(value: NumericValue) {
   const multipliers: Record<string, number> = {
     ns: 1e-6,
     us: 1e-3,
-    'μs': 1e-3,
-    'µs': 1e-3,
+    μs: 1e-3,
+    µs: 1e-3,
     ms: 1,
     s: 1_000,
     min: 60_000,
@@ -219,9 +222,19 @@ function evaluateFormula(
     if (token === 'SUM') return numbers.reduce<NumericValue>((sum, value) => addValues(sum, value), { value: 0 });
     if (!numbers.length && token === 'AVERAGE') throw new Error('#DIV/0!');
     if (!numbers.length) return 0;
-    const format = numbers.reduce<NumericFormat | undefined>((current, value) => mergeFormats(current, value.format), undefined);
-    if (token === 'AVERAGE') return { value: numbers.reduce((sum, value) => sum + value.value, 0) / numbers.length, format };
-    return { value: token === 'MIN' ? Math.min(...numbers.map((value) => value.value)) : Math.max(...numbers.map((value) => value.value)), format };
+    const format = numbers.reduce<NumericFormat | undefined>(
+      (current, value) => mergeFormats(current, value.format),
+      undefined,
+    );
+    if (token === 'AVERAGE')
+      return { value: numbers.reduce((sum, value) => sum + value.value, 0) / numbers.length, format };
+    return {
+      value:
+        token === 'MIN'
+          ? Math.min(...numbers.map((value) => value.value))
+          : Math.max(...numbers.map((value) => value.value)),
+      format,
+    };
   };
   const unary = (): EvaluatedValue => {
     if (peek() === '+' || peek() === '-') {
@@ -259,7 +272,7 @@ function evaluateFormula(
   return result;
 }
 
-export function evaluateDataTable(table: DataTableValue): DataTableResult[][] {
+export function evaluateDataTableRows(table: DataTableValue, rowIndexes: number[]): DataTableResult[][] {
   const cache = new Map<string, EvaluatedValue>();
   const visiting = new Set<string>();
   let steps = MAX_EVALUATION_STEPS;
@@ -300,7 +313,16 @@ export function evaluateDataTable(table: DataTableValue): DataTableResult[][] {
       visiting.delete(key);
     }
   };
-  return table.rows.map((row, rowIndex) => row.cells.map((_, columnIndex) => formatResult(read(rowIndex, columnIndex))));
+  return rowIndexes.map((rowIndex) =>
+    table.rows[rowIndex].cells.map((_, columnIndex) => formatResult(read(rowIndex, columnIndex))),
+  );
+}
+
+export function evaluateDataTable(table: DataTableValue): DataTableResult[][] {
+  return evaluateDataTableRows(
+    table,
+    table.rows.map((_, index) => index),
+  );
 }
 
 function numericOrText(value: string): EvaluatedValue {

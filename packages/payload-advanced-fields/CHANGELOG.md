@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Reworked row-backed Data Tables to use stable table IDs and immutable row revisions, including tables nested in blocks, arrays, tabs, and globals.
+- Added revision-aware, access-checked row reads through a bounded table ID endpoint. The former field-path route and manifests without IDs are no longer supported.
+- Added a paged admin preview; the full table loads when editing begins.
+- Reused unchanged immutable row records across revisions, evaluated formula pages from their referenced rows, and pruned snapshots no longer referenced by a document or retained Payload version.
+
 ## 1.3.0
 
 - Added the UI-only Message Field for localized admin notices with info, success, warning, and error tones, plus an opt-in Banner presentation.

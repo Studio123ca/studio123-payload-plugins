@@ -80,6 +80,10 @@ export type DataTableRow = {
 
 export type DataTableValue = {
   version: 1;
+  /** Stable table identity, assigned by row storage on first save. */
+  tableId?: string;
+  /** Immutable row snapshot referenced by this document version. */
+  revisionId?: string;
   headerRow?: boolean;
   caption?: string;
   appearance?: DataTableAppearance;

@@ -265,6 +265,12 @@ export function validateDataTable(value: unknown, options: ResolvedDataTableOpti
   const table = value as Partial<DataTableValue>;
   if (table.version !== 1 || !Array.isArray(table.columns) || !Array.isArray(table.rows))
     return 'Invalid data table value.';
+  if (
+    [table.tableId, table.revisionId].some(
+      (id) => id !== undefined && (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)),
+    )
+  )
+    return 'Invalid data table identity.';
   const isExternalManifest =
     options.storage.mode === 'rows' &&
     table.storage?.mode === 'rows' &&
@@ -347,6 +353,8 @@ export function normalizeDataTableValue(value: unknown): DataTableValue | null {
   if (isCompact) return value as DataTableValue;
   return {
     version: 1,
+    ...(typeof table.tableId === 'string' ? { tableId: table.tableId } : {}),
+    ...(typeof table.revisionId === 'string' ? { revisionId: table.revisionId } : {}),
     ...(typeof table.headerRow === 'boolean' ? { headerRow: table.headerRow } : {}),
     ...(typeof table.caption === 'string' ? { caption: table.caption } : {}),
     ...(table.appearance && typeof table.appearance === 'object' ? { appearance: table.appearance } : {}),

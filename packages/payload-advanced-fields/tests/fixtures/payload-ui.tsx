@@ -8,13 +8,15 @@ export function Fixture({
   disabled = false,
   locale = 'en',
   rows = [],
+  documentInfo = {},
+  config = {},
   children,
 }: any) {
   const [value, setValue] = useState(initialValue);
   const [modal, setModal] = useState<string | null>(null);
   useEffect(() => setValue(initialValue), [initialValue]);
   return (
-    <Context.Provider value={{ value, setValue, path, disabled, locale, rows, modal, setModal }}>
+    <Context.Provider value={{ value, setValue, path, disabled, locale, rows, modal, setModal, documentInfo, config }}>
       {children}
       <pre data-value>{JSON.stringify(value)}</pre>
     </Context.Provider>
@@ -39,7 +41,13 @@ export function useForm() {
   );
 }
 export function useConfig() {
-  return { config: { localization: { defaultLocale: 'en', fallback: true } } };
+  return {
+    config: {
+      routes: { api: '/api' },
+      localization: { defaultLocale: 'en', fallback: true },
+      ...useContext(Context).config,
+    },
+  };
 }
 export function useLocale() {
   return { code: useContext(Context).locale };
@@ -57,7 +65,7 @@ export function useTranslation() {
   };
 }
 export function useDocumentInfo() {
-  return useContext(Context);
+  return useContext(Context).documentInfo;
 }
 export function RenderFields(props: any) {
   calls.push({ action: 'RenderFields', args: props });

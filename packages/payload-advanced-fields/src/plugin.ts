@@ -1,99 +1,95 @@
-import type { CollectionConfig, Config, Plugin } from 'payload';
+import type { CollectionConfig, Field, Plugin } from 'payload';
 import type { LinkCollectionOption } from './link-field/shared/types.js';
 import { configureAdvancedFields } from './config.js';
 import {
   createDataTableRowsCollection,
+  createDataTableRevisionsCollection,
   createDataTableRowsEndpoint,
-  createDataTableStorageHooks,
+  createDataTableStorageFieldHooks,
+  createDataTableDeleteHook,
+  createDataTableOwnerHook,
+  createDataTableGlobalHook,
   DEFAULT_DATA_TABLE_STORAGE_COLLECTION,
-  type DataTableStorageDefinition,
+  DEFAULT_DATA_TABLE_REVISION_COLLECTION,
 } from './data-table-field/server/storage.js';
+import { hasTableField, mapTableFields, tableOptions } from './data-table-field/server/traversal.js';
 
 export type AdvancedFieldsPluginConfig = {
-  link?: {
-    collections?: LinkCollectionOption[];
-  };
-  dataTable?: {
-    storageCollection?: string;
-  };
+  link?: { collections?: LinkCollectionOption[] };
+  dataTable?: { storageCollection?: string; revisionCollection?: string };
 };
 
-function collectDataTableDefinitions(fields: unknown[], parentPath = ''): DataTableStorageDefinition[] {
-  const definitions: DataTableStorageDefinition[] = [];
-  for (const candidate of fields) {
-    if (!candidate || typeof candidate !== 'object') continue;
-    const field = candidate as Record<string, unknown>;
-    const ownName = typeof field.name === 'string' ? field.name : '';
-    const fieldPath = ownName ? (parentPath ? `${parentPath}.${ownName}` : ownName) : parentPath;
-    const metadata = field.custom as { dataTable?: { options?: DataTableStorageDefinition['options'] } } | undefined;
-    if (metadata?.dataTable?.options?.storage.mode === 'rows' && fieldPath) {
-      definitions.push({ fieldName: fieldPath, options: metadata.dataTable.options });
-    }
-    if (
-      Array.isArray(field.fields) &&
-      ['group', 'row', 'collapsible'].includes(typeof field.type === 'string' ? field.type : '')
-    )
-      definitions.push(...collectDataTableDefinitions(field.fields, fieldPath));
-    if (Array.isArray(field.tabs)) {
-      for (const tab of field.tabs) {
-        if (!tab || typeof tab !== 'object') continue;
-        const tabRecord = tab as Record<string, unknown>;
-        const tabName = typeof tabRecord.name === 'string' ? tabRecord.name : '';
-        const tabPath = tabName ? (parentPath ? `${parentPath}.${tabName}` : tabName) : parentPath;
-        if (Array.isArray(tabRecord.fields))
-          definitions.push(...collectDataTableDefinitions(tabRecord.fields, tabPath));
-      }
-    }
-  }
-  return definitions;
-}
-
-/**
- * Payload plugin for advanced fields (link field, code field, etc)
- * Configures the global link collection registry
- */
 export function advancedFieldsPlugin(config: AdvancedFieldsPluginConfig = {}): Plugin {
-  return (incomingConfig: Config) => {
-    // Configure the link field collections globally
-    if (config.link?.collections) {
-      configureAdvancedFields({
-        link: {
-          collections: config.link.collections,
-        },
-      });
-    }
-    const storageCollection = config.dataTable?.storageCollection ?? DEFAULT_DATA_TABLE_STORAGE_COLLECTION;
-    let hasDataTableStorage = false;
-    const collections = (incomingConfig.collections ?? []).map((collection) => {
-      const definitions = collectDataTableDefinitions(collection.fields as unknown[]);
-      if (!definitions.length) return collection;
-      hasDataTableStorage = true;
-      const storageHooks = createDataTableStorageHooks(collection.slug, definitions, storageCollection);
+  return (incomingConfig) => {
+    if (config.link?.collections) configureAdvancedFields({ link: { collections: config.link.collections } });
+    const storage = {
+      storageCollection: config.dataTable?.storageCollection ?? DEFAULT_DATA_TABLE_STORAGE_COLLECTION,
+      revisionCollection: config.dataTable?.revisionCollection ?? DEFAULT_DATA_TABLE_REVISION_COLLECTION,
+    };
+    let enabled = false;
+    const transform = (field: Field): Field => {
+      if (field.type !== 'json') throw new Error('Data Table storage requires a JSON field.');
+      enabled = true;
+      const hooks = createDataTableStorageFieldHooks(storage, tableOptions(field)!);
       return {
-        ...collection,
-        endpoints: (collection.endpoints === false
-          ? false
-          : [
-              ...(collection.endpoints ?? []),
-              ...definitions.map((definition) =>
-                createDataTableRowsEndpoint({
-                  collectionSlug: collection.slug,
-                  fieldName: definition.fieldName,
-                  options: definition.options,
-                  storageCollection,
-                }),
-              ),
-            ]) as CollectionConfig['endpoints'],
+        ...field,
+        hooks: { ...field.hooks, beforeChange: [...(field.hooks?.beforeChange ?? []), hooks.beforeChange] },
+      };
+    };
+    const blocks = (incomingConfig.blocks ?? []).map((block) => ({
+      ...block,
+      fields: mapTableFields(block.fields, incomingConfig.blocks ?? [], transform),
+    }));
+    const collections = (incomingConfig.collections ?? []).map((collection) => ({
+      ...collection,
+      fields: mapTableFields(collection.fields, blocks, transform),
+    }));
+    const globals = (incomingConfig.globals ?? []).map((global) => {
+      const fields = mapTableFields(global.fields, blocks, transform);
+      return {
+        ...global,
+        fields,
         hooks: {
-          ...collection.hooks,
-          beforeChange: [storageHooks.beforeChange, ...(collection.hooks?.beforeChange ?? [])],
-          afterChange: [...(collection.hooks?.afterChange ?? []), storageHooks.afterChange],
+          ...global.hooks,
+          afterChange: hasTableField(fields, blocks)
+            ? [...(global.hooks?.afterChange ?? []), createDataTableGlobalHook(storage, blocks)]
+            : global.hooks?.afterChange,
         },
       };
     });
-    if (hasDataTableStorage && !collections.some((collection) => collection.slug === storageCollection)) {
-      collections.push(createDataTableRowsCollection(storageCollection));
-    }
-    return { ...incomingConfig, collections };
+    if (!enabled) return incomingConfig;
+    if (
+      storage.storageCollection === storage.revisionCollection ||
+      collections.some((c) => c.slug === storage.storageCollection || c.slug === storage.revisionCollection)
+    )
+      throw new Error('Data Table storage collection slugs must be distinct and reserved for the plugin.');
+    if (
+      incomingConfig.endpoints?.some(
+        (endpoint) => endpoint.method === 'get' && endpoint.path === '/data-tables/:tableId/rows',
+      )
+    )
+      throw new Error('The Data Table row endpoint path is already registered.');
+    return {
+      ...incomingConfig,
+      blocks,
+      endpoints: [...(incomingConfig.endpoints ?? []), createDataTableRowsEndpoint(storage)],
+      collections: [
+        ...collections.map((collection): CollectionConfig => ({
+          ...collection,
+          hooks: {
+            ...collection.hooks,
+            afterChange: hasTableField(collection.fields, blocks)
+              ? [createDataTableOwnerHook(storage, blocks), ...(collection.hooks?.afterChange ?? [])]
+              : collection.hooks?.afterChange,
+            afterDelete: hasTableField(collection.fields, blocks)
+              ? [...(collection.hooks?.afterDelete ?? []), createDataTableDeleteHook(storage)]
+              : collection.hooks?.afterDelete,
+          },
+        })),
+        createDataTableRowsCollection(storage.storageCollection),
+        createDataTableRevisionsCollection(storage.revisionCollection),
+      ],
+      globals,
+    };
   };
 }
