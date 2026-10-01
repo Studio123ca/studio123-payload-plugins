@@ -60,6 +60,14 @@
       "types": "./dist/data-table-field/client.d.ts",
       "default": "./dist/data-table-field/client.js"
     },
+    "./message": {
+      "types": "./dist/message-field/index.d.ts",
+      "default": "./dist/message-field/index.js"
+    },
+    "./message/client": {
+      "types": "./dist/message-field/client.d.ts",
+      "default": "./dist/message-field/client.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

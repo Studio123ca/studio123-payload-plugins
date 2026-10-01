@@ -17,6 +17,7 @@ A collection of enhanced field types for Payload CMS.
 - **Code Editor Field** - Syntax-highlighted code editing with CodeMirror
 - **Link Field** - Internal/external link management with validation
 - **Phone Field** - Canonical phone data with country selector, extension input, validation, and custom formatting
+- **Message Field** - Localized, tone-aware admin notices that do not store a value
 - **Data Table Field** - A spreadsheet-style table built with TanStack Table, Radix menus, CSV import/export, formulas, sticky rows, reordering, row virtualization, and opt-in row-backed storage with paginated API access
 - **Optimized Bundling** - Each field is independently bundled for minimal bloat
 - **Tree-shakeable** - Import only what you need
@@ -37,6 +38,7 @@ npm install @studio123/payload-advanced-fields
 | Code       | [Documentation](docs/CODE_FIELD.md)       | `@studio123/payload-advanced-fields/code`       | Syntax-highlighted code editor powered by CodeMirror.                                                 |
 | Link       | [Documentation](docs/LINK_FIELD.md)       | `@studio123/payload-advanced-fields/link`       | Internal/external link field with plugin-level collection config.                                     |
 | Phone      | [Documentation](docs/PHONE_FIELD.md)      | `@studio123/payload-advanced-fields/phone`      | Canonical phone data field with country selector, extension input, validation, and custom formatting. |
+| Message    | [Documentation](docs/MESSAGE_FIELD.md)    | `@studio123/payload-advanced-fields/message`    | Localized admin notice with info, success, warning, and error tones; stores no value.                 |
 | Data Table | [Documentation](docs/DATA_TABLE_FIELD.md) | `@studio123/payload-advanced-fields/data-table` | Editable text table with sorting, resizing, row/column editing, and optional row-backed pagination.   |
 
 ---
@@ -213,6 +215,7 @@ import { ColorField } from '@studio123/payload-advanced-fields/color/client';
 - **Code Field** - Compiled with TypeScript (uses external @codemirror)
 - **Link Field** - Compiled with TypeScript (minimal dependencies)
 - **Phone Field** - Compiled with TypeScript and powered by `libphonenumber-js`
+- **Message Field** - Compiled with TypeScript and rendered entirely in the admin UI
 - **Data Table Field** - Compiled with TypeScript, with a separate client entry point and packaged CSS; no additional runtime dependency
 
 This ensures users only pay for what they use - if you only use ColorField, you don't load CodeMirror.

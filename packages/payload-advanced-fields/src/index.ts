@@ -41,6 +41,11 @@ export {
   resolveDataTableOptions,
   validateDataTable,
 } from './data-table-field/index.js';
+
+export { messageField } from './message-field/server/field.js';
+export type { MessageField, MessageFieldConfig } from './message-field/server/field.js';
+export { MESSAGE_TONES } from './message-field/shared/types.js';
+export type { MessageTone } from './message-field/shared/types.js';
 export type {
   DataTableColumn,
   DataTableDimensionOptions,

@@ -83,13 +83,23 @@ export function FieldLabel({ htmlFor, label, required }: any) {
 export function FieldError() {
   return null;
 }
-export function FieldDescription({ description, path }: any) {
-  return description ? <p id={`field-description-${path?.replace(/\./g, '__')}`}>{description}</p> : null;
+export function FieldDescription({ className, description, path }: any) {
+  return description ? (
+    <p className={className} id={`field-description-${path?.replace(/\./g, '__')}`}>
+      {description}
+    </p>
+  ) : null;
 }
 export function Button({ children, buttonStyle: _buttonStyle, margin: _margin, size: _size, ...props }: any) {
   return <button {...props}>{children}</button>;
 }
-
+export function Banner({ children, className, type = 'default' }: any) {
+  return (
+    <div className={['banner', `banner--type-${type}`, className].filter(Boolean).join(' ')} data-banner-type={type}>
+      <span className="banner__content">{children}</span>
+    </div>
+  );
+}
 // Expose popup contents to the DOM adapter; real portal behavior is exercised in Storybook.
 export function Popup({ button, buttonAriaLabel, render }: any) {
   return (

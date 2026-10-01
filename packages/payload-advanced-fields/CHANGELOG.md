@@ -2,6 +2,7 @@
 
 ## Next
 
+- Added the UI-only Message Field for localized admin notices with info, success, warning, and error tones, plus an opt-in Banner presentation.
 - Fixed Phone Field country defaults and dropdown focus behavior, exposed all supported countries when no allowlist is configured, preserved extensions during server normalization, hardened non-string validation, and moved custom formatter execution to the server hook.
 - Fixed Color Field string defaults, empty preset handling, alpha preservation, malformed color validation, picker initialization, read-only interaction, and swatch accessibility.
 - Added server-side `beforeValidate` normalization for phone and color fields while preserving user-provided hooks.
