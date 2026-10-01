@@ -10,6 +10,9 @@ import type { CollectionConfig } from 'payload';
 
 export const FieldShowcases: CollectionConfig = {
   slug: 'field-showcases',
+  access: {
+    read: () => true,
+  },
   admin: {
     useAsTitle: 'title',
     defaultColumns: ['title', 'updatedAt'],
@@ -31,7 +34,8 @@ export const FieldShowcases: CollectionConfig = {
       label: 'Data Table field',
       columns: { max: 3 },
       rows: { max: 200 },
-      formulas: { enabled: true, compute: true },
+      formulas: { enabled: true, compute: false },
     }),
+
   ],
 };

@@ -1,8 +1,15 @@
-export function parseDelimited(text: string, delimiter = '\t', maxRows = 1_000, maxColumns = 100): string[][] {
+export function parseDelimited(
+  text: string,
+  delimiter = '\t',
+  maxRows = 1_000,
+  maxColumns = 100,
+  maxCells = Number.POSITIVE_INFINITY,
+): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
   let quoted = false;
+  let cellCount = 0;
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
     const next = text[index + 1];
@@ -13,10 +20,14 @@ export function parseDelimited(text: string, delimiter = '\t', maxRows = 1_000, 
       quoted = !quoted;
     } else if (character === delimiter && !quoted) {
       row.push(cell);
+      cellCount += 1;
+      if (cellCount > maxCells) throw new Error(`Pasted data exceeds ${maxCells} cells.`);
       cell = '';
     } else if ((character === '\n' || character === '\r') && !quoted) {
       if (character === '\r' && next === '\n') index += 1;
       row.push(cell);
+      cellCount += 1;
+      if (cellCount > maxCells) throw new Error(`Pasted data exceeds ${maxCells} cells.`);
       rows.push(row);
       row = [];
       cell = '';
@@ -25,8 +36,15 @@ export function parseDelimited(text: string, delimiter = '\t', maxRows = 1_000, 
       cell += character;
     }
   }
-  if (cell.length || row.length) row.push(cell);
-  if (row.length) rows.push(row);
+  if (cell.length || row.length) {
+    row.push(cell);
+    cellCount += 1;
+    if (cellCount > maxCells) throw new Error(`Pasted data exceeds ${maxCells} cells.`);
+  }
+  if (row.length) {
+    rows.push(row);
+    if (rows.length > maxRows) throw new Error(`Pasted data exceeds ${maxRows} rows.`);
+  }
   if (rows.some((entry) => entry.length > maxColumns)) throw new Error(`Pasted data exceeds ${maxColumns} columns.`);
   return rows;
 }

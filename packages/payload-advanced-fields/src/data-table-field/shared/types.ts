@@ -80,39 +80,11 @@ export type DataTableRow = {
 
 export type DataTableValue = {
   version: 1;
-  /** Stable table identity, assigned by row storage on first save. */
-  tableId?: string;
-  /** Immutable row snapshot referenced by this document version. */
-  revisionId?: string;
   headerRow?: boolean;
   caption?: string;
   appearance?: DataTableAppearance;
-  storage?: {
-    mode: 'rows';
-    rowCount: number;
-  };
   columns: DataTableColumn[];
   rows: DataTableRow[];
-};
-
-export type DataTableStorageOptions = {
-  mode?: 'json' | 'rows';
-  pagination?:
-    | boolean
-    | {
-        enabled?: boolean;
-        defaultLimit?: number;
-        maxLimit?: number;
-      };
-};
-
-export type ResolvedDataTableStorageOptions = {
-  mode: 'json' | 'rows';
-  pagination: {
-    enabled: boolean;
-    defaultLimit: number;
-    maxLimit: number;
-  };
 };
 
 export type DataTableDimensionOptions = {
@@ -135,7 +107,6 @@ export type DataTableOptions = {
     includeIds?: boolean;
     computeFormulas?: boolean;
   };
-  storage?: DataTableStorageOptions;
   formats?: DataTableFormat[];
   textFormats?: boolean | DataTableTextFormats;
   stickyRows?: { enabled?: boolean; top?: number; bottom?: number };
@@ -146,7 +117,6 @@ export type ResolvedDataTableOptions = {
   rows: ResolvedDataTableDimensionOptions;
   formulas: { enabled: boolean; compute: boolean };
   apiResponse: { includeIds: boolean; computeFormulas: boolean };
-  storage: ResolvedDataTableStorageOptions;
   formats: DataTableFormat[];
   textFormats: ResolvedDataTableTextFormats;
   stickyRows: { enabled: boolean; top: number; bottom: number };

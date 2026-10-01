@@ -5,15 +5,10 @@ export {
   resolveDataTableOptions,
   validateDataTable,
   isSafeDataTableURL,
+  MAX_DATA_TABLE_ROWS,
+  MAX_DATA_TABLE_COLUMNS,
 } from './shared/dataTable.js';
 export { evaluateDataTable } from './shared/formulas.js';
-export {
-  createDataTableStorageManifest,
-  hydrateDataTableStorageManifest,
-  isDataTableStorageManifest,
-  paginateDataTableRows,
-} from './shared/storage.js';
-export type { DataTableRowPage, DataTableRowRecord, DataTableStorageManifest } from './shared/storage.js';
 export { csvToDataTable, dataTableToCSV } from './shared/csv.js';
 export {
   clearDataTableSelection,
@@ -33,7 +28,6 @@ export type {
   DataTableAppearance,
   DataTableCell,
   DataTableResponseCell,
-  DataTableStorageOptions,
   DataTableColumn,
   DataTableDimensionOptions,
   DataTableTextStyle,
@@ -49,5 +43,4 @@ export type {
   DataTableValue,
   ResolvedDataTableDimensionOptions,
   ResolvedDataTableOptions,
-  ResolvedDataTableStorageOptions,
 } from './shared/types.js';

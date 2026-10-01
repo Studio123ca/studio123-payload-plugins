@@ -5,7 +5,7 @@
   "scripts": {
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down -v",
-    "dev": "cross-env PAYLOAD_CONFIG_PATH=./src/payload.config.ts next dev --hostname 127.0.0.1",
+    "dev": "cross-env PAYLOAD_CONFIG_PATH=./src/payload.config.ts next dev --webpack --hostname 127.0.0.1",
     "build:plugin": "npm --prefix ../.. run build",
     "generate:importmap": "cross-env PAYLOAD_CONFIG_PATH=./src/payload.config.ts payload generate:importmap",
     "test:e2e": "npm run build:plugin && npm run generate:importmap && playwright test"

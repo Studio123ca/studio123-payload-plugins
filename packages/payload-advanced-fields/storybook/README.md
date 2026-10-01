@@ -40,7 +40,7 @@ The static build goes into the ignored `packages/payload-advanced-fields/storybo
 
 To add a field example, create a `*.stories.tsx` file here, reuse `PayloadField` and common controls, and add explicit fixture API handlers where necessary. Stories and backend fixtures are excluded from the published npm package by its `files` allowlist. After upgrading MSW, run `npx msw init .storybook/public --save` from `packages/payload-advanced-fields` to regenerate its worker.
 
-Data Table also includes formulas, formats, sticky rows, read-only, and required examples. The Paginated API story uses the 1,000-record CSV, a row-backed storage manifest, and the shared row-page helper to show the same bounded response shape used by the Payload endpoint; it remains an in-memory fixture because Storybook has no database. Format and sticky-row controls mirror the field configuration, and `maxHeight` mirrors `admin.maxHeight`. Fields are listed alphabetically.
+Data Table also includes formulas, formats, sticky rows, read-only, and required examples. The Large Data Table story demonstrates the maximum dimensions with a 250-by-50 table. Format and sticky-row controls mirror the field configuration, and `maxHeight` mirrors `admin.maxHeight`. Fields are listed alphabetically.
 
 ## GitHub Pages
 

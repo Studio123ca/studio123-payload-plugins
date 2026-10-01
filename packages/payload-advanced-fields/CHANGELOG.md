@@ -1,11 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.3.1 - 2026-10-01
 
-- Reworked row-backed Data Tables to use stable table IDs and immutable row revisions, including tables nested in blocks, arrays, tabs, and globals.
-- Added revision-aware, access-checked row reads through a bounded table ID endpoint. The former field-path route and manifests without IDs are no longer supported.
-- Added a paged admin preview; the full table loads when editing begins.
-- Reused unchanged immutable row records across revisions, evaluated formula pages from their referenced rows, and pruned snapshots no longer referenced by a document or retained Payload version.
+- Removed row-backed Data Table storage, including managed collections, hooks, manifests, and the paginated endpoint. Data Tables now use the same JSON field and editor in every configuration, capped at 250 rows and 50 columns.
+- Added a live Payload admin/API regression test proving CSV imports replace a cleared JSON-backed table and persist the imported values.
 - Prevented unsafe stored URLs from becoming clickable Link or Data Table preview links, and hardened internal Link URL resolution.
 - Made Code and Data Table normalization and validation handle malformed runtime values without throwing.
 

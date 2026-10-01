@@ -29,7 +29,7 @@ export const Products: CollectionConfig = {
     dataTableField({
       name: 'pricing',
       label: 'Pricing',
-      rows: { initial: 10, min: 1, max: 1_000 },
+      rows: { initial: 10, min: 1, max: 250 },
       columns: { initial: 4, min: 2, max: 12 },
       formulas: { enabled: true },
       apiResponse: { includeIds: true, computeFormulas: true },
@@ -64,17 +64,13 @@ export const Products: CollectionConfig = {
 | `localized`                       | boolean              | `false`        | Enable Payload localization.                                                       |
 | `rows.initial`                    | number               | `3`            | Number of rows created for a new table.                                            |
 | `rows.min`                        | number               | `1`            | Minimum number of rows.                                                            |
-| `rows.max`                        | number               | unlimited      | Maximum number of rows.                                                            |
+| `rows.max`                        | number               | `250`          | Maximum number of rows; the hard ceiling is 250.                                   |
 | `columns.initial`                 | number               | `3`            | Number of columns created for a new table.                                         |
 | `columns.min`                     | number               | `1`            | Minimum number of columns.                                                         |
-| `columns.max`                     | number               | unlimited      | Maximum number of columns.                                                         |
+| `columns.max`                     | number               | `50`           | Maximum number of columns; the hard ceiling is 50.                                 |
 | `formulas`                        | boolean or object    | `false`        | Enable spreadsheet formulas with `{ enabled: true }`.                              |
 | `apiResponse.includeIds`          | boolean              | `false`        | Add `columnId`, `rowId`, and spreadsheet-style `cellId` values to API responses.   |
 | `apiResponse.computeFormulas`     | boolean              | `false`        | Return calculated formula values in API responses.                                 |
-| `storage.mode`                    | `'json'` or `'rows'` | `'json'`       | Store the complete value in the document or store rows in the managed collection.  |
-| `storage.pagination`              | boolean or object    | `false`        | Configure row page limits. Row-backed endpoints are always paginated.              |
-| `storage.pagination.defaultLimit` | number               | `50`           | Page size used when no `limit` is supplied.                                        |
-| `storage.pagination.maxLimit`     | number               | `250`          | Largest page size accepted by the row-storage endpoint.                            |
 | `formats`                         | DataTableFormat[]    | `[]`           | Configure background and text-color choices. The Format menu is hidden when empty. |
 | `textFormats`                     | boolean or object    | `false`        | Enable bold, italic, underline, strikethrough, alignment, wrapping, and links.     |
 | `stickyRows.enabled`              | boolean              | `true`         | Enable sticky-row behavior.                                                        |
@@ -113,62 +109,7 @@ type DataTableValue = {
 
 `columnId`, `rowId`, and `cellId` are response-only fields. They are not stored unless an application explicitly writes them into another structure.
 
-## Row-backed Storage
-
-Use row-backed storage when a complete table should not be embedded in the parent document. The mode is opt-in and requires the plugin so Payload can register the hidden row collection, save hooks, and endpoint.
-
-```typescript
-import { buildConfig } from 'payload';
-import { advancedFieldsPlugin } from '@studio123/payload-advanced-fields';
-import { dataTableField } from '@studio123/payload-advanced-fields/data-table';
-
-export default buildConfig({
-  plugins: [advancedFieldsPlugin()],
-  collections: [
-    {
-      slug: 'products',
-      fields: [
-        dataTableField({
-          name: 'pricing',
-          storage: {
-            mode: 'rows',
-            pagination: { enabled: true, defaultLimit: 50, maxLimit: 250 },
-          },
-        }),
-      ],
-    },
-  ],
-});
-```
-
-The parent document stores a manifest with a stable table ID and an immutable row revision:
-
-```typescript
-{
-  version: 1,
-  tableId: 'table-uuid',
-  revisionId: 'revision-uuid',
-  columns: [{ id: 'column-id', label: 'Product' }],
-  rows: [],
-  storage: { mode: 'rows', rowCount: 10_000 },
-}
-```
-
-The plugin stores rows in the hidden `data-table-rows` collection and revision ownership in `data-table-revisions`. To read rows, first read the manifest from the parent document, then use its IDs:
-
-```text
-GET /api/data-tables/:tableId/rows?revision=:revisionId&page=2&limit=50
-```
-
-The response includes `pagination.page`, `limit`, `totalRows`, `totalPages`, `hasPreviousPage`, and `hasNextPage`. Every row response is bounded by `storage.pagination.maxLimit`. The admin field first loads a single preview page; choosing **Edit table** loads every page for spreadsheet operations. `raw=true` returns compact cell values instead of calculated response cells. Formula responses fetch the requested page and referenced rows; formulas spanning the whole table still require the whole table.
-
-Use `draft=true` to read rows from a draft document, `version=<Payload version ID>` to read a historical version, and `locale=<locale>` for a localized table. The endpoint checks parent and field read access, plus version access when a version is requested. It verifies that the selected document actually references the requested revision. Direct client access to both managed collections is disabled.
-
-Tables in groups, arrays, blocks, referenced blocks, tabs, collections, and globals can use row storage. Reordering a block retains its table ID. Duplicating a block or table creates a new table ID. An edit creates a new revision so a draft or older document version keeps its original rows. Each revision stores ordered references to immutable row records, so editing one row writes one new row record. After a save, unreferenced revisions and rows are pruned while snapshots still referenced by retained Payload versions remain. In-flight revisions are protected; abandoned revisions are eligible for cleanup after 24 hours on a later save. Hard deleting the parent removes all its revisions and rows.
-
-This storage format is a breaking change for installations using the former field-path row storage or the earlier per-revision row collection. Old manifests without IDs and row revisions without ordered row references are unsupported; convert existing tables before deploying the new plugin. Back up the database and apply the adapter's schema migration before deployment. Enable database transactions for atomic parent, revision, and row saves; Payload does not enable SQLite transactions by default.
-
-`storage.mode: 'rows'` requires `advancedFieldsPlugin()` in the Payload config. The plugin registers its own root endpoint, managed collections, and field hooks. `advancedFieldsPlugin({ dataTable: { storageCollection, revisionCollection } })` changes the managed collection slugs; reserve both slugs for the plugin.
+A table is limited to 250 rows and 50 columns; larger datasets are better represented by a collection.
 
 ## API Usage
 
@@ -182,12 +123,11 @@ for (const row of table.rows) {
 }
 ```
 
-For row-backed tables, read the manifest from the normal document response and use the table ID and revision endpoint when rows are needed. `apiResponse.includeIds` and `apiResponse.computeFormulas` apply to the normal field hook and to row endpoint responses.
+`apiResponse.includeIds` and `apiResponse.computeFormulas` control response enrichment for the JSON value.
 
 ## Notes
 
 - Cells are strings or formula objects; formula objects are available only when formulas are enabled.
 - CSV import uses the first row as column labels. CSV export preserves formula text.
 - Rows and columns can be selected, inserted, deleted, moved, resized, and frozen from the admin menus and context menus.
-- The admin editor virtualizes large row sets to reduce DOM work. Editing still loads the complete table and sends it on save; the preview and row API avoid that cost until editing is requested. Revision metadata also stores one reference per row.
-- The Storybook `Paginated API` story uses the 1,000-record customer fixture to show the row-backed manifest and pagination metadata. The package tests cover storage hooks, access checks, revisions, and pagination with an in-memory Payload fixture. Verify adapter migrations and draft publishing in the consuming Payload app.
+- Tables can contain at most 250 rows and 50 columns. Use a collection for larger datasets.

@@ -4,7 +4,13 @@ import type { DataTableValue, ResolvedDataTableOptions } from './types.js';
 
 /** Imports a CSV with its first row as column labels. */
 export function csvToDataTable(csv: string, options: ResolvedDataTableOptions): DataTableValue {
-  const matrix = parseDelimited(csv, ',', options.rows.max + 1, options.columns.max);
+  const matrix = parseDelimited(
+    csv,
+    ',',
+    options.rows.max + 1,
+    options.columns.max,
+    (options.rows.max + 1) * options.columns.max,
+  );
   const headers = matrix.shift() ?? [];
   const width = Math.max(options.columns.min, headers.length, ...matrix.map((row) => row.length));
   const rowCount = Math.max(options.rows.min, matrix.length);

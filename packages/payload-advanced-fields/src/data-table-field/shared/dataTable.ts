@@ -2,6 +2,8 @@ import type { DataTableOptions, DataTableValue, ResolvedDataTableOptions } from 
 
 export const MAX_DATA_TABLE_CELL_LENGTH = 10_000;
 export const MAX_DATA_TABLE_FORMULA_LENGTH = 1_024;
+export const MAX_DATA_TABLE_ROWS = 250;
+export const MAX_DATA_TABLE_COLUMNS = 50;
 
 const safeText = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : '';
@@ -12,8 +14,6 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
   const textFormatsEnabled =
     options.textFormats === true || (textFormatOptions !== undefined && textFormatOptions.enabled !== false);
   const apiResponseOptions = options.apiResponse ?? {};
-  const storageOptions = options.storage ?? {};
-  const paginationOptions = typeof storageOptions.pagination === 'object' ? storageOptions.pagination : undefined;
   const computeFormulas = apiResponseOptions.computeFormulas ?? formulaOptions?.compute ?? false;
   const columnOptions = options.columns ?? {};
   const rowOptions = options.rows ?? {};
@@ -21,12 +21,12 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
     columns: {
       initial: columnOptions.initial ?? 3,
       min: columnOptions.min ?? 1,
-      max: columnOptions.max ?? Number.POSITIVE_INFINITY,
+      max: columnOptions.max ?? MAX_DATA_TABLE_COLUMNS,
     },
     rows: {
       initial: rowOptions.initial ?? 3,
       min: rowOptions.min ?? 1,
-      max: rowOptions.max ?? Number.POSITIVE_INFINITY,
+      max: rowOptions.max ?? MAX_DATA_TABLE_ROWS,
     },
     formulas: {
       enabled: formulaOptions?.enabled ?? (typeof options.formulas === 'boolean' ? options.formulas : false),
@@ -35,17 +35,6 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
     apiResponse: {
       includeIds: apiResponseOptions.includeIds ?? false,
       computeFormulas,
-    },
-    storage: {
-      mode: storageOptions.mode ?? 'json',
-      pagination: {
-        enabled:
-          typeof storageOptions.pagination === 'boolean'
-            ? storageOptions.pagination
-            : (paginationOptions?.enabled ?? false),
-        defaultLimit: paginationOptions?.defaultLimit ?? 50,
-        maxLimit: paginationOptions?.maxLimit ?? 250,
-      },
     },
     formats: options.formats ?? [],
     textFormats: {
@@ -82,16 +71,11 @@ export function resolveDataTableOptions(options: DataTableOptions = {}): Resolve
     resolved.rows.initial > resolved.rows.max
   )
     throw new Error('Initial dimensions must not exceed the configured maximums.');
-  if (!['json', 'rows'].includes(resolved.storage.mode)) throw new Error('Invalid data table storage mode.');
-  if (
-    !Number.isSafeInteger(resolved.storage.pagination.defaultLimit) ||
-    resolved.storage.pagination.defaultLimit < 1 ||
-    !Number.isSafeInteger(resolved.storage.pagination.maxLimit) ||
-    resolved.storage.pagination.maxLimit < resolved.storage.pagination.defaultLimit
-  )
-    throw new Error('Data table pagination limits must be positive integers with maxLimit >= defaultLimit.');
   if (resolved.columns.min > resolved.columns.max || resolved.rows.min > resolved.rows.max)
     throw new Error('Minimum dimensions must not exceed the configured maximums.');
+  if (resolved.columns.max > MAX_DATA_TABLE_COLUMNS)
+    throw new Error(`Data Table columns.max cannot exceed ${MAX_DATA_TABLE_COLUMNS}.`);
+  if (resolved.rows.max > MAX_DATA_TABLE_ROWS) throw new Error(`Data Table rows.max cannot exceed ${MAX_DATA_TABLE_ROWS}.`);
   if (!Array.isArray(resolved.formats) || resolved.formats.length > 32)
     throw new Error('Data table formats may contain at most 32 entries.');
   const formatKeys = new Set<string>();
@@ -272,23 +256,9 @@ export function validateDataTable(value: unknown, options: ResolvedDataTableOpti
   const table = value as Partial<DataTableValue>;
   if (table.version !== 1 || !Array.isArray(table.columns) || !Array.isArray(table.rows))
     return 'Invalid data table value.';
-  if (
-    [table.tableId, table.revisionId].some(
-      (id) => id !== undefined && (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)),
-    )
-  )
-    return 'Invalid data table identity.';
-  const isExternalManifest =
-    options.storage.mode === 'rows' &&
-    table.storage?.mode === 'rows' &&
-    Number.isSafeInteger(table.storage.rowCount) &&
-    table.storage.rowCount >= 0 &&
-    table.rows.length === 0;
   if (table.columns.length < options.columns.min || table.columns.length > options.columns.max)
     return `Use between ${options.columns.min} and ${options.columns.max} columns.`;
-  if (!isExternalManifest && (table.rows.length < options.rows.min || table.rows.length > options.rows.max))
-    return `Use between ${options.rows.min} and ${options.rows.max} rows.`;
-  if (isExternalManifest && (table.storage!.rowCount < options.rows.min || table.storage!.rowCount > options.rows.max))
+  if (table.rows.length < options.rows.min || table.rows.length > options.rows.max)
     return `Use between ${options.rows.min} and ${options.rows.max} rows.`;
   const appearance = validateAppearance(
     table.appearance,
@@ -312,7 +282,6 @@ export function validateDataTable(value: unknown, options: ResolvedDataTableOpti
     )
       return 'Invalid column metadata.';
   }
-  if (isExternalManifest) return true;
   for (const row of table.rows) {
     if (!row || typeof row !== 'object' || !uniqueID(row.id) || !Array.isArray(row.cells))
       return 'Rows must have unique IDs and cells.';
@@ -351,6 +320,7 @@ export function normalizeDataTableValue(value: unknown): DataTableValue | null {
     return null;
   const isCompact =
     table.version === 1 &&
+    Object.keys(table).every((key) => ['version', 'headerRow', 'caption', 'appearance', 'columns', 'rows'].includes(key)) &&
     columns.every((column) => !('columnId' in column)) &&
     rows.every(
       (row) =>
@@ -365,14 +335,9 @@ export function normalizeDataTableValue(value: unknown): DataTableValue | null {
   if (isCompact) return value as DataTableValue;
   return {
     version: 1,
-    ...(typeof table.tableId === 'string' ? { tableId: table.tableId } : {}),
-    ...(typeof table.revisionId === 'string' ? { revisionId: table.revisionId } : {}),
     ...(typeof table.headerRow === 'boolean' ? { headerRow: table.headerRow } : {}),
     ...(typeof table.caption === 'string' ? { caption: table.caption } : {}),
     ...(table.appearance && typeof table.appearance === 'object' ? { appearance: table.appearance } : {}),
-    ...(table.storage && table.storage.mode === 'rows' && Number.isSafeInteger(table.storage.rowCount)
-      ? { storage: { mode: 'rows' as const, rowCount: table.storage.rowCount } }
-      : {}),
     columns: columns.map((column) => ({
       id: safeText(column.id ?? column.columnId),
       label: safeText(column.label),

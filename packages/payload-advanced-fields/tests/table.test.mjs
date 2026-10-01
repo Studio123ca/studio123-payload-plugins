@@ -10,12 +10,8 @@ import {
   resolveDataTableOptions,
   validateDataTable,
   isSafeDataTableURL,
-  createDataTableStorageManifest,
-  isDataTableStorageManifest,
-  paginateDataTableRows,
 } from '../dist/data-table-field/index.js';
-import { advancedFieldsPlugin } from '../dist/index.js';
-import { pasteDataTableCells } from '../dist/data-table-field/shared/operations.js';
+import { insertDataTableColumn, insertDataTableRow, pasteDataTableCells } from '../dist/data-table-field/shared/operations.js';
 
 test('data table factory creates a JSON field with a DataTableField admin component', () => {
   const field = dataTableField({ name: 'pricing', label: 'Pricing', rows: { initial: 2 }, columns: { initial: 4 } });
@@ -24,11 +20,10 @@ test('data table factory creates a JSON field with a DataTableField admin compon
   assert.equal(field.admin.components.Field.path, '@studio123/payload-advanced-fields/data-table/client');
   assert.equal(field.admin.components.Field.exportName, 'DataTableField');
   assert.deepEqual(field.admin.components.Field.clientProps.options, {
-    columns: { initial: 4, min: 1, max: Infinity },
-    rows: { initial: 2, min: 1, max: Infinity },
+    columns: { initial: 4, min: 1, max: 50 },
+    rows: { initial: 2, min: 1, max: 250 },
     formulas: { enabled: false, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
-    storage: { mode: 'json', pagination: { enabled: false, defaultLimit: 50, maxLimit: 250 } },
     formats: [],
     textFormats: {
       enabled: false,
@@ -69,16 +64,14 @@ test('data table field forwards spreadsheet options to the client component', ()
     columns: { min: 2 },
     formulas: { enabled: true, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
-    storage: { mode: 'json', pagination: { enabled: false, defaultLimit: 50, maxLimit: 250 } },
     stickyRows: { enabled: true, top: 1 },
     formats: [{ key: 'blue', label: 'Blue', background: 'var(--theme-elevation-100)' }],
   });
   assert.deepEqual(field.admin.components.Field.clientProps.options, {
-    columns: { initial: 3, min: 2, max: Infinity },
-    rows: { initial: 3, min: 2, max: Infinity },
+    columns: { initial: 3, min: 2, max: 50 },
+    rows: { initial: 3, min: 2, max: 250 },
     formulas: { enabled: true, compute: false },
     apiResponse: { includeIds: false, computeFormulas: false },
-    storage: { mode: 'json', pagination: { enabled: false, defaultLimit: 50, maxLimit: 250 } },
     formats: [{ key: 'blue', label: 'Blue', background: 'var(--theme-elevation-100)' }],
     textFormats: {
       enabled: false,
@@ -169,50 +162,6 @@ test('supports minimum dimensions and CSV round trips', () => {
   assert.equal(dataTableToCSV(table), 'Name,Value\nWidget,12\nGizmo,24');
 });
 
-test('supports opt-in row-backed manifests and bounded row pages', () => {
-  const options = resolveDataTableOptions({
-    rows: { initial: 4 },
-    columns: { initial: 1 },
-    storage: { mode: 'rows', pagination: { enabled: true, defaultLimit: 2, maxLimit: 3 } },
-  });
-  const table = createDataTable(options);
-  const manifest = createDataTableStorageManifest(table);
-  assert.equal(isDataTableStorageManifest(manifest), true);
-  assert.equal(validateDataTable(manifest, options), true);
-  const page = paginateDataTableRows(table.rows, 2, 2);
-  assert.deepEqual(
-    page.rows.map((row) => row.id),
-    table.rows.slice(2).map((row) => row.id),
-  );
-  assert.deepEqual(
-    { page: page.page, limit: page.limit, totalRows: page.totalRows, totalPages: page.totalPages },
-    { page: 2, limit: 2, totalRows: 4, totalPages: 2 },
-  );
-});
-
-test('registers row storage hooks, collection, and endpoint through the plugin', () => {
-  const field = dataTableField({ name: 'grid', storage: { mode: 'rows' } });
-  const config = advancedFieldsPlugin()({
-    collections: [
-      {
-        slug: 'documents',
-        fields: [{ type: 'group', name: 'details', fields: [field] }],
-        endpoints: [],
-        hooks: {},
-      },
-    ],
-  });
-  const documents = config.collections.find((collection) => collection.slug === 'documents');
-  assert.equal(documents.endpoints?.length ?? 0, 0);
-  assert.equal(documents.fields[0].fields[0].hooks.beforeChange.length, 1);
-  assert.equal(config.endpoints[0].path, '/data-tables/:tableId/rows');
-  assert.equal(documents.hooks.afterChange.length, 1);
-  assert.equal(
-    config.collections.some((collection) => collection.slug === 'data-table-rows'),
-    true,
-  );
-});
-
 test('validates safe data table link URLs', () => {
   assert.equal(isSafeDataTableURL('https://payloadcms.com'), true);
   assert.equal(isSafeDataTableURL('mailto:hello@example.com'), true);
@@ -234,6 +183,39 @@ test('data table validation rejects malformed and oversized values', () => {
   assert.match(validateDataTable(table, options), /Every data table cell/);
   assert.throws(() => resolveDataTableOptions({ rows: { initial: 3, max: 2 } }));
   assert.throws(() => dataTableField({ admin: { maxHeight: 'invalid' } }));
+});
+
+test('caps dimensions at 250 rows and 50 columns across configuration, values, edits, paste, and CSV', () => {
+  const defaults = resolveDataTableOptions();
+  assert.equal(defaults.rows.max, 250);
+  assert.equal(defaults.columns.max, 50);
+  assert.throws(() => resolveDataTableOptions({ rows: { max: 251 } }), /rows.max cannot exceed 250/);
+  assert.throws(() => resolveDataTableOptions({ columns: { max: 51 } }), /columns.max cannot exceed 50/);
+
+  const rowsOptions = resolveDataTableOptions({ rows: { initial: 250 }, columns: { initial: 1 } });
+  const rowsTable = createDataTable(rowsOptions);
+  assert.equal(validateDataTable(rowsTable, rowsOptions), true);
+  assert.equal(insertDataTableRow(rowsTable, rowsTable.rows.length, rowsOptions), rowsTable);
+
+  const columnsOptions = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 50 } });
+  const columnsTable = createDataTable(columnsOptions);
+  assert.equal(validateDataTable(columnsTable, columnsOptions), true);
+  assert.equal(insertDataTableColumn(columnsTable, columnsTable.columns.length, columnsOptions), columnsTable);
+
+  const editableOptions = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 1 } });
+  const editableTable = createDataTable(editableOptions);
+  const fullRows = pasteDataTableCells(editableTable, Array.from({ length: 250 }, (_, index) => [`${index}`]), 0, 0, editableOptions);
+  assert.equal(fullRows.rows.length, 250);
+  assert.throws(
+    () => pasteDataTableCells(editableTable, Array.from({ length: 251 }, () => ['x']), 0, 0, editableOptions),
+    /table limits/,
+  );
+
+  const headers = Array.from({ length: 50 }, (_, index) => `Value ${index + 1}`).join(',');
+  const validRows = Array.from({ length: 250 }, (_, row) => Array.from({ length: 50 }, (_, col) => `${row}-${col}`).join(','));
+  assert.equal(csvToDataTable([headers, ...validRows].join('\n'), defaults).rows.length, 250);
+  assert.throws(() => csvToDataTable(`${headers},Extra\nvalue`, defaults), /50 columns/);
+  assert.throws(() => csvToDataTable(`Value\n${Array.from({ length: 251 }, (_, index) => index).join('\n')}`, defaults), /251 rows/);
 });
 
 test('malformed null rows and columns fail validation without throwing', () => {

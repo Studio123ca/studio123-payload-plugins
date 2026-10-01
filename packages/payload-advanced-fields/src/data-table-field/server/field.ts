@@ -21,7 +21,6 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     rows,
     formulas,
     apiResponse,
-    storage,
     formats,
     stickyRows,
     name = 'dataTable',
@@ -35,7 +34,6 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     rows,
     formulas,
     apiResponse,
-    storage,
     formats,
     stickyRows,
   });
@@ -79,13 +77,6 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     validate: (value, args) => {
       const result = validateDataTable(value, options, Boolean(config.required));
       return result !== true ? result : customValidate ? customValidate(value, args) : true;
-    },
-    custom: {
-      ...config.custom,
-      dataTable: {
-        storage: options.storage,
-        options,
-      },
     },
     admin: {
       ...nativeAdmin,

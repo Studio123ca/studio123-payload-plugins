@@ -1,12 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useAllFormFields } from '@payloadcms/ui';
 import { reduceFieldsToValues } from 'payload/shared';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { DataTableField } from '../src/data-table-field/admin/DataTableField.js';
 import { dataTableField } from '../src/data-table-field/server/field.js';
 import { createDataTable, resolveDataTableOptions } from '../src/data-table-field/shared/dataTable.js';
-import { csvToDataTable } from '../src/data-table-field/shared/csv.js';
-import { createDataTableStorageManifest, paginateDataTableRows } from '../src/data-table-field/shared/storage.js';
 import type { DataTableValue, ResolvedDataTableOptions } from '../src/data-table-field/shared/types.js';
 import { PayloadField, commonArgs, commonArgTypes, fieldProps } from './support/PayloadField.js';
 import type { FieldControls } from './support/PayloadField.js';
@@ -17,10 +15,6 @@ type Args = FieldControls & {
   maxHeight: number;
   formulas: boolean | { enabled?: boolean; compute?: boolean };
   apiResponse: { includeIds?: boolean; computeFormulas?: boolean };
-  storage?: {
-    mode?: 'json' | 'rows';
-    pagination?: boolean | { enabled?: boolean; defaultLimit?: number; maxLimit?: number };
-  };
   formats: Array<{
     key: string;
     label: string;
@@ -193,20 +187,25 @@ freezeExample.rows.forEach((row, index) => {
 freezeExample.appearance = { stickyRows: { top: 1, bottom: 1 } };
 
 function LargeDataTableStory(args: Args, { globals }: any) {
-  const [value, setValue] = useState<DataTableValue | null>(null);
-  const options = useMemo(() => resolveDataTableOptions(args), [args]);
-  useEffect(() => {
-    let active = true;
-    fetch('./customers-1000.csv')
-      .then((response) => response.text())
-      .then((csv) => {
-        if (active) setValue(csvToDataTable(csv, options));
-      });
-    return () => {
-      active = false;
-    };
+  const options = useMemo(
+    () =>
+      resolveDataTableOptions({
+        ...args,
+        columns: { initial: 50, min: 1, max: 50 },
+        rows: { initial: 250, min: 1, max: 250 },
+      }),
+    [args],
+  );
+  const value = useMemo(() => {
+    const table = createDataTable(options);
+    table.columns.forEach((column, index) => {
+      column.label = `Column ${index + 1}`;
+    });
+    table.rows.forEach((row, rowIndex) => {
+      row.cells = row.cells.map((_, columnIndex) => `Row ${rowIndex + 1}, cell ${columnIndex + 1}`);
+    });
+    return table;
   }, [options]);
-  if (!value) return <p>Loading large data table…</p>;
   return (
     <PayloadField args={{ ...args, initialValue: value }} theme={globals.theme} locale={globals.locale}>
       <DataTableField {...fieldProps(args, 'json')} options={options} maxHeight={args.maxHeight} />
@@ -239,92 +238,6 @@ function APIResponsePanel({ options }: { options: ResolvedDataTableOptions }) {
   );
 }
 
-function storyColumnName(index: number) {
-  let name = '';
-  for (let value = index + 1; value > 0; value = Math.floor((value - 1) / 26)) {
-    name = String.fromCharCode(65 + ((value - 1) % 26)) + name;
-  }
-  return name;
-}
-
-function PaginatedAPIResponsePanel({ value, options }: { value: DataTableValue; options: ResolvedDataTableOptions }) {
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
-  const manifest = useMemo(() => createDataTableStorageManifest(value), [value]);
-  const pageResult = useMemo(() => paginateDataTableRows(value.rows, page, pageSize), [page, pageSize, value.rows]);
-  const { rows: _pageRows, ...pagination } = pageResult;
-  const currentPage = pageResult.page;
-  const response = useMemo(() => {
-    const field = dataTableField({
-      apiResponse: { includeIds: true, computeFormulas: options.apiResponse.computeFormulas },
-    });
-    const afterRead = field.hooks?.afterRead?.[0] as ((args: { value: unknown }) => unknown) | undefined;
-    const pageResponse = afterRead
-      ? afterRead({ value: { ...manifest, rows: pageResult.rows } })
-      : { ...manifest, rows: pageResult.rows };
-    const responseRows = (pageResponse as { rows: Array<{ rowId?: string; cells: Array<Record<string, unknown>> }> })
-      .rows;
-    return {
-      ...(pageResponse as Record<string, unknown>),
-      rows: responseRows.map((row, pageRowIndex) => ({
-        ...row,
-        rowId: pageResult.rows[pageRowIndex]?.id ?? row.rowId,
-        cells: row.cells.map((cell, columnIndex) => ({
-          ...cell,
-          cellId: `${storyColumnName(columnIndex)}${(currentPage - 1) * pageSize + pageRowIndex + 1}`,
-        })),
-      })),
-      pagination,
-    };
-  }, [currentPage, manifest, options.apiResponse.computeFormulas, pageResult, pageSize, pagination]);
-  return (
-    <aside className="story-value" data-testid="paginated-api-response">
-      <div className="story-value__heading">
-        <strong>Paginated API response</strong>
-        <span>
-          Page {currentPage} of {pageResult.totalPages} · {pageSize} rows per page
-        </span>
-      </div>
-      <div className="story-value__actions">
-        <button type="button" disabled={currentPage === 1} onClick={() => setPage((current) => current - 1)}>
-          Previous
-        </button>
-        <button
-          type="button"
-          disabled={currentPage === pageResult.totalPages}
-          onClick={() => setPage((current) => current + 1)}
-        >
-          Next
-        </button>
-      </div>
-      <pre>{JSON.stringify(response, null, 2)}</pre>
-    </aside>
-  );
-}
-
-function PaginatedAPIStory(args: Args, { globals }: any) {
-  const [value, setValue] = useState<DataTableValue | null>(null);
-  const options = useMemo(() => resolveDataTableOptions(args), [args]);
-  useEffect(() => {
-    let active = true;
-    fetch('./customers-1000.csv')
-      .then((response) => response.text())
-      .then((csv) => {
-        if (active) setValue(csvToDataTable(csv, options));
-      });
-    return () => {
-      active = false;
-    };
-  }, [options]);
-  if (!value) return <p>Loading paginated data table…</p>;
-  return (
-    <PayloadField args={{ ...args, initialValue: value }} theme={globals.theme} locale={globals.locale}>
-      <DataTableField {...fieldProps(args, 'json')} options={options} maxHeight={args.maxHeight} />
-      <PaginatedAPIResponsePanel value={value} options={options} />
-    </PayloadField>
-  );
-}
-
 const meta = {
   title: 'Fields/Data Table',
   tags: ['autodocs'],
@@ -347,7 +260,6 @@ const meta = {
     maxHeight: { control: { type: 'number', min: 120, max: 1_000 } },
     formulas: { control: 'object', description: 'Configure formula editing and evaluation.' },
     apiResponse: { control: 'object', description: 'Opt into response IDs and computed formula values.' },
-    storage: { control: 'object', description: 'Opt into row-backed storage and API pagination.' },
     formats: { control: 'object', description: 'Optional format choices. The Format menu is hidden when empty.' },
     textFormats: { control: 'object', description: 'Enable cell text formatting options.' },
     stickyRows: { control: 'object', description: 'Configure sticky top and bottom row counts.' },
@@ -385,14 +297,6 @@ export const APIResponse: Story = {
       </PayloadField>
     );
   },
-};
-export const PaginatedAPI: Story = {
-  args: {
-    apiResponse: { includeIds: true, computeFormulas: false },
-    storage: { mode: 'rows', pagination: { enabled: true, defaultLimit: 50, maxLimit: 100 } },
-    maxHeight: 420,
-  },
-  render: PaginatedAPIStory,
 };
 export const Formatting: Story = {
   args: { initialValue: formattingExample, formats: formatOptions.formats, textFormats: true },

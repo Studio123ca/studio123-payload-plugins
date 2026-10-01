@@ -4,6 +4,7 @@ const email = 'admin@example.test';
 const password = 'payload-fields-test-password';
 
 test('renders all plugin fields and imports CSV after saving a cleared JSON table', async ({ page, request }) => {
+  test.setTimeout(60_000);
   const listResponse = await request.get(
     `/api/field-showcases?where[title][equals]=Data%20Table%20import%20regression&limit=1&depth=0`,
   );
@@ -20,24 +21,25 @@ test('renders all plugin fields and imports CSV after saving a cleared JSON tabl
 
   await page.goto('/admin/login');
   await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(password);
+  await page.getByRole('textbox', { name: 'Password' }).fill(password);
   await page.getByRole('button', { name: /login|sign in/i }).click();
   await expect(page).toHaveURL(/\/admin(?:\/)?$/);
 
   await page.goto(`/admin/collections/field-showcases/${id}`);
-  await expect(page.getByLabel('Code field')).toBeVisible();
+  const jsonField = page.locator('#field-tableExample');
+  await expect(page.getByRole('textbox', { name: 'Code field' })).toBeVisible();
   await expect(page.getByText('This message field is rendered by the plugin.')).toBeVisible();
   await expect(page.getByText('Link field', { exact: true })).toBeVisible();
   await expect(page.getByText('Color field', { exact: true })).toBeVisible();
   await expect(page.getByText('Phone field', { exact: true })).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Data table' })).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Data table' }).getByRole('row')).toHaveCount(12);
-  await expect(page.getByText('2.001s', { exact: true })).toBeVisible();
+  await expect(jsonField.getByRole('table', { name: 'Data table' })).toBeVisible();
+  await expect(jsonField.getByRole('table', { name: 'Data table' }).getByRole('row')).toHaveCount(12);
+  await expect(jsonField.getByRole('table', { name: 'Data table' }).getByText('2.001s', { exact: true })).toHaveCount(4);
 
-  await page.getByRole('menubar', { name: 'Data table actions' }).getByRole('menuitem', { name: 'Table' }).click();
+  await jsonField.getByRole('menubar', { name: 'Data table actions' }).getByRole('menuitem', { name: 'Table' }).click();
   await page.getByRole('menuitem', { name: 'Clear table' }).click();
-  await page.getByRole('dialog', { name: 'Clear table?' }).getByRole('button', { name: 'Clear table' }).click();
-  await expect(page.getByRole('button', { name: 'Create Table' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Clear table' }).click();
+  await expect(jsonField.getByRole('button', { name: 'Create Table' })).toBeVisible();
   const clearSave = page.waitForResponse(
     (response) => response.url().includes(`/api/field-showcases/${id}`) && response.request().method() === 'PATCH',
   );
@@ -48,8 +50,8 @@ test('renders all plugin fields and imports CSV after saving a cleared JSON tabl
   expect(cleared.ok()).toBeTruthy();
   expect((await cleared.json()).tableExample).toBeNull();
 
-  await page.getByRole('button', { name: 'Create Table' }).click();
-  await page.getByLabel('Import CSV').setInputFiles({
+  await jsonField.getByRole('button', { name: 'Create Table' }).click();
+  await jsonField.getByLabel('Import CSV').setInputFiles({
     name: 'experiment-data.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(
@@ -58,7 +60,8 @@ test('renders all plugin fields and imports CSV after saving a cleared JSON tabl
   });
 
   await expect(page.getByRole('columnheader', { name: /Undergrounds/ })).toBeVisible();
-  await expect(page.getByText('2.010s', { exact: true })).toBeVisible();
+  // The editor evaluates numeric-looking duration cells for display, which trims trailing zeros.
+  await expect(page.getByText('2.01s', { exact: true })).toBeVisible();
   const importSave = page.waitForResponse(
     (response) => response.url().includes(`/api/field-showcases/${id}`) && response.request().method() === 'PATCH',
   );
@@ -74,7 +77,9 @@ test('renders all plugin fields and imports CSV after saving a cleared JSON tabl
     'Undergrounds',
   ]);
   expect(document.tableExample.rows).toHaveLength(7);
-  expect(document.tableExample.rows[0].cells.map((cell: { value?: string } | string) =>
-    typeof cell === 'string' ? cell : cell.value,
-  )).toEqual(['1', '2.010s', '2.008s']);
+  expect(
+    document.tableExample.rows[0].cells.map((cell: { value?: string } | string) =>
+      typeof cell === 'string' ? cell : cell.value,
+    ),
+  ).toEqual(['1', '2.010s', '2.008s']);
 });

@@ -16,7 +16,11 @@ import {
 } from '@tanstack/react-table';
 import { DataTableMenubar } from './DataTableMenubar.js';
 import { DataTableContextMenu, type DataTableContextTarget } from './DataTableContextMenu.js';
-import { createDataTable, isSafeDataTableURL, MAX_DATA_TABLE_CELL_LENGTH } from '../shared/dataTable.js';
+import {
+  createDataTable,
+  isSafeDataTableURL,
+  MAX_DATA_TABLE_CELL_LENGTH,
+} from '../shared/dataTable.js';
 import {
   dataTableBackgroundStyle,
   dataTableLink,
@@ -271,7 +275,11 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const addRows = (count: number) => {
     if (!value || count < 1) return;
     let next = value;
-    for (let index = 0; index < count && next.rows.length < options.rows.max; index += 1) {
+    for (
+      let index = 0;
+      index < count && next.rows.length < options.rows.max;
+      index += 1
+    ) {
       next = insertDataTableRow(next, next.rows.length, options);
     }
     if (next !== value) commit(next);
@@ -279,7 +287,11 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   const addColumns = (count: number) => {
     if (!value || count < 1) return;
     let next = value;
-    for (let index = 0; index < count && next.columns.length < options.columns.max; index += 1) {
+    for (
+      let index = 0;
+      index < count && next.columns.length < options.columns.max;
+      index += 1
+    ) {
       next = insertDataTableColumn(next, next.columns.length, options);
     }
     if (next !== value) commit(next);
@@ -539,7 +551,13 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
     const columnIndex = focused ? value.columns.findIndex((column) => column.id === focused.column.id) : -1;
     if (rowIndex === undefined || columnIndex < 0) return;
     void navigator.clipboard.readText().then((text) => {
-      const matrix = parseDelimited(text, '\t', options.rows.max, options.columns.max);
+      const matrix = parseDelimited(
+        text,
+        '\t',
+        options.rows.max,
+        options.columns.max,
+        options.rows.max * options.columns.max,
+      );
       commit(pasteDataTableCells(value, matrix, rowIndex, columnIndex, options));
     });
   };
@@ -1000,7 +1018,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
   return (
     <div ref={tableRootRef} className="data-table">
       {!readOnly && (
-        <DataTableMenubar
+      <DataTableMenubar
           canAddRow={value.rows.length < options.rows.max}
           canAddColumn={value.columns.length < options.columns.max}
           canAddRows={value.rows.length < options.rows.max}
