@@ -9,6 +9,7 @@ import { act, createElement } from 'react';
 import {
   createDataTable,
   createDataTableStorageManifest,
+  dataTableField,
   resolveDataTableOptions,
 } from '../dist/data-table-field/index.js';
 
@@ -122,6 +123,72 @@ test('creates and edits a Data Table value', async () => {
   assert.equal(stored().rows.length, 1);
   await selectMenuItem('Edit', 'Undo');
   assert.equal(stored().columns.length, 1);
+});
+
+test('CSV import replaces an existing JSON table', async () => {
+  const tableOptions = resolveDataTableOptions({
+    columns: { max: 3 },
+    rows: { max: 200 },
+    formulas: { enabled: true, compute: true },
+  });
+  const value = createDataTable(tableOptions);
+  value.rows[0].cells[0] = 'Saved value';
+  const savedResponse = dataTableField({ name: 'dataTable', ...tableOptions }).hooks.afterRead[0]({ value });
+  await render({ value: savedResponse, tableOptions });
+  const input = document.querySelector('input[aria-label="Import CSV"]');
+  Object.defineProperty(input, 'files', {
+    configurable: true,
+    value: [{ text: async () => 'Product\nNew CSV value' }],
+  });
+  await act(async () => {
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  assert.equal(stored().columns[0].label, 'Product');
+  assert.equal(stored().rows[0].cells[0], 'New CSV value');
+});
+
+test('CSV import replaces a newly created table after the saved field was null', async () => {
+  const tableOptions = resolveDataTableOptions({
+    columns: { max: 3 },
+    rows: { max: 200 },
+    formulas: { enabled: true, compute: true },
+  });
+  await render({ value: null, tableOptions });
+  await act(async () => button('Create Table').click());
+  const input = document.querySelector('input[aria-label="Import CSV"]');
+  Object.defineProperty(input, 'files', {
+    configurable: true,
+    value: [{ text: async () => 'Bounce #,Surface,Undergrounds\n1,2.010s,2.008s\nAverage,2.025s,2.015s' }],
+  });
+  await act(async () => {
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  assert.deepEqual(
+    stored().columns.map((column) => column.label),
+    ['Bounce #', 'Surface', 'Undergrounds'],
+  );
+  assert.equal(stored().rows.length, 2);
+  assert.deepEqual(stored().rows[0].cells, ['1', '2.010s', '2.008s']);
+});
+
+test('CSV import over the configured column limit keeps the saved table and reports the rejection', async () => {
+  const tableOptions = resolveDataTableOptions({ columns: { max: 3 }, rows: { max: 200 } });
+  const value = createDataTable(tableOptions);
+  value.rows[0].cells[0] = 'Saved value';
+  await render({ value, tableOptions });
+  const input = document.querySelector('input[aria-label="Import CSV"]');
+  Object.defineProperty(input, 'files', {
+    configurable: true,
+    value: [{ text: async () => 'A,B,C,D\n1,2,3,4' }],
+  });
+  await act(async () => {
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  assert.equal(stored().rows[0].cells[0], 'Saved value');
+  assert.match(document.querySelector('[role="alert"]')?.textContent ?? '', /exceeds 3 columns/);
 });
 
 test('places the caret at the end when entering cell edit mode', async () => {
@@ -256,6 +323,18 @@ test('updates headers and respects read-only mode', async () => {
   assert.equal(button('Insert'), undefined);
   assert.equal(document.querySelector('textarea'), null);
   assert.equal(document.querySelector('[data-context-cell="0:0"] [class="data-table__cell-value"]').textContent, '');
+});
+
+test('malformed stored table links render as text, never clickable links', async () => {
+  const linkOptions = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 1 }, textFormats: true });
+  const value = createDataTable(linkOptions);
+  value.rows[0].cells[0] = 'Untrusted value';
+  value.appearance = {
+    links: { [value.rows[0].id]: { [value.columns[0].id]: { url: 'javascript:alert(1)' } } },
+  };
+  await render({ value, tableOptions: linkOptions });
+  assert.equal(document.querySelector('a'), null);
+  assert.equal(document.querySelector('.data-table__cell-value')?.textContent, 'Untrusted value');
 });
 
 test('orders menus and opens the keyboard shortcuts drawer', async () => {

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { validateLink } from '../dist/link-field/shared/validateLink.js';
+import { normalizeLinkValue, validateLink } from '../dist/link-field/shared/validateLink.js';
+import { getLinkHref } from '../dist/link-field/shared/getLinkHref.js';
+import { linkField } from '../dist/link-field/server/field.js';
+import { createLinkFieldHooks } from '../dist/link-field/server/hooks.js';
+import { configureAdvancedFields } from '../dist/config.js';
 
 const externalLink = (external) => ({
   type: 'external',
@@ -31,10 +35,17 @@ test('external links reject unsupported schemes and malformed URLs', () => {
   }
 });
 
-import { normalizeLinkValue } from '../dist/link-field/shared/validateLink.js';
-import { linkField } from '../dist/link-field/server/field.js';
-import { createLinkFieldHooks } from '../dist/link-field/server/hooks.js';
-import { configureAdvancedFields } from '../dist/config.js';
+test('unsafe stored link values never become browser destinations', async () => {
+  const hooks = createLinkFieldHooks();
+  for (const external of ['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)']) {
+    const value = { type: 'external', label: 'Stored value', external, url: external };
+    assert.equal(getLinkHref(value, []), '');
+    const hydrated = await hooks.afterRead[0]({ value });
+    assert.equal(hydrated.url, null);
+  }
+  assert.equal(getLinkHref(externalLink('/safe/path'), []), '/safe/path');
+  assert.equal(getLinkHref(externalLink('https://example.com'), []), 'https://example.com');
+});
 
 const collections = [{ slug: 'pages', generateURL: ({ doc }) => `/pages/${doc.slug}` }];
 configureAdvancedFields({ link: { collections } });

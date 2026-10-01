@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload';
 import type { LinkCollectionOption, LinkValue } from './types.js';
+import { isSafeLinkHref } from './safeHref.js';
 
 const trim = (value?: string | null) => (typeof value === 'string' ? value.trim() : '');
 
@@ -27,8 +28,10 @@ export function getLinkHref(
       // display and non-async scenarios.
       return '';
     }
-    case 'external':
-      return trim(value.external);
+    case 'external': {
+      const href = trim(value.external);
+      return isSafeLinkHref(href) ? href : '';
+    }
     case 'email':
       return trim(value.email) ? `mailto:${trim(value.email)}` : '';
     case 'phone': {

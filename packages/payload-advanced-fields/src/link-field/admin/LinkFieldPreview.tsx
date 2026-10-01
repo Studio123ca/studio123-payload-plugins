@@ -4,6 +4,7 @@ import { Button } from '@payloadcms/ui/elements/Button';
 import type { ReactNode } from 'react';
 import { RxExternalLink } from 'react-icons/rx';
 import type { LinkValue } from '../shared/types.js';
+import { isSafeLinkHref } from '../shared/safeHref.js';
 
 type Props = {
   collectionSlugs?: string[];
@@ -15,8 +16,9 @@ type Props = {
 };
 
 export function LinkFieldPreview({ collectionSlugs, onClear, onEdit, renderLabel, value }: Props) {
-  const url = value?.url?.trim() || null;
-  const label = value?.label?.trim() ?? '';
+  const rawURL = value?.url?.trim() || null;
+  const url = rawURL && isSafeLinkHref(rawURL) ? rawURL : null;
+  const label = typeof value?.label === 'string' ? value.label.trim() : '';
   const opensInNewTab = Boolean(value?.newTab);
   const hasDestination = Boolean(value);
   const hasExternalSelected = value?.type === 'external' && value?.external?.trim();

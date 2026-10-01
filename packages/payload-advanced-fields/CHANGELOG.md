@@ -6,6 +6,8 @@
 - Added revision-aware, access-checked row reads through a bounded table ID endpoint. The former field-path route and manifests without IDs are no longer supported.
 - Added a paged admin preview; the full table loads when editing begins.
 - Reused unchanged immutable row records across revisions, evaluated formula pages from their referenced rows, and pruned snapshots no longer referenced by a document or retained Payload version.
+- Prevented unsafe stored URLs from becoming clickable Link or Data Table preview links, and hardened internal Link URL resolution.
+- Made Code and Data Table normalization and validation handle malformed runtime values without throwing.
 
 ## 1.3.0
 

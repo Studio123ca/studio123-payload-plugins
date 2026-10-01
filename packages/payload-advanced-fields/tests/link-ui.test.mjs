@@ -78,6 +78,18 @@ test('read-only props, field settings and disabled form state hide edit and clea
   }
 });
 
+test('malformed stored URLs are displayed as text, never clickable links', async () => {
+  const value = {
+    type: 'external',
+    label: 'Untrusted stored value',
+    external: 'javascript:alert(1)',
+    url: 'javascript:alert(1)',
+  };
+  await render({}, {}, value);
+  assert.equal(document.querySelector('a'), null);
+  assert.equal(document.querySelector('.field-type a[href^="javascript:"]'), null);
+});
+
 test('drawer rejects unsupported URLs and saves intentional relative URLs', async () => {
   for (const url of ['javascript:alert(1)', 'about us', '/about', '../contact', '?preview=true', '#details']) {
     await render({}, {}, { ...initialValue, external: url });

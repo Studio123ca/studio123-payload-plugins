@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createDataTable,
+  normalizeDataTableValue,
   csvToDataTable,
   dataTableToCSV,
   dataTableField,
@@ -233,4 +234,38 @@ test('data table validation rejects malformed and oversized values', () => {
   assert.match(validateDataTable(table, options), /Every data table cell/);
   assert.throws(() => resolveDataTableOptions({ rows: { initial: 3, max: 2 } }));
   assert.throws(() => dataTableField({ admin: { maxHeight: 'invalid' } }));
+});
+
+test('malformed null rows and columns fail validation without throwing', () => {
+  const options = resolveDataTableOptions({ rows: { initial: 1 }, columns: { initial: 1 } });
+  const table = createDataTable(options);
+  const hostileObject = JSON.parse('{"toString":null}');
+  assert.equal(
+    validateDataTable({ ...table, columns: [null] }, options),
+    'Columns must have unique IDs and text labels.',
+  );
+  assert.equal(validateDataTable({ ...table, rows: [null] }, options), 'Rows must have unique IDs and cells.');
+  assert.equal(normalizeDataTableValue({ ...table, columns: [null] }), null);
+  assert.equal(normalizeDataTableValue({ ...table, rows: [null] }), null);
+  assert.equal(
+    validateDataTable({ ...table, columns: [{ ...table.columns[0], id: hostileObject }] }, options),
+    'Columns must have unique IDs and text labels.',
+  );
+  assert.doesNotThrow(() =>
+    normalizeDataTableValue({ ...table, columns: [{ ...table.columns[0], id: hostileObject }] }),
+  );
+  assert.equal(
+    validateDataTable({ ...table, appearance: { stickyRows: { top: hostileObject, bottom: 0 } } }, options),
+    'Invalid data table sticky row settings.',
+  );
+  assert.equal(
+    validateDataTable(
+      {
+        ...table,
+        appearance: { text: { [table.rows[0].id]: { [table.columns[0].id]: { align: hostileObject } } } },
+      },
+      options,
+    ),
+    'Invalid data table text appearance.',
+  );
 });

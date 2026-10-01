@@ -36,6 +36,7 @@ export const normalizeCodeFieldRows = (value: unknown): number | undefined => {
 export const normalizeCodeValue = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (value === null || typeof value === 'undefined') return '';
+  if (typeof value === 'object' || typeof value === 'function') return '';
   return String(value);
 };
 

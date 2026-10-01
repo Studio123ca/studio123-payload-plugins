@@ -3,6 +3,7 @@ import { getAdvancedFieldsConfig, getLinkCollections } from '../../config.js';
 import { getLinkHref } from '../shared/getLinkHref.js';
 import type { LinkCollectionOption, LinkHrefResolver, LinkValue } from '../shared/types.js';
 import { normalizeLinkValue } from '../shared/validateLink.js';
+import { isSafeLinkHref } from '../shared/safeHref.js';
 import { DEFAULT_LINK_COLLECTIONS } from '../shared/constants.js';
 
 const fetchInternalDoc = async (req: PayloadRequest | undefined, relationTo: string, id: string | number) => {
@@ -112,7 +113,7 @@ const resolveStoredHref = async (
           req,
         });
 
-        if (resolvedHref) return appendAnchor(resolvedHref, value.anchor);
+        if (resolvedHref && isSafeLinkHref(resolvedHref)) return appendAnchor(resolvedHref, value.anchor);
       }
 
       // Fall back to collection's generateURL
@@ -126,13 +127,16 @@ const resolveStoredHref = async (
           locale,
           req,
         });
-        return appendAnchor(generatedHref, value.anchor);
+        return typeof generatedHref === 'string' && isSafeLinkHref(generatedHref)
+          ? appendAnchor(generatedHref, value.anchor)
+          : null;
       }
     }
     return null;
   }
 
-  return getLinkHref(value, collections, { req }) || appendAnchor(value.url || null, value.anchor) || null;
+  const href = getLinkHref(value, collections, { req });
+  return href && isSafeLinkHref(href) ? href : null;
 };
 
 const stripInternalDoc = (value: LinkValue) => {

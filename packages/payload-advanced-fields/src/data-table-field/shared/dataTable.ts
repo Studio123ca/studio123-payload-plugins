@@ -3,6 +3,9 @@ import type { DataTableOptions, DataTableValue, ResolvedDataTableOptions } from 
 export const MAX_DATA_TABLE_CELL_LENGTH = 10_000;
 export const MAX_DATA_TABLE_FORMULA_LENGTH = 1_024;
 
+const safeText = (value: unknown): string =>
+  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : '';
+
 export function resolveDataTableOptions(options: DataTableOptions = {}): ResolvedDataTableOptions {
   const formulaOptions = typeof options.formulas === 'object' ? options.formulas : undefined;
   const textFormatOptions = typeof options.textFormats === 'object' ? options.textFormats : undefined;
@@ -157,7 +160,7 @@ function validateAppearance(
   const validRows = (rows: unknown) =>
     Boolean(rows && typeof rows === 'object' && !Array.isArray(rows)) &&
     Object.entries(rows as Record<string, unknown>).every(
-      ([rowID, key]) => rowIDs.includes(rowID) && formatKeys.has(String(key)),
+      ([rowID, key]) => rowIDs.includes(rowID) && typeof key === 'string' && formatKeys.has(key),
     );
   if (appearance.rows !== undefined && !validRows(appearance.rows)) return 'Invalid data table row appearance.';
   if (appearance.cells !== undefined) {
@@ -168,7 +171,7 @@ function validateAppearance(
         return 'Invalid data table cell appearance.';
       if (
         Object.entries(cells as Record<string, unknown>).some(
-          ([columnID, key]) => !columnIDs.includes(columnID) || !formatKeys.has(String(key)),
+          ([columnID, key]) => !columnIDs.includes(columnID) || typeof key !== 'string' || !formatKeys.has(key),
         )
       )
         return 'Invalid data table cell appearance.';
@@ -187,7 +190,9 @@ function validateAppearance(
           return 'Invalid data table text color appearance.';
         if (Object.keys(cells as Record<string, unknown>).some((columnID) => !columnIDs.includes(columnID)))
           return 'Invalid data table text color appearance.';
-        if (Object.values(cells as Record<string, unknown>).some((key) => !formatKeys.has(String(key))))
+        if (
+          Object.values(cells as Record<string, unknown>).some((key) => typeof key !== 'string' || !formatKeys.has(key))
+        )
           return 'Invalid data table text color appearance.';
       }
     }
@@ -228,7 +233,7 @@ function validateAppearance(
             return typeof value !== 'boolean';
           }) ||
           ('align' in (style as Record<string, unknown>) &&
-            !['left', 'center', 'right'].includes(String((style as Record<string, unknown>).align)))
+            !['left', 'center', 'right'].includes((style as Record<string, unknown>).align as string))
         )
           return 'Invalid data table text appearance.';
       }
@@ -239,11 +244,13 @@ function validateAppearance(
     if (
       !sticky ||
       typeof sticky !== 'object' ||
+      typeof sticky.top !== 'number' ||
+      typeof sticky.bottom !== 'number' ||
       !Number.isSafeInteger(sticky.top) ||
       !Number.isSafeInteger(sticky.bottom) ||
-      Number(sticky.top) < 0 ||
-      Number(sticky.bottom) < 0 ||
-      Number(sticky.top) + Number(sticky.bottom) > rowIDs.length
+      sticky.top < 0 ||
+      sticky.bottom < 0 ||
+      sticky.top + sticky.bottom > rowIDs.length
     )
       return 'Invalid data table sticky row settings.';
   }
@@ -285,8 +292,8 @@ export function validateDataTable(value: unknown, options: ResolvedDataTableOpti
     return `Use between ${options.rows.min} and ${options.rows.max} rows.`;
   const appearance = validateAppearance(
     table.appearance,
-    table.rows.map((row) => String(row?.id)),
-    table.columns.map((column) => String(column.id)),
+    table.rows.map((row) => (typeof row?.id === 'string' ? row.id : '')),
+    table.columns.map((column) => (typeof column?.id === 'string' ? column.id : '')),
     new Set(options.formats.map((entry) => entry.key)),
   );
   if (appearance !== true) return appearance;
@@ -337,6 +344,11 @@ export function normalizeDataTableValue(value: unknown): DataTableValue | null {
   if (!Array.isArray(table.columns) || !Array.isArray(table.rows)) return null;
   const columns = table.columns as unknown as Array<Record<string, unknown>>;
   const rows = table.rows as unknown as Array<Record<string, unknown>>;
+  if (
+    columns.some((column) => !column || typeof column !== 'object' || Array.isArray(column)) ||
+    rows.some((row) => !row || typeof row !== 'object' || Array.isArray(row))
+  )
+    return null;
   const isCompact =
     table.version === 1 &&
     columns.every((column) => !('columnId' in column)) &&
@@ -362,20 +374,20 @@ export function normalizeDataTableValue(value: unknown): DataTableValue | null {
       ? { storage: { mode: 'rows' as const, rowCount: table.storage.rowCount } }
       : {}),
     columns: columns.map((column) => ({
-      id: String(column.id ?? column.columnId ?? ''),
-      label: String(column.label ?? ''),
+      id: safeText(column.id ?? column.columnId),
+      label: safeText(column.label),
       ...(typeof column.width === 'number' ? { width: column.width } : {}),
     })),
     rows: rows.map((row) => ({
-      id: String(row.id ?? row.rowId ?? ''),
+      id: safeText(row.id ?? row.rowId),
       cells: Array.isArray(row.cells)
         ? row.cells.map((cell) => {
             if (cell && typeof cell === 'object') {
               const entry = cell as Record<string, unknown>;
               if (typeof entry.formula === 'string') return { formula: entry.formula };
-              if ('value' in entry) return String(entry.value ?? '');
+              if ('value' in entry) return safeText(entry.value);
             }
-            return typeof cell === 'string' ? cell : String(cell ?? '');
+            return safeText(cell);
           })
         : [],
     })),

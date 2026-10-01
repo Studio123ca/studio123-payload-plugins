@@ -52,6 +52,8 @@ test('unsupported languages fail during server configuration instead of silently
 test('code values and length constraints normalize hostile runtime values', () => {
   assert.equal(normalizeCodeValue(null), '');
   assert.equal(normalizeCodeValue(42), '42');
+  assert.equal(normalizeCodeValue(JSON.parse('{"toString":null}')), '');
+  assert.equal(normalizeCodeValue(Object.create(null)), '');
   assert.equal(normalizeCodeLength(-1), undefined);
   assert.equal(normalizeCodeLength(4.8), 4);
 });

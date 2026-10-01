@@ -16,7 +16,7 @@ import {
 } from '@tanstack/react-table';
 import { DataTableMenubar } from './DataTableMenubar.js';
 import { DataTableContextMenu, type DataTableContextTarget } from './DataTableContextMenu.js';
-import { createDataTable, MAX_DATA_TABLE_CELL_LENGTH } from '../shared/dataTable.js';
+import { createDataTable, isSafeDataTableURL, MAX_DATA_TABLE_CELL_LENGTH } from '../shared/dataTable.js';
 import {
   dataTableBackgroundStyle,
   dataTableLink,
@@ -1370,7 +1370,7 @@ export function DataTableEditor({ value, options, maxHeight = 640, readOnly = fa
                                 textOverflow: textStyle?.wrap === false ? 'ellipsis' : undefined,
                               }}
                             >
-                              {link ? (
+                              {link && isSafeDataTableURL(link.url) ? (
                                 <a href={link.url} target="_blank" rel="noopener noreferrer">
                                   {String(results[row.index]?.[index] ?? '')}
                                 </a>
