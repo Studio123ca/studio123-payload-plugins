@@ -1,6 +1,6 @@
 # Changelog
 
-## Next
+## 1.3.0
 
 - Added the UI-only Message Field for localized admin notices with info, success, warning, and error tones, plus an opt-in Banner presentation.
 - Fixed Phone Field country defaults and dropdown focus behavior, exposed all supported countries when no allowlist is configured, preserved extensions during server normalization, hardened non-string validation, and moved custom formatter execution to the server hook.
