@@ -1,5 +1,5 @@
 import type { JSONField } from 'payload';
-import { resolveDataTableOptions, validateDataTable } from '../shared/dataTable.js';
+import { normalizeDataTableValue, resolveDataTableOptions, validateDataTable } from '../shared/dataTable.js';
 import { evaluateDataTable } from '../shared/formulas.js';
 import type { DataTableFieldConfig, DataTableValue } from '../shared/types.js';
 
@@ -13,6 +13,24 @@ function columnName(index: number) {
 const validMaxHeight = (value: unknown): value is number | string =>
   (typeof value === 'number' && Number.isFinite(value) && value > 0) ||
   (typeof value === 'string' && /^(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|vh|dvh|svh|lvh|vw|vmin|vmax|%)$/.test(value));
+
+const hasProperty = (value: unknown, property: string) =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value) && property in value);
+
+function isEnrichedDataTableValue(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const table = value as { columns?: unknown; rows?: unknown };
+  if (!Array.isArray(table.columns) || !Array.isArray(table.rows)) return false;
+  if (table.columns.some((column) => hasProperty(column, 'columnId'))) return true;
+  return table.rows.some(
+    (row) =>
+      hasProperty(row, 'rowId') ||
+      (row &&
+        typeof row === 'object' &&
+        Array.isArray(row.cells) &&
+        row.cells.some((cell: unknown) => hasProperty(cell, 'value'))),
+  );
+}
 
 /** Creates a JSON-backed Data Table field with a small, stable data contract. */
 export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
@@ -40,6 +58,8 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
   const { maxHeight = 640, ...nativeAdmin } = admin ?? {};
   if (!validMaxHeight(maxHeight)) throw new Error('admin.maxHeight must be a positive CSS length or pixel value.');
   const customValidate = validate as JSONField['validate'];
+  const normalizeEnrichedValue = ({ value }: { value?: unknown }) =>
+    isEnrichedDataTableValue(value) ? (normalizeDataTableValue(value) ?? value) : value;
   const afterRead = ({ value }: { value?: unknown }) => {
     if (!value || typeof value !== 'object' || !Array.isArray((value as DataTableValue).rows)) return value;
     const table = value as DataTableValue;
@@ -72,6 +92,7 @@ export function dataTableField(config: DataTableFieldConfig = {}): JSONField {
     type: 'json',
     hooks: {
       ...config.hooks,
+      beforeValidate: [normalizeEnrichedValue, ...(config.hooks?.beforeValidate ?? [])],
       afterRead: [afterRead, ...(config.hooks?.afterRead ?? [])],
     },
     validate: (value, args) => {

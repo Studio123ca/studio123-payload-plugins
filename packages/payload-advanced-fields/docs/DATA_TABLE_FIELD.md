@@ -94,6 +94,8 @@ Currency values, percentages, durations, dates, and times retain their display f
 
 Set `apiResponse.computeFormulas` to `true` when calculated values should be included in API responses. Formula values are always previewed in the admin editor; this option controls server response enrichment.
 
+`formulas.compute` is retained as a compatibility alias for `apiResponse.computeFormulas`. Setting it to `true` also enables computed values in API responses.
+
 ## Stored Data
 
 The default value is a compact JSON object:

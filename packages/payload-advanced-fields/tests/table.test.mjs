@@ -87,7 +87,7 @@ test('data table field forwards spreadsheet options to the client component', ()
   });
 });
 
-test('formula-enabled API reads expose stable response IDs and computed values', () => {
+test('computed API reads can be resubmitted unchanged as valid stored values', () => {
   const options = resolveDataTableOptions({
     rows: { initial: 1 },
     columns: { initial: 3 },
@@ -97,13 +97,16 @@ test('formula-enabled API reads expose stable response IDs and computed values',
   table.rows[0].cells = ['2', '3', { formula: '=A1+B1' }];
   assert.deepEqual(evaluateDataTable(table)[0][2], 5);
   const field = dataTableField({
-    formulas: { enabled: true },
-    apiResponse: { includeIds: true, computeFormulas: true },
+    columns: { max: 3 },
+    rows: { max: 200 },
+    formulas: { enabled: true, compute: true },
   });
   const response = field.hooks.afterRead[0]({ value: table });
-  assert.equal(response.columns[0].columnId, response.columns[0].id);
-  assert.equal(response.rows[0].rowId, response.rows[0].id);
-  assert.deepEqual(response.rows[0].cells[2], { cellId: 'C1', value: 5, formula: '=A1+B1' });
+  assert.equal(field.admin.components.Field.clientProps.options.apiResponse.computeFormulas, true);
+  assert.deepEqual(response.rows[0].cells[2], { value: 5, formula: '=A1+B1' });
+  const submittedWithoutEdits = field.hooks.beforeValidate[0]({ value: response });
+  assert.deepEqual(submittedWithoutEdits, table);
+  assert.equal(field.validate(submittedWithoutEdits, {}), true);
 });
 
 test('formulas calculate common formatted numeric values', () => {

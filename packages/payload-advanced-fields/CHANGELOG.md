@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2 - 2026-10-02
+
+- Normalized computed formula response cells before validation so saving an untouched Data Table does not fail.
+
 ## 1.3.1 - 2026-10-01
 
 - Removed row-backed Data Table storage, including managed collections, hooks, manifests, and the paginated endpoint. Data Tables now use the same JSON field and editor in every configuration, capped at 250 rows and 50 columns.
