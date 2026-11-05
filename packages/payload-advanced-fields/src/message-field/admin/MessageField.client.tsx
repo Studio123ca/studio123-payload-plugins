@@ -1,10 +1,6 @@
 'use client';
 
-import { Banner } from '@payloadcms/ui/elements/Banner';
-import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
-import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
-import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
-import { useLocale } from '@payloadcms/ui/providers/Locale';
+import { Banner, FieldDescription, FieldLabel, fieldBaseClass, useLocale } from '@payloadcms/ui';
 import type { UIFieldClientProps } from 'payload';
 import type { CSSProperties } from 'react';
 import { MESSAGE_TONES, type MessageTone } from '../shared/types.js';

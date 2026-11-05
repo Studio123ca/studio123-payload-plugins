@@ -1,4 +1,7 @@
-import type { FieldLabelServerComponent } from 'payload';
+import type { ComponentType } from 'react';
+import type { Field, FieldLabelServerProps } from 'payload';
+
+type FieldLabelServerComponent = ComponentType<FieldLabelServerProps<Field>>;
 
 export type ColorFieldClientComponent = {
   pickerType?:

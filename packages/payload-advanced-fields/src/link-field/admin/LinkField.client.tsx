@@ -1,11 +1,6 @@
 'use client';
 
-import { useField } from '@payloadcms/ui/forms/useField';
-import { useModal } from '@payloadcms/ui/elements/Modal';
-import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
-import { FieldError } from '@payloadcms/ui/fields/FieldError';
-import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
-import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
+import { useField, useModal, FieldDescription, FieldError, FieldLabel, fieldBaseClass } from '@payloadcms/ui';
 import type { JSONFieldClientProps } from 'payload';
 import type { ReactNode } from 'react';
 import type { LinkType, LinkValue } from '../shared/types.js';

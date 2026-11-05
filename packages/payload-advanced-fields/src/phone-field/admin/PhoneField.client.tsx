@@ -2,12 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FocusEvent } from 'react';
-import { useField } from '@payloadcms/ui/forms/useField';
-import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
-import { FieldError } from '@payloadcms/ui/fields/FieldError';
-import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
-import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
-import { useLocale } from '@payloadcms/ui/providers/Locale';
+import { useField, FieldDescription, FieldError, FieldLabel, fieldBaseClass, useLocale } from '@payloadcms/ui';
 import type { JSONFieldClientProps } from 'payload';
 import type { CountryCode } from 'libphonenumber-js/max';
 import type { PhoneFieldClientProps, PhoneFieldValue } from '../shared/types.js';

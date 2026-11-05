@@ -1,15 +1,17 @@
 'use client';
 
-import { Button } from '@payloadcms/ui/elements/Button';
-import { Drawer } from '@payloadcms/ui/elements/Drawer';
-import { useConfig } from '@payloadcms/ui/providers/Config';
-import { useLocale } from '@payloadcms/ui/providers/Locale';
-import { useModal } from '@payloadcms/ui/elements/Modal';
-import { CheckboxInput } from '@payloadcms/ui/fields/Checkbox';
-import { FieldError } from '@payloadcms/ui/fields/FieldError';
-import { RelationshipInput } from '@payloadcms/ui/fields/Relationship';
-import { SelectInput } from '@payloadcms/ui/fields/Select';
-import { TextInput } from '@payloadcms/ui/fields/Text';
+import {
+  Button,
+  Drawer,
+  useConfig,
+  useLocale,
+  useModal,
+  CheckboxInput,
+  FieldError,
+  RelationshipInput,
+  SelectInput,
+  TextInput,
+} from '@payloadcms/ui';
 import type { ValueWithRelation } from 'payload';
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';

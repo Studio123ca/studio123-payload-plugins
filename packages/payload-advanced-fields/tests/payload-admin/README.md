@@ -1,6 +1,6 @@
 # Payload field test app
 
-This is a small, generic Payload app for exercising every custom field in this package through Payload's real admin form and API. It uses the same Payload canary version as the package peer dependencies and a dedicated PostgreSQL service named `payload-fields-test-db`.
+This is a small, generic Payload app for exercising every custom field in this package through Payload's real admin form and API. It uses Payload 4.0.0-beta.7, the lowest version the package peer dependencies allow, and a dedicated PostgreSQL service named `payload-fields-test-db`.
 
 The app contains one authentication collection and one showcase collection with Code, Link, Color, Phone, Message, and a JSON Data Table. Playwright covers JSON clear/import/save behavior through Payload’s real admin form and API.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0 - 2026-11-05
+
+- Requires Payload and `@payloadcms/ui` 4.0.0-beta.7 or a later 4.0 beta, or stable 4.x, and Node 24.22.1+. The peer range excludes canary and internal snapshot builds. Stay on 1.x for `4.0.0-canary.37`.
+- Replaced the removed `FieldLabelServerComponent` type; the exported `*FieldLabelComponent` types are unchanged.
+- Updated the Storybook harness to `RootProviders`.
+
 ## 1.3.2 - 2026-10-02
 
 - Normalized computed formula response cells before validation so saving an untouched Data Table does not fail.

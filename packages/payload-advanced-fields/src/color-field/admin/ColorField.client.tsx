@@ -1,12 +1,7 @@
 'use client';
 
 import { Sketch, Block, Circle, Compact, Slider, Github, Material, Colorful, Wheel, Chrome } from '@uiw/react-color';
-import { useField } from '@payloadcms/ui/forms/useField';
-import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
-import { FieldError } from '@payloadcms/ui/fields/FieldError';
-import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
-import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
-import { Button } from '@payloadcms/ui/elements/Button';
+import { useField, FieldDescription, FieldError, FieldLabel, fieldBaseClass, Button } from '@payloadcms/ui';
 import type { JSONFieldClientProps } from 'payload';
 import { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import type { ColorValue, RGB, HSL, ColorOption } from '../shared/types.js';

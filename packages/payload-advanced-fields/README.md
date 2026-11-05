@@ -62,7 +62,7 @@ const fields = [
 ];
 ```
 
-See the [Data Table field guide](docs/DATA_TABLE_FIELD.md) for the value contract and configuration. This package currently pins Payload and `@payloadcms/ui` to `4.0.0-canary.37`.
+See the [Data Table field guide](docs/DATA_TABLE_FIELD.md) for the value contract and configuration. Requires Payload and `@payloadcms/ui` 4.0.0-beta.7 or later (4.0 betas and stable 4.x). Use 1.x for `4.0.0-canary.37`.
 
 Data Table dimensions default to three initial rows and columns, with maximums of 250 rows and 50 columns. Lower row and column limits can be configured with `rows.max` and `columns.max`. Use a collection when a dataset exceeds these limits. API response IDs and computed formula values are opt-in through `apiResponse`; stored values remain compact by default.
 

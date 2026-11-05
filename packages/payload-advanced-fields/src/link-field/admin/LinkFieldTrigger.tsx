@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@payloadcms/ui/elements/Button';
-import { useModal } from '@payloadcms/ui/elements/Modal';
+import { Button, useModal } from '@payloadcms/ui';
 
 type Props = {
   children?: string;

@@ -1,6 +1,6 @@
 {
   "name": "@studio123/payload-advanced-fields",
-  "version": "1.3.2",
+  "version": "2.0.0",
   "private": false,
   "type": "module",
   "license": "MIT",
@@ -87,7 +87,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node esbuild.js",
+    "build": "rm -rf dist && tsc -p tsconfig.json && node esbuild.js",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run storybook:typecheck",
     "test": "npm run build && node --test tests/*.test.mjs",
@@ -96,10 +96,10 @@
     "storybook:typecheck": "tsc -p .storybook/tsconfig.json"
   },
   "peerDependencies": {
-    "@payloadcms/ui": "4.0.0-canary.37",
-    "payload": "4.0.0-canary.37",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "@payloadcms/ui": ">=4.0.0-beta.7 <4.0.0-c || ^4.0.0",
+    "payload": ">=4.0.0-beta.7 <4.0.0-c || ^4.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",
@@ -117,7 +117,8 @@
     "validator": "^13.15.35"
   },
   "devDependencies": {
-    "@payloadcms/translations": "4.0.0-canary.37",
+    "@payloadcms/translations": "4.0.0-beta.7",
+    "@payloadcms/ui": "4.0.0-beta.7",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.6.0",
     "@storybook/react-vite": "10.6.0",
@@ -128,12 +129,13 @@
     "jsdom": "26.1.0",
     "msw": "3.0.0",
     "msw-storybook-addon": "3.0.3",
+    "payload": "4.0.0-beta.7",
     "storybook": "10.6.0",
     "typescript": "6.0.3",
     "vite": "8.3.1"
   },
   "engines": {
-    "node": "^18.20.2 || >=20.9.0"
+    "node": ">=24.22.1"
   },
   "msw": {
     "workerDirectory": [

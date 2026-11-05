@@ -5,7 +5,7 @@ import {
   DocumentInfoProvider,
   Form,
   OperationProvider,
-  RootProvider,
+  RootProviders,
   RouterAdapterContext,
   useAllFormFields,
   useForm,
@@ -153,21 +153,28 @@ export function PayloadField({
   );
   return (
     <div className="field-story" data-theme={theme}>
-      <RootProvider
+      <RootProviders
         key={storyKey}
-        config={config}
-        dateFNSKey={en.dateFNSKey}
-        fallbackLang="en"
-        highContrastMode={false}
-        languageCode="en"
-        languageOptions={[{ value: 'en', label: 'English' }]}
-        locale={locale}
-        permissions={permissions}
+        data={{
+          clientConfig: config,
+          dateFNSKey: en.dateFNSKey,
+          dir: 'ltr',
+          fallbackLang: 'en',
+          highContrastMode: false,
+          isEmbedded: false,
+          isNavOpen: false,
+          languageCode: 'en',
+          languageOptions: [{ value: 'en', label: 'English' }],
+          locale,
+          permissions,
+          suppressHydrationWarning: false,
+          theme,
+          themeSource: 'default',
+          translations: en.translations,
+          user: demoUser,
+        }}
         RouterAdapter={Router}
         serverFunction={serverFunction}
-        theme={theme}
-        translations={en.translations}
-        user={demoUser}
       >
         <OperationProvider operation="create">
           <DocumentInfoProvider
@@ -200,7 +207,7 @@ export function PayloadField({
             </Form>
           </DocumentInfoProvider>
         </OperationProvider>
-      </RootProvider>
+      </RootProviders>
     </div>
   );
 }

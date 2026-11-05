@@ -8,13 +8,15 @@ import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import type { EditorView } from '@codemirror/view';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { useField } from '@payloadcms/ui/forms/useField';
-import { FieldDescription } from '@payloadcms/ui/fields/FieldDescription';
-import { FieldError } from '@payloadcms/ui/fields/FieldError';
-import { FieldLabel } from '@payloadcms/ui/fields/FieldLabel';
-import { fieldBaseClass } from '@payloadcms/ui/fields/shared';
-import { useLocale } from '@payloadcms/ui/providers/Locale';
-import { useTranslation } from '@payloadcms/ui/providers/Translation';
+import {
+  useField,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  fieldBaseClass,
+  useLocale,
+  useTranslation,
+} from '@payloadcms/ui';
 import type { TextareaFieldClientProps } from 'payload';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { CodeLanguage } from '../shared/types.js';

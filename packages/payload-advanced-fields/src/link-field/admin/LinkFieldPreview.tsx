@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@payloadcms/ui/elements/Button';
+import { Button } from '@payloadcms/ui';
 import type { ReactNode } from 'react';
 import { RxExternalLink } from 'react-icons/rx';
 import type { LinkValue } from '../shared/types.js';
