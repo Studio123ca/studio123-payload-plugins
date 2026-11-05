@@ -23,7 +23,7 @@ await build({
     {
       name: 'payload-ui-fixture',
       setup(build) {
-        build.onResolve({ filter: /^@payloadcms\/ui\// }, () => ({ path: fixture }));
+        build.onResolve({ filter: /^@payloadcms\/ui(\/|$)/ }, () => ({ path: fixture }));
       },
     },
   ],
