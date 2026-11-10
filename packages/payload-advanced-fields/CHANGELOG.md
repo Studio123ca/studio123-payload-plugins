@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 - 2026-11-10
+
+- A blank link, such as the field's default, now counts as no link: optional link fields save empty instead of failing with "Enter a label", and store `null`.
+
 ## 2.0.0 - 2026-11-05
 
 - Requires Payload and `@payloadcms/ui` 4.0.0-beta.7 or a later 4.0 beta, or stable 4.x, and Node 24.22.1+. The peer range excludes canary and internal snapshot builds. Stay on 1.x for `4.0.0-canary.37`.

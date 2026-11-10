@@ -58,6 +58,10 @@ export function normalizeLinkValue(value: LinkValue | null | undefined, collecti
     anchor: keepAnchor && Boolean(value.enableAnchor) ? anchor : null,
   };
 
+  // A link nobody filled in (such as the field's blank default) is no link, so optional links can stay empty.
+  const blank = !next.label && next.internal?.value == null && !next.external && !next.email && !next.phone;
+  if (blank) return null;
+
   next.url = getLinkHref(next, collections) || null;
   return next;
 }

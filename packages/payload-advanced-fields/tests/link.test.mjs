@@ -69,6 +69,16 @@ test('validation requires a valid type, email and allowed internal destination',
   assert.equal(validateLink(null, { collections, required: true }), 'A link is required.');
 });
 
+test('a blank link, like the field default, counts as empty', async () => {
+  const blank = linkField({ defaultType: 'internal' }).defaultValue;
+  assert.equal(normalizeLinkValue(blank, collections), null);
+  assert.equal(validateLink(blank, { collections }), true);
+  assert.equal(validateLink(blank, { collections, required: true }), 'A link is required.');
+  assert.equal(await createLinkFieldHooks().beforeChange[0]({ value: blank }), null);
+  assert.equal(validateLink({ ...blank, type: 'external', external: '/about' }), 'Enter a label.');
+  assert.equal(validateLink({ ...blank, type: 'external', label: 'About' }), 'Enter a URL.');
+});
+
 test('field preserves required metadata and runs built-in hooks before custom hooks', async () => {
   const custom = ({ value }) => ({ ...value, label: `${value.label}!` });
   const beforeValidate = ({ value }) => value;
